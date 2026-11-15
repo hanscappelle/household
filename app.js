@@ -31,6 +31,7 @@ function validateMealIdeas(ideas, members) {
 function normalizeTask(task) {
   return {
     ...task,
+    important: task.important === true,
     memberId: task.memberId ?? '',
     weekday: task.weekday ?? 1,
     monthDay: task.monthDay ?? 1,
@@ -330,7 +331,7 @@ function renderDashboard() {
           }).join('')}</div>
           <div class="day-detail"><div class="day-detail-head"><strong>${escapeHtml(formatDate(date, { weekday: 'long', day: 'numeric', month: 'long' }))}</strong><span>${todayTasks.length} ${todayTasks.length === 1 ? 'taak' : 'taken'}</span></div>
             ${birthdays.map(member => `<div class="birthday-row"><span class="birthday-icon" aria-hidden="true">🎂</span><div><strong>Verjaardag van ${escapeHtml(member.name)}</strong><small>${date.getFullYear() - parseDate(member.birthDate).getFullYear()} jaar</small></div></div>`).join('')}
-            ${todayTasks.map(task => `<div class="task-row ${isDone(task, date) ? 'done' : ''}"><input class="check" type="checkbox" data-action="complete" data-id="${escapeHtml(task.id)}" aria-label="${escapeHtml(task.title)} afronden" ${isDone(task, date) ? 'checked' : ''}><div class="task-info"><strong>${escapeHtml(task.title)}</strong><small>${escapeHtml(memberOn(task, date).name)} · ${frequencyLabel(task)}</small></div>${taskMenu(task)}</div>`).join('')}
+            ${todayTasks.map(task => `<div class="task-row ${isDone(task, date) ? 'done' : ''}"><input class="check" type="checkbox" data-action="complete" data-id="${escapeHtml(task.id)}" aria-label="${escapeHtml(task.title)} afronden" ${isDone(task, date) ? 'checked' : ''}><div class="task-info"><strong>${escapeHtml(task.title)}${task.important ? '<span class="important-icon" title="Belangrijke taak" aria-label="Belangrijke taak"><svg viewBox="0 0 24 24" focusable="false"><path d="m12 2.8 2.8 5.7 6.3.9-4.6 4.5 1.1 6.3-5.6-3-5.6 3 1.1-6.3-4.6-4.5 6.3-.9z"/></svg></span>' : ''}</strong><small>${escapeHtml(memberOn(task, date).name)} · ${frequencyLabel(task)}</small></div>${taskMenu(task)}</div>`).join('')}
             ${!todayTasks.length && !birthdays.length ? `<div class="empty"><span class="empty-icon">☼</span><strong>Een lekker lege planning</strong>Plan een taak in en hij verschijnt hier.</div>` : ''}
             ${memberLoads.length ? `<div class="daily-load"><strong>Verdeling per gezinslid</strong><ul>${memberLoads.map(({ member, count }) => `<li><span class="load-name">${escapeHtml(member.name)}</span><span class="load-track" aria-hidden="true"><span class="load-bar" style="width:${maxLoad ? count / maxLoad * 100 : 0}%"></span></span><span class="load-count">${count} ${count === 1 ? 'taak' : 'taken'}</span></li>`).join('')}</ul></div>` : ''}
           </div>
@@ -357,7 +358,7 @@ function renderTasks() {
     <div class="list-summary">${filtered.length} ${filtered.length === 1 ? 'taak' : 'taken'}</div><div class="panel list-panel"><table class="task-table"><thead><tr><th scope="col">Taak</th><th scope="col" class="status-column" aria-sort="${statusSort === 'none' ? 'none' : statusSort === 'scheduled-first' ? 'ascending' : 'descending'}"><button type="button" class="status-sort" data-action="sort-status" aria-label="Sorteer op planningsstatus, ${sortLabel}">Status <span aria-hidden="true">${statusSort === 'none' ? '↕' : statusSort === 'scheduled-first' ? '↑' : '↓'}</span></button></th><th scope="col" class="frequency-column">Frequentie</th></tr></thead><tbody>${filtered.length ? filtered.map(task => {
       const scheduled = isScheduled(task);
       const status = scheduled ? 'Ingepland' : 'Niet ingepland';
-      return `<tr class="task-list-row" data-action="edit-task" data-id="${escapeHtml(task.id)}"><td><button type="button" class="task-list-item" aria-label="${escapeHtml(task.title)} — ${status} — bewerken"><span class="stat-icon" style="width:34px;height:34px;font-size:15px">✓</span><span class="task-info"><strong>${escapeHtml(task.title)}</strong><small>${!task.schedules && (task.frequency === 'monthly' || task.frequency === 'occasional') ? `${escapeHtml(memberFor(task)?.name || 'Niet toegewezen')} · ` : ''}${escapeHtml(taskSchedule(task))}${task.group ? ` · ${escapeHtml(task.group)}` : ''}</small></span></button></td><td class="status-column"><span class="schedule-status ${scheduled ? 'scheduled' : 'unscheduled'}">${status}</span></td><td class="frequency-column"><span class="frequency-tag">${frequencyLabel(task)}</span></td></tr>`;
+      return `<tr class="task-list-row" data-action="edit-task" data-id="${escapeHtml(task.id)}"><td><button type="button" class="task-list-item" aria-label="${escapeHtml(task.title)}${task.important ? ' — belangrijk' : ''} — ${status} — bewerken"><span class="stat-icon" style="width:34px;height:34px;font-size:15px">✓</span><span class="task-info"><strong>${escapeHtml(task.title)}${task.important ? '<span class="important-icon" title="Belangrijke taak" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="m12 2.8 2.8 5.7 6.3.9-4.6 4.5 1.1 6.3-5.6-3-5.6 3 1.1-6.3-4.6-4.5 6.3-.9z"/></svg></span>' : ''}</strong><small>${!task.schedules && (task.frequency === 'monthly' || task.frequency === 'occasional') ? `${escapeHtml(memberFor(task)?.name || 'Niet toegewezen')} · ` : ''}${escapeHtml(taskSchedule(task))}${task.group ? ` · ${escapeHtml(task.group)}` : ''}</small></span></button></td><td class="status-column"><span class="schedule-status ${scheduled ? 'scheduled' : 'unscheduled'}">${status}</span></td><td class="frequency-column"><span class="frequency-tag">${frequencyLabel(task)}</span></td></tr>`;
     }).join('') : '<tr><td colspan="3"><div class="empty" style="margin:20px 0">Geen taken gevonden.</div></td></tr>'}</tbody></table></div>`;
 }
 
@@ -441,7 +442,7 @@ function renderHelp() {
       </section>
       <section class="panel help-panel"><h2>Overzicht en taken</h2>
         <p>Op <a href="#overzicht">Overzicht</a> zie je de weekplanning, taken en verjaardagen. Kies een dag in de agenda of gebruik de pijlen om naar een andere week te gaan. Vink een taak af wanneer die klaar is.</p>
-        <p>Op <a href="#taken">Alle taken</a> kun je een taak openen om de planning te wijzigen. Kies per dag, week, maand of eenmalige datum wie de taak uitvoert. Gebruik de zoekbalk en filters om taken terug te vinden.</p>
+        <p>Op <a href="#taken">Alle taken</a> kun je een taak openen om de planning te wijzigen. Kies per dag, week, maand of eenmalige datum wie de taak uitvoert. Markeer in het taakformulier belangrijke taken; die herken je aan het label <strong>Belangrijk</strong>. Gebruik de zoekbalk en filters om taken terug te vinden.</p>
       </section>
       <section class="panel help-panel"><h2>Gezinsleden</h2>
         <p>Voeg op <a href="#gezin">Ons gezin</a> gezinsleden toe en bewerk hun naam, geboortedatum en optioneel e-mailadres. Een geboortedatum wordt gebruikt om de leeftijd te tonen en verjaardagen op het overzicht te markeren.</p>
@@ -529,6 +530,7 @@ function validateBackup(backup) {
   for (const task of data.tasks) {
     if (!object(task) || !id(task.id) || taskIds.has(task.id) || typeof task.title !== 'string' || !task.title.trim() ||
       !optionalString(task.group) || !validSchedule(task) ||
+      (task.important !== undefined && typeof task.important !== 'boolean') ||
       (task.schedules != null && (!Array.isArray(task.schedules) || !task.schedules.length ||
         !task.schedules.every(part => validSchedule(part) && typeof part.title === 'string' && part.title.trim())))) {
       throw new Error('Een taak bevat ongeldige gegevens of een ongeldig schema.');
@@ -617,11 +619,12 @@ function readSchedule(task, data) {
 
 function openTask(id) {
   const existing = state.tasks.find(task => task.id === id);
-  const task = existing ? structuredClone(existing) : normalizeTask({ title: '', frequency: 'daily', group: '', memberId: '', days: [], week: 'all', weekday: 1, monthDay: 1, date: '' });
+  const task = existing ? normalizeTask(structuredClone(existing)) : normalizeTask({ title: '', frequency: 'daily', group: '', memberId: '', days: [], week: 'all', weekday: 1, monthDay: 1, date: '' });
   let scheduleIndex = 0;
   let activeSchedule = task.schedules ? task.schedules[0] : task;
   document.querySelector('#modal-content').innerHTML = `<form id="task-form" class="modal-inner"><div class="modal-head"><div><h2 id="modal-title">${existing ? 'Taak bewerken' : 'Nieuwe taak'}</h2><p>Maak het samen een beetje makkelijker.</p></div><button type="button" class="close" data-action="close-modal" aria-label="Sluiten">×</button></div>
     <div class="form-grid"><div class="field full"><label for="title">Naam van de taak</label><input id="title" name="title" value="${escapeHtml(task.title)}" required maxlength="200" placeholder="Bijvoorbeeld: tafel afruimen"></div>
+    <div class="field full"><label class="important-checkbox"><input type="checkbox" name="important" ${task.important ? 'checked' : ''}> Markeer als belangrijk</label></div>
     ${task.schedules ? `<div class="field full"><label for="schedule-index">Schema bewerken</label><select id="schedule-index">${task.schedules.map((part, index) => `<option value="${index}">${index + 1}. ${escapeHtml(part.title)} (${FREQUENCIES[part.frequency]})</option>`).join('')}</select><span class="field-help">Bij overlap heeft het eerste passende schema voorrang. Wijzigingen aan alle schema's worden samen opgeslagen.</span></div>` : ''}
     <div class="field full"><label for="frequency">Frequentie</label><select id="frequency" name="frequency">${Object.entries(FREQUENCIES).map(([value, label]) => `<option value="${value}" ${activeSchedule.frequency === value ? 'selected' : ''}>${label}</option>`).join('')}</select></div>
     <div id="schedule-fields" class="field full" style="display:contents">${scheduleFields(activeSchedule)}</div></div>
@@ -647,7 +650,7 @@ function openTask(id) {
     const title = String(data.get('title')).trim();
     if (!title) { form.elements.title.setCustomValidity('Vul een naam in.'); form.elements.title.reportValidity(); return; }
     readSchedule(activeSchedule, data);
-    const updated = { ...task, id: existing?.id || crypto.randomUUID(), title };
+    const updated = { ...task, id: existing?.id || crypto.randomUUID(), title, important: data.has('important') };
     if (existing) state.tasks[state.tasks.indexOf(existing)] = updated;
     else state.tasks.push(updated);
     if (await save()) { document.querySelector('#modal').close(); render(); showToast('Taak opgeslagen'); }

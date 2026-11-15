@@ -128,6 +128,11 @@ h1{font-size:36px;letter-spacing:-.7px;line-height:1.15}
 .check{width:19px;height:19px;flex-shrink:0;accent-color:#6e9978;cursor:pointer}
 .task-info{min-width:0;flex:1}
 .task-info strong{display:block;font-size:12px;font-weight:600;overflow-wrap:anywhere}
+.important-mark{display:inline-block;margin-left:8px;padding:2px 6px;border-radius:5px;background:#fff0d9;color:#92651e;font-size:9px;font-weight:700;vertical-align:1px;text-decoration:none}
+.important-icon{display:inline-flex;width:14px;height:14px;margin-left:7px;vertical-align:-2px;color:#c4933f}
+.important-icon svg{width:100%;height:100%;fill:currentColor}
+.important-checkbox{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:#6e8072}
+.important-checkbox input{width:16px;height:16px;margin:0;accent-color:#c4933f}
 .task-info small{display:block;margin-top:4px;color:#a0ada2;font-size:10px}
 .task-row.done strong{text-decoration:line-through;color:#aeb8af}
 .task-action{border:0;background:none;color:#a6b3a8;font-size:17px;padding:5px}
@@ -265,6 +270,9 @@ dialog::backdrop{background:rgba(34,50,38,.42)}
 [data-theme="dark"] .meal-wishes legend,[data-theme="dark"] .meal-empty-members{color:#c0d9c3}
 [data-theme="dark"] .meal-count{color:#c0d9c3}
 [data-theme="dark"] .invite-form label,[data-theme="dark"] .created-invitation label,[data-theme="dark"] .invite-list-title{color:#c0d9c3}
+[data-theme="dark"] .important-mark{background:#55472d;color:#f1ce86}
+[data-theme="dark"] .important-icon{color:#f1ce86}
+[data-theme="dark"] .important-checkbox{color:#c0d9c3}
 [data-theme="dark"] .created-invitation{background:#29392b}
 [data-theme="dark"] .created-invitation p{color:#b4c5b7}
 [data-theme="dark"] .meal-count.majority{background:#354b39;color:#d0ebd2}

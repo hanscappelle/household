@@ -74,6 +74,7 @@ test(`accounts en opslag op ${basePath || '/'}`, { skip: !configured, timeout: 3
   const changed = structuredClone(state.json.data);
   changed.customization.websiteTitle = 'De familie test';
   changed.customization.brandSubtitle = 'SAMEN STERK';
+  changed.tasks[0].important = true;
   changed.groceries.push({ id: 'test', name: 'Melk', done: false, urgent: false });
   const saved = await request('/api/state', { method: 'PUT', cookie: first.cookie, body: { data: changed, revision: state.json.revision } });
   assert.equal(saved.status, 200);
@@ -81,6 +82,7 @@ test(`accounts en opslag op ${basePath || '/'}`, { skip: !configured, timeout: 3
   assert.deepEqual((await request('/api/state', { cookie: first.cookie })).json.data.groceries, changed.groceries);
   assert.equal((await request('/api/state', { cookie: first.cookie })).json.data.customization.websiteTitle, 'De familie test');
   assert.equal((await request('/api/state', { cookie: first.cookie })).json.data.customization.brandSubtitle, 'SAMEN STERK');
+  assert.equal((await request('/api/state', { cookie: first.cookie })).json.data.tasks[0].important, true);
   assert.deepEqual((await request('/api/state', { cookie: second.cookie })).json.data.groceries, []);
   const invitation = await request('/api/invitations', {
     method: 'POST', cookie: first.cookie, body: { email: emails[2], role: 'parent', memberId: 'member-3' }

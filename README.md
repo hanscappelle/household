@@ -192,6 +192,10 @@ moment is één gezinslid verantwoordelijk:
   in een maand, dan wordt die maand overgeslagen.
 - Sporadisch: kies een gezinslid en eventueel een datum.
 
+Vink in het taakformulier **Markeer als belangrijk** aan om een taak extra
+opvallend te labelen. De ster bij de taak geeft dit aan op het overzicht en in
+**Alle taken**. Oudere back-ups zonder deze instelling blijven geldig; die
+taken zijn standaard niet als belangrijk gemarkeerd.
 Een taak zonder gezinslid of een sporadische taak zonder datum staat wel in de
 takenlijst, maar niet op de kalender. Afvinken geldt voor de afzonderlijke
 geplande datum. Bestaande planningen worden automatisch overgenomen.
@@ -285,4 +289,3 @@ verwijdert deze weer. Zonder databaseconfiguratie wordt de test overgeslagen.
 - app vertaling voorzien
 - feature requests voorzien (link naar github)
 - opensource project, github
-- taken kunnen prioritair zijn
