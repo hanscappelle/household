@@ -193,7 +193,7 @@ moment is één gezinslid verantwoordelijk:
 - Sporadisch: kies een gezinslid en eventueel een datum.
 
 Vink in het taakformulier **Markeer als belangrijk** aan om een taak extra
-opvallend te labelen. De ster bij de taak geeft dit aan op het overzicht en in
+opvallend te labelen. Het uitroepteken bij de taak geeft dit aan op het overzicht en in
 **Alle taken**. Oudere back-ups zonder deze instelling blijven geldig; die
 taken zijn standaard niet als belangrijk gemarkeerd.
 Een taak zonder gezinslid of een sporadische taak zonder datum staat wel in de
