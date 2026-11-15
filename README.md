@@ -187,6 +187,13 @@ huishouden. Plaats een notitie met titel en beschrijving; de auteur wordt
 automatisch ingevuld met je profielnaam, of met je login-e-mailadres als er
 geen gekoppeld profiel is. Een ander gezinslid kan de notitie bewerken; de app
 vermeldt dan diens naam en het tijdstip als bewerker.
+Markeer een notitie als belangrijk bij het plaatsen of bewerken; nieuwe en
+oudere notities zijn standaard niet belangrijk. Op het overzicht staan de
+notities als post-its in een grid, met belangrijke notities eerst. Het gezin
+staat naast de weekplanning en de notities staan daaronder. Voeg een notitie
+toe met de plusknop. Via het driepuntjesmenu op een post-it kun je die
+bewerken of archiveren; in het archief gebruik je hetzelfde menu om een
+notitie te herstellen of definitief te verwijderen.
 Archiveer notities om ze van het overzicht te halen. Via **Notitiearchief**
 kun je ze herstellen of definitief verwijderen.
 
@@ -287,14 +294,20 @@ Bij oudere back-ups zonder kookinspiratie begint die lijst leeg.
 ## Help voor gebruikers
 
 In de app vind je via **Help** een praktische uitleg over aanmelden, het
-overzicht en taken, gezinsleden uitnodigen, boodschappen, kookinspiratie,
-instellingen, back-ups en het gebruik op meerdere apparaten.
+overzicht en taken, gedeelde post-itnotities en hun driepuntjesmenu,
+gezinsleden uitnodigen, boodschappen, kookinspiratie, de vier persoonlijke
+kleurenpaletten, instellingen, back-ups en het gebruik op meerdere apparaten.
 
 ## Weergave
 
 Met de knop **Donker** bovenaan schakel je donkere modus in. Met **Licht**
 schakel je terug. Je keuze wordt afzonderlijk in de lokale browser bewaard.
 Je persoonlijke kleurenpalet blijft daarbij actief in beide modi.
+In donkere modus kleuren ook de achtergrond, panelen en invoervelden mee met
+het gekozen palet.
+Bij het invoeren of bewerken krijgen taken, boodschappen, gerechten,
+gezinsnamen, notitietitels en gepersonaliseerde teksten automatisch een
+hoofdletter aan het begin. Bestaande gegevens worden niet ongevraagd gewijzigd.
 
 ## Testen
 

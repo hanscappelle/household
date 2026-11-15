@@ -91,6 +91,7 @@ const notesValid = notes => Array.isArray(notes) && notes.length <= 1000 &&
     typeof note.description === 'string' && Boolean(note.description.trim()) && note.description.length <= 2000 &&
     typeof note.author === 'string' && Boolean(note.author.trim()) && note.author.length <= 254 &&
     typeof note.archived === 'boolean' &&
+    (note.important === undefined || typeof note.important === 'boolean') &&
     (note.authorUserId == null || ['string', 'number'].includes(typeof note.authorUserId)) &&
     (note.editedByUserId == null || ['string', 'number'].includes(typeof note.editedByUserId)) &&
     (note.editedBy == null || typeof note.editedBy === 'string' && note.editedBy.length <= 254) &&
@@ -420,13 +421,15 @@ router.put('/api/state', authenticate, async (req, res) => {
   const previousById = new Map(previousNotes.map(note => [note.id, note]));
   const notes = submittedNotes.map(note => {
     const previous = previousById.get(note.id);
-    if (!previous) return { ...note, author, authorUserId: req.user.id, archived: false, editedBy: '', editedByUserId: '', editedAt: '' };
-    const changed = note.title !== previous.title || note.description !== previous.description;
+    if (!previous) return { ...note, important: note.important === true, author, authorUserId: req.user.id, archived: false, editedBy: '', editedByUserId: '', editedAt: '' };
+    const important = note.important === undefined ? previous.important === true : note.important;
+    const changed = note.title !== previous.title || note.description !== previous.description || important !== (previous.important === true);
     const editorIsAuthor = previous.authorUserId != null
       ? String(previous.authorUserId) === String(req.user.id)
       : author === previous.author;
     return {
       ...note,
+      important,
       author: previous.author,
       authorUserId: previous.authorUserId,
       editedBy: changed ? (editorIsAuthor ? '' : author) : previous.editedBy || '',

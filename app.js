@@ -140,6 +140,23 @@ function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
 }
 
+function capitalizeFirst(value) {
+  const characters = Array.from(value.trim());
+  if (!characters.length) return '';
+  characters[0] = characters[0].toLocaleUpperCase('nl-BE');
+  return characters.join('');
+}
+
+function capitalizedField(input) {
+  const value = capitalizeFirst(input.value);
+  if (input.maxLength >= 0 && value.length > input.maxLength) {
+    input.setCustomValidity('De tekst is na het toevoegen van een hoofdletter te lang.');
+    input.reportValidity();
+    return null;
+  }
+  return value;
+}
+
 function dateKey(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
@@ -346,7 +363,7 @@ function renderDashboard() {
       <div class="stat"><span class="stat-icon">✓</span><div><strong>${done}</strong><small>Afgerond deze week</small></div></div>
       <div class="stat"><span class="stat-icon">!</span><div><strong>${importantTasks}</strong><small>Belangrijke taken deze week</small></div></div>
     </div>
-    <div class="dashboard-grid dashboard-stack">
+    <div class="dashboard-grid">
       <section><div class="section-heading"><div><h2>De week in beeld</h2><p>Een klein beetje planning, een groot verschil.</p></div><button class="text-button" data-action="today">Vandaag</button></div>
         <div class="panel"><div class="calendar-head"><div><strong>Week ${week} <span style="color:#9eaca0;font-weight:400">· ${week % 2 ? 'oneven' : 'even'} week</span></strong><small>${escapeHtml(range)}</small></div><div class="calendar-controls"><button class="icon-button" data-action="previous-week" aria-label="Vorige week">‹</button><button class="icon-button" data-action="next-week" aria-label="Volgende week">›</button></div></div>
           <div class="weekdays">${weekDates.map(day => {
@@ -363,33 +380,62 @@ function renderDashboard() {
           </div>
         </div>
       </section>
-      <section class="dashboard-notes"><div class="section-heading"><div><h2>Notities</h2><p>Deel een mededeling met het gezin.</p></div><a class="text-button" href="#notitiearchief">Archief beheren →</a></div>
-        <div class="panel notes-panel">
-          <form id="note-form" class="note-form"><div class="note-field"><label for="note-title">Titel</label><input id="note-title" name="title" required maxlength="120" placeholder="Titel van de notitie"></div><div class="note-field"><label for="note-description">Beschrijving</label><textarea id="note-description" name="description" required maxlength="2000" rows="3" placeholder="Schrijf een notitie voor het gezin"></textarea></div><button class="button" type="submit">Notitie plaatsen</button><div id="note-error" role="alert"></div></form>
-          <div class="note-list">${state.notes.filter(note => !note.archived).length ? state.notes.filter(note => !note.archived).map(note => `<article class="note-card"><div class="note-card-heading"><h3>${escapeHtml(note.title)}</h3><div><button type="button" class="text-button" data-action="edit-note" data-id="${escapeHtml(note.id)}">Bewerken</button><button type="button" class="text-button" data-action="archive-note" data-id="${escapeHtml(note.id)}">Archiveren</button></div></div><p>${escapeHtml(note.description).replace(/\n/g, '<br>')}</p><small>Door ${escapeHtml(note.author)}${note.editedBy ? ` · Bewerkt door ${escapeHtml(note.editedBy)}${note.editedAt ? ` op ${escapeHtml(new Date(note.editedAt).toLocaleString('nl-BE'))}` : ''}` : ''}</small></article>`).join('') : '<div class="empty"><strong>Nog geen notities</strong>Plaats hieronder een notitie voor het gezin.</div>'}</div>
-        </div>
-      </section>
       <section><div class="section-heading"><div><h2>Ons gezin</h2><p>Samen staan we sterker.</p></div><a class="text-button" href="#gezin">Bekijken →</a></div>
         <div class="panel family-panel">${state.members.length ? state.members.map((member, index) => `<div class="family-row">${avatar(member, index)}<div><strong>${escapeHtml(member.name)}</strong><small>${escapeHtml(memberDetails(member))}${member.email ? ` · ${escapeHtml(member.email)}` : ''}</small></div></div>`).join('') : '<div class="empty">Voeg een gezinslid toe om te beginnen.</div>'}</div>
         <div class="tip"><span class="tip-icon">✧</span><div><strong>Goed om te weten</strong><p>De taken uit jullie lijst staan al klaar. Wijs ze toe en kies wanneer ze terugkomen.</p><a class="text-button" href="#taken" style="padding-left:0">Bekijk alle taken →</a></div></div>
       </section>
+      <section class="dashboard-notes"><div class="section-heading"><div><h2>Notities</h2><p>Deel een mededeling met het gezin.</p></div><div class="note-section-actions"><a class="text-button" href="#notitiearchief">Archief beheren →</a><button type="button" class="button" data-action="new-note"><span class="plus">+</span> Notitie toevoegen</button></div></div>
+        <div class="panel notes-panel">
+          <div class="note-list">${renderNoteCards(state.notes.filter(note => !note.archived), 'active')}</div>
+        </div>
+      </section>
     </div>`;
+}
+
+function renderNoteCards(notes, type) {
+  if (!notes.length) {
+    return type === 'active'
+      ? '<div class="empty"><strong>Nog geen notities</strong>Plaats hieronder een notitie voor het gezin.</div>'
+      : '<div class="empty"><strong>Het archief is leeg</strong>Gearchiveerde notities verschijnen hier.</div>';
+  }
+  const sortedNotes = [...notes].sort((a, b) => Number(b.important === true) - Number(a.important === true));
+  return sortedNotes.map(note => {
+    const noteId = escapeHtml(note.id);
+    const actions = type === 'active'
+      ? `<button type="button" data-action="edit-note" data-id="${noteId}">Bewerken</button><button type="button" data-action="archive-note" data-id="${noteId}">Archiveren</button>`
+      : `<button type="button" data-action="restore-note" data-id="${noteId}">Herstellen</button><button type="button" data-action="delete-note" data-id="${noteId}">Definitief verwijderen</button>`;
+    return `<article class="note-card ${note.important ? 'important-note' : ''}"><div class="note-card-heading"><h3>${note.important ? '<span class="note-important-mark" aria-label="Belangrijke notitie" title="Belangrijke notitie">!</span>' : ''}${escapeHtml(note.title)}</h3><div class="note-menu-wrap"><button type="button" class="note-menu-trigger" data-action="toggle-note-menu" aria-label="Acties voor ${escapeHtml(note.title)}" aria-expanded="false">⋯</button><div class="note-actions-menu" hidden>${actions}</div></div></div><p>${escapeHtml(note.description).replace(/\n/g, '<br>')}</p><small>Door ${escapeHtml(note.author)}${note.editedBy ? ` · Bewerkt door ${escapeHtml(note.editedBy)}${note.editedAt ? ` op ${escapeHtml(new Date(note.editedAt).toLocaleString('nl-BE'))}` : ''}` : ''}</small></article>`;
+  }).join('');
 }
 
 function renderNoteArchive() {
   const archived = state.notes.filter(note => note.archived);
   return `<div class="page-heading"><div><h1>Notitiearchief</h1><p>Herstel een gearchiveerde notitie of verwijder die definitief.</p></div><a class="button secondary" href="#overzicht">Terug naar overzicht</a></div>
-    <div class="panel notes-panel"><div class="note-list">${archived.length ? archived.map(note => `<article class="note-card"><div class="note-card-heading"><h3>${escapeHtml(note.title)}</h3><div><button type="button" class="text-button" data-action="restore-note" data-id="${escapeHtml(note.id)}">Herstellen</button><button type="button" class="text-button" data-action="delete-note" data-id="${escapeHtml(note.id)}">Definitief verwijderen</button></div></div><p>${escapeHtml(note.description).replace(/\n/g, '<br>')}</p><small>Door ${escapeHtml(note.author)}${note.editedBy ? ` · Bewerkt door ${escapeHtml(note.editedBy)}${note.editedAt ? ` op ${escapeHtml(new Date(note.editedAt).toLocaleString('nl-BE'))}` : ''}` : ''}</small></article>`).join('') : '<div class="empty"><strong>Het archief is leeg</strong>Gearchiveerde notities verschijnen hier.</div>'}</div></div>`;
+    <div class="panel notes-panel"><div class="note-list">${renderNoteCards(archived, 'archived')}</div></div>`;
+}
+
+function closeNoteMenus() {
+  document.querySelectorAll('.note-actions-menu:not([hidden])').forEach(menu => {
+    menu.hidden = true;
+    menu.parentElement.querySelector('.note-menu-trigger')?.setAttribute('aria-expanded', 'false');
+  });
+}
+
+function openNewNote() {
+  document.querySelector('#modal-content').innerHTML = `<form id="note-create-form" class="modal-inner"><div class="modal-head"><div><h2 id="modal-title">Nieuwe notitie</h2><p>Deel een bericht met het gezin.</p></div><button type="button" class="close" data-action="close-modal" aria-label="Sluiten">×</button></div><div class="form-grid"><div class="field full"><label for="note-title">Titel</label><input id="note-title" name="title" required maxlength="120" placeholder="Titel van de notitie"></div><div class="field full"><label for="note-description">Beschrijving</label><textarea id="note-description" name="description" required maxlength="2000" rows="5" placeholder="Schrijf een notitie voor het gezin"></textarea></div><div class="field full"><label class="note-important-option"><input type="checkbox" name="important"><span>Markeer als belangrijk</span></label></div></div><div id="note-error" role="alert"></div><div class="modal-actions"><button type="button" class="button secondary" data-action="close-modal">Annuleren</button><button type="submit" class="button">Notitie plaatsen</button></div></form>`;
+  document.querySelector('#modal').showModal();
+  document.querySelector('#note-title').focus();
 }
 
 function openNote(id) {
   const existing = state.notes.find(note => note.id === id);
   if (!existing) return;
-  document.querySelector('#modal-content').innerHTML = `<form id="note-edit-form" class="modal-inner"><div class="modal-head"><div><h2 id="modal-title">Notitie bewerken</h2><p>Door ${escapeHtml(existing.author)}</p></div><button type="button" class="close" data-action="close-modal" aria-label="Sluiten">×</button></div><div class="form-grid"><div class="field full"><label for="edit-note-title">Titel</label><input id="edit-note-title" name="title" required maxlength="120" value="${escapeHtml(existing.title)}"></div><div class="field full"><label for="edit-note-description">Beschrijving</label><textarea id="edit-note-description" name="description" required maxlength="2000" rows="5">${escapeHtml(existing.description)}</textarea></div></div><div class="modal-actions"><button type="button" class="button secondary" data-action="close-modal">Annuleren</button><button type="submit" class="button">Opslaan</button></div></form>`;
+  document.querySelector('#modal-content').innerHTML = `<form id="note-edit-form" class="modal-inner"><div class="modal-head"><div><h2 id="modal-title">Notitie bewerken</h2><p>Door ${escapeHtml(existing.author)}</p></div><button type="button" class="close" data-action="close-modal" aria-label="Sluiten">×</button></div><div class="form-grid"><div class="field full"><label for="edit-note-title">Titel</label><input id="edit-note-title" name="title" required maxlength="120" value="${escapeHtml(existing.title)}"></div><div class="field full"><label for="edit-note-description">Beschrijving</label><textarea id="edit-note-description" name="description" required maxlength="2000" rows="5">${escapeHtml(existing.description)}</textarea></div><div class="field full"><label class="note-important-option"><input type="checkbox" name="important" ${existing.important ? 'checked' : ''}><span>Markeer als belangrijk</span></label></div></div><div class="modal-actions"><button type="button" class="button secondary" data-action="close-modal">Annuleren</button><button type="submit" class="button">Opslaan</button></div></form>`;
   const form = document.querySelector('#note-edit-form');
   form.addEventListener('submit', async event => {
     event.preventDefault();
-    const title = form.elements.title.value.trim();
+    const title = capitalizedField(form.elements.title);
+    if (title === null) return;
     const description = form.elements.description.value.trim();
     if (!title || !description) {
       const field = title ? form.elements.description : form.elements.title;
@@ -401,13 +447,16 @@ function openNote(id) {
     const editedByAuthor = existing.authorUserId != null
       ? String(existing.authorUserId) === currentUserId
       : editor === existing.author;
+    const important = form.elements.important.checked;
+    const changed = title !== existing.title || description !== existing.description || important !== (existing.important === true);
     const updated = {
       ...existing,
       title,
       description,
-      editedBy: editedByAuthor ? '' : editor,
-      editedByUserId: editedByAuthor ? '' : currentUserId,
-      editedAt: editedByAuthor ? '' : new Date().toISOString()
+      important,
+      editedBy: changed ? (editedByAuthor ? '' : editor) : existing.editedBy,
+      editedByUserId: changed ? (editedByAuthor ? '' : currentUserId) : existing.editedByUserId,
+      editedAt: changed ? (editedByAuthor ? '' : new Date().toISOString()) : existing.editedAt
     };
     const nextState = { ...state, notes: state.notes.map(note => note.id === existing.id ? updated : note) };
     if (await save(nextState)) {
@@ -526,7 +575,8 @@ function renderHelp() {
       </section>
       <section class="panel help-panel"><h2>Overzicht en taken</h2>
         <p>Op <a href="#overzicht">Overzicht</a> zie je de weekplanning, taken en verjaardagen. Kies een dag in de agenda of gebruik de pijlen om naar een andere week te gaan. Vink een taak af wanneer die klaar is.</p>
-        <p>Onder de weekplanning kun je een notitie voor het hele huishouden plaatsen. De auteur wordt automatisch ingevuld. Andere gezinsleden kunnen notities bewerken; hun naam en bewerktijd worden dan getoond. Archiveer een notitie om die van het overzicht te halen en beheer die via <a href="#notitiearchief">Notitiearchief</a>.</p>
+        <p>Naast de weekplanning zie je de gezinsleden; daaronder staan gedeelde notities als post-its. Kies <strong>Notitie toevoegen</strong> om in een venster een titel en beschrijving in te vullen. De auteur wordt automatisch ingevuld. Zet eventueel <strong>Markeer als belangrijk</strong> aan; dit staat standaard uit. Belangrijke notities krijgen een uitroepteken en staan bovenaan.</p>
+        <p>Open het driepuntjesmenu op een post-it om die te bewerken of te archiveren. Bij bewerken door een ander gezinslid worden diens naam en bewerktijd vermeld. Gearchiveerde notities verdwijnen van het overzicht. Via <a href="#notitiearchief">Notitiearchief</a> kun je ze herstellen of definitief verwijderen.</p>
         <p>Op <a href="#taken">Alle taken</a> kun je een taak openen om de planning te wijzigen. Kies per dag, week, maand of eenmalige datum wie de taak uitvoert. Markeer in het taakformulier belangrijke taken; die herken je aan het label <strong>Belangrijk</strong>. Gebruik de zoekbalk en filters om taken terug te vinden.</p>
       </section>
       <section class="panel help-panel"><h2>Gezinsleden</h2>
@@ -539,7 +589,7 @@ function renderHelp() {
       </section>
       <section class="panel help-panel"><h2>Instellingen en gegevens bewaren</h2>
         <p>Bij <a href="#instellingen">Instellingen</a> pas je de websitetitel, de ondertekst van het logo en de welkomst- en zijpaneelteksten aan. Deze teksten zijn zichtbaar voor het hele gezin.</p>
-        <p>Je kiest daar ook een kleurenpalet. Die keuze wordt afzonderlijk per login bewaard en heeft geen invloed op de rest van het huishouden.</p>
+        <p>Kies bij Instellingen een van de kleurenpaletten <strong>Bosgroen</strong>, <strong>Oceaanblauw</strong>, <strong>Lavendel</strong> of <strong>Terracotta</strong>. Het kleurenpalet wordt per login bewaard, geldt ook in donkere modus en verandert niets voor andere gezinsleden. De keuze wordt niet opgenomen in een back-up.</p>
         <p>Je kunt daar ook een JSON-back-up downloaden of terugzetten. Terugzetten vervangt de huidige gezinsgegevens; maak eventueel eerst een back-up. Bewaar het bestand veilig, want het bevat persoonlijke gegevens.</p>
       </section>
       <section class="panel help-panel"><h2>Wijzigingen op meerdere apparaten</h2>
@@ -644,6 +694,7 @@ function validateBackup(backup) {
         typeof note.description !== 'string' || !note.description.trim() || note.description.length > 2000 ||
         typeof note.author !== 'string' || !note.author.trim() || note.author.length > 254 ||
         typeof note.archived !== 'boolean' ||
+        (note.important !== undefined && typeof note.important !== 'boolean') ||
         (note.authorUserId != null && !['string', 'number'].includes(typeof note.authorUserId)) ||
         (note.editedByUserId != null && !['string', 'number'].includes(typeof note.editedByUserId)) ||
         (note.editedBy != null && (typeof note.editedBy !== 'string' || note.editedBy.length > 254)) ||
@@ -654,7 +705,7 @@ function validateBackup(backup) {
     }
   }
   if (data.mealIdeas !== undefined) validateMealIdeas(data.mealIdeas, data.members);
-  return { ...data, customization: { ...CUSTOM_TEXT_DEFAULTS, ...data.customization }, groceries: data.groceries ?? [], notes: data.notes ?? [], mealIdeas: data.mealIdeas === undefined ? [] : data.mealIdeas, tasks: data.tasks.map(task => {
+  return { ...data, customization: { ...CUSTOM_TEXT_DEFAULTS, ...data.customization }, groceries: data.groceries ?? [], notes: (data.notes ?? []).map(note => ({ ...note, important: note.important === true })), mealIdeas: data.mealIdeas === undefined ? [] : data.mealIdeas, tasks: data.tasks.map(task => {
     const normalized = normalizeTask(task);
     if (normalized.schedules) normalized.schedules = normalized.schedules.map(normalizeTask);
     return normalized;
@@ -751,7 +802,8 @@ function openTask(id) {
   form.addEventListener('submit', async event => {
     event.preventDefault();
     const data = new FormData(form);
-    const title = String(data.get('title')).trim();
+    const title = capitalizedField(form.elements.title);
+    if (title === null) return;
     if (!title) { form.elements.title.setCustomValidity('Vul een naam in.'); form.elements.title.reportValidity(); return; }
     readSchedule(activeSchedule, data);
     const updated = { ...task, id: existing?.id || crypto.randomUUID(), title, important: data.has('important') };
@@ -777,7 +829,8 @@ function openMember(id) {
   const form = document.querySelector('#member-form');
   form.addEventListener('submit', async event => {
     event.preventDefault();
-    const name = form.elements.name.value.trim();
+    const name = capitalizedField(form.elements.name);
+    if (name === null) return;
     if (!name) { form.elements.name.setCustomValidity('Vul een naam in.'); form.elements.name.reportValidity(); return; }
     const birthDate = form.elements.birthDate.value || null;
     const email = form.elements.email.value.trim().toLowerCase();
@@ -816,10 +869,37 @@ function openMember(id) {
   document.querySelector('#modal').showModal();
 }
 
+document.addEventListener('focusin', event => {
+  if (!event.target.closest('.note-menu-wrap')) closeNoteMenus();
+});
+
+document.addEventListener('keydown', event => {
+  if (event.key !== 'Escape') return;
+  const trigger = document.querySelector('.note-menu-trigger[aria-expanded="true"]');
+  if (trigger) {
+    closeNoteMenus();
+    trigger.focus();
+  }
+});
+
 document.addEventListener('click', async event => {
   const button = event.target.closest('[data-action]');
-  if (!button) return;
+  if (!button) {
+    if (!event.target.closest('.note-menu-wrap')) closeNoteMenus();
+    return;
+  }
   const action = button.dataset.action;
+  if (action === 'toggle-note-menu') {
+    const shouldOpen = button.getAttribute('aria-expanded') !== 'true';
+    closeNoteMenus();
+    if (shouldOpen) {
+      button.parentElement.querySelector('.note-actions-menu').hidden = false;
+      button.setAttribute('aria-expanded', 'true');
+    }
+    return;
+  }
+  closeNoteMenus();
+  if (action === 'new-note') openNewNote();
   if (action === 'new-task') openTask();
   if (action === 'edit-task') openTask(button.dataset.id);
   if (action === 'sort-status') {
@@ -982,12 +1062,13 @@ document.addEventListener('change', event => {
 });
 
 document.addEventListener('submit', async event => {
-  if (event.target.id === 'note-form') {
+  if (event.target.id === 'note-create-form') {
     event.preventDefault();
     const form = event.target;
     const errorBox = form.querySelector('#note-error');
     errorBox.textContent = '';
-    const title = form.elements.title.value.trim();
+    const title = capitalizedField(form.elements.title);
+    if (title === null) return;
     const description = form.elements.description.value.trim();
     if (!title || !description) {
       const field = title ? form.elements.description : form.elements.title;
@@ -1000,6 +1081,7 @@ document.addEventListener('submit', async event => {
       id: crypto.randomUUID(),
       title,
       description,
+      important: form.elements.important.checked,
       author: currentAuthorName(),
       authorUserId: currentUserId,
       archived: false,
@@ -1010,6 +1092,7 @@ document.addEventListener('submit', async event => {
     const nextState = { ...state, notes: [...state.notes, note] };
     if (await save(nextState)) {
       state = nextState;
+      document.querySelector('#modal').close();
       render();
       showToast('Notitie geplaatst');
     }
@@ -1041,7 +1124,12 @@ document.addEventListener('submit', async event => {
   if (event.target.id === 'customization-form') {
     event.preventDefault();
     const form = event.target;
-    const customization = Object.fromEntries(Object.keys(CUSTOM_TEXT_LIMITS).map(key => [key, form.elements[key].value.trim()]));
+    const customization = {};
+    for (const key of Object.keys(CUSTOM_TEXT_LIMITS)) {
+      const value = capitalizedField(form.elements[key]);
+      if (value === null) return;
+      customization[key] = value;
+    }
     const invalidEntry = Object.entries(customization).find(([key, value]) => !value || value.length > CUSTOM_TEXT_LIMITS[key]);
     if (invalidEntry) {
       const input = form.elements[invalidEntry[0]];
@@ -1098,7 +1186,8 @@ document.addEventListener('submit', async event => {
   if (!['groceries-form', 'meal-ideas-form'].includes(event.target.id)) return;
   event.preventDefault();
   const input = event.target.elements.name;
-  const name = input.value.trim();
+  const name = capitalizedField(input);
+  if (name === null) return;
   const meal = event.target.id === 'meal-ideas-form';
   if (!name) { input.setCustomValidity(meal ? 'Vul een gerecht of voeding in.' : 'Vul een boodschap in.'); input.reportValidity(); return; }
   const nextState = meal
@@ -1109,7 +1198,7 @@ document.addEventListener('submit', async event => {
 
 document.addEventListener('input', event => {
   if (event.target.id === 'grocery-name' || event.target.id === 'meal-idea-name') event.target.setCustomValidity('');
-  if (event.target.form?.id === 'note-form' || event.target.form?.id === 'note-edit-form') event.target.setCustomValidity('');
+  if (event.target.form?.id === 'note-create-form' || event.target.form?.id === 'note-edit-form') event.target.setCustomValidity('');
   if (event.target.form?.id === 'customization-form') event.target.setCustomValidity('');
   if (event.target.id !== 'task-search') return;
   taskSearch = event.target.value;
