@@ -36,6 +36,9 @@ moment is één gezinslid verantwoordelijk:
 Een taak zonder gezinslid of een sporadische taak zonder datum staat wel in de
 takenlijst, maar niet op de kalender. Afvinken geldt voor de afzonderlijke
 geplande datum. Bestaande planningen worden automatisch overgenomen.
+In **Alle taken** geeft het label **Ingepland** of **Niet ingepland** aan of
+minstens één moment met een gezinslid is ingesteld. Een sporadische taak met
+een datum in het verleden blijft als ingepland aangeduid.
 
 Eerder samengevoegde taken behouden hun schema's en afvinkjes. Hun schema's
 kun je via **bewerken** afzonderlijk aanpassen; bij overlap heeft het eerste
@@ -44,6 +47,17 @@ passende schema voorrang.
 Wijzigingen worden alleen in de lokale browseropslag bewaard: ze worden niet
 gesynchroniseerd met andere apparaten of gebruikers en kunnen verdwijnen als
 browsergegevens worden gewist. De app heeft geen login of gedeelde server.
+
+## Back-up
+
+Via **Back-up** kun je handmatig een JSON-bestand downloaden met gezinsleden,
+taken, planningen en afvinkjes. Bewaar dit bestand veilig: het bevat persoonlijke
+gegevens. De instelling voor lichte of donkere modus staat niet in de back-up.
+
+Kies op dezelfde pagina een eerder gedownload bestand en klik op **Back-up
+terugzetten**. Na bevestiging worden de huidige gegevens in deze browser
+vervangen, niet samengevoegd. Maak eventueel eerst een back-up van de huidige
+gegevens. Een back-up wordt niet automatisch gemaakt of bijgewerkt.
 
 ## Weergave
 
@@ -63,4 +77,3 @@ schakel je terug. Je keuze wordt afzonderlijk in de lokale browser bewaard.
 - app publiek zetten en bv hosten via alwaysdata
 - this will require users to create a login if everything is public + manage a family
 - android app nodig? 
-- (lokale) backups nodig? 

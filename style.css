@@ -120,12 +120,20 @@ input:focus,select:focus{border-color:#85ad8d;box-shadow:0 0 0 3px #e9f2e9}
 .task-list-item{width:100%;border:0;border-bottom:1px solid #f0f2ef;background:transparent;color:inherit;text-align:left}
 .task-list-item:hover{background:#f8faf6}
 .task-list-item:focus-visible{outline:2px solid #507a60;outline-offset:-2px;border-radius:4px}
+.schedule-status{display:inline-block;margin-top:7px;padding:3px 7px;border-radius:5px;font-size:10px;font-weight:700}
+.schedule-status.scheduled{background:#e8f2e7;color:#416c4d}
+.schedule-status.unscheduled{background:#f9f0e2;color:#8b6734}
 .frequency-tag{font-size:10px;background:#eff5ec;color:#76977b;padding:5px 8px;border-radius:5px;white-space:nowrap}
 .list-summary{font-size:11px;color:#9aa79d;margin-bottom:10px}
 .members-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:15px}
 .member-card{padding:22px}.member-card .avatar{width:48px;height:48px;font-size:20px;margin-bottom:14px}
 .member-card h3{font-size:14px}.member-card p{color:#9aa79d;font-size:11px;margin-top:6px}
 .member-card button{margin-top:14px;padding-left:0}
+.backup-panel{padding:22px;margin-bottom:16px;max-width:680px}
+.backup-panel h2{font-size:21px}
+.backup-panel p{color:#7a8a7d;font-size:12px;line-height:1.6;margin:10px 0 16px}
+.backup-panel label{display:block;margin-bottom:7px}
+.backup-panel input[type="file"]{display:block;max-width:100%;margin-bottom:14px}
 dialog{border:0;border-radius:14px;padding:0;width:min(510px,calc(100% - 32px));max-height:90vh;color:var(--ink);box-shadow:0 20px 80px #263e2c33}
 dialog::backdrop{background:rgba(34,50,38,.42)}
 .modal-inner{padding:26px}
@@ -155,6 +163,7 @@ dialog::backdrop{background:rgba(34,50,38,.42)}
 [data-theme="dark"] .top-avatar{border-color:#202f25;box-shadow:0 0 0 1px #425746}
 [data-theme="dark"] .sidebar-bottom,[data-theme="dark"] .tip{background:#29392b;border-color:#40503d;color:#d0dfcb}
 [data-theme="dark"] .sidebar-bottom p,[data-theme="dark"] .tip p,[data-theme="dark"] .tip strong{color:#c3d0bb}
+[data-theme="dark"] .backup-panel p{color:#b4c5b7}
 [data-theme="dark"] .sidebar-foot{border-color:#455a47}
 [data-theme="dark"] .breadcrumb span:last-child,[data-theme="dark"] .page-heading p,[data-theme="dark"] .section-heading p,[data-theme="dark"] .stat small,[data-theme="dark"] .family-row small,[data-theme="dark"] .task-info small,[data-theme="dark"] .member-card p,[data-theme="dark"] .field-help{color:#b4c5b7}
 [data-theme="dark"] .hero{background:#304d37}
@@ -170,6 +179,8 @@ dialog::backdrop{background:rgba(34,50,38,.42)}
 [data-theme="dark"] .day-number{color:#dce9dd}
 [data-theme="dark"] .weekdays,[data-theme="dark"] .task-row,[data-theme="dark"] .family-row{border-color:#3a4e3e}
 [data-theme="dark"] .task-list-item:hover{background:#293c2e}
+[data-theme="dark"] .schedule-status.scheduled{background:#354b39;color:#d0ebd2}
+[data-theme="dark"] .schedule-status.unscheduled{background:#4b402b;color:#f0d7a2}
 [data-theme="dark"] .empty{background:#293a2c;border-color:#4b624e;color:#b8cdbb}
 [data-theme="dark"] .empty strong,[data-theme="dark"] .field label,[data-theme="dark"] .field-label,[data-theme="dark"] .text-button{color:#c0d9c3}
 [data-theme="dark"] .avatar{background:#38533d;color:#d4e7d5}

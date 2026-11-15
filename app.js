@@ -1,5 +1,6 @@
 const STORAGE_KEY = 'ons-huishouden-v1';
 const THEME_KEY = 'ons-huishouden-thema';
+const BACKUP_FORMAT = 'ons-huishouden-backup';
 const DAYS = ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'];
 const FREQUENCIES = { daily: 'Dagelijks', weekly: 'Wekelijks', monthly: 'Maandelijks', occasional: 'Sporadisch' };
 const initialState = () => ({
@@ -11,6 +12,11 @@ const initialState = () => ({
 function normalizeTask(task) {
   return {
     ...task,
+    memberId: task.memberId ?? '',
+    weekday: task.weekday ?? 1,
+    monthDay: task.monthDay ?? 1,
+    date: task.date ?? '',
+    group: task.group ?? '',
     dailyAssignments: task.dailyAssignments ?? Object.fromEntries((task.days || []).map(day => [day, task.memberId || ''])),
     weeklyAssignments: task.weeklyAssignments ?? {
       even: task.week === 'odd' ? '' : task.memberId || '',
@@ -155,6 +161,25 @@ function occursOn(task, date) {
   return task.frequency === 'occasional' && task.date === dateKey(date);
 }
 
+function isScheduled(task) {
+  return schedulesFor(task).some(schedule => {
+    if (schedule.frequency === 'daily') {
+      return DAYS.some((_, index) => state.members.some(member => member.id === schedule.dailyAssignments[index + 1]));
+    }
+    if (schedule.frequency === 'weekly') {
+      return Number.isInteger(schedule.weekday) && schedule.weekday >= 1 && schedule.weekday <= 7 &&
+        ['even', 'odd'].some(week => state.members.some(member => member.id === schedule.weeklyAssignments[week]));
+    }
+    if (!memberFor(schedule)) return false;
+    if (schedule.frequency === 'monthly') return Number.isInteger(schedule.monthDay) && schedule.monthDay >= 1 && schedule.monthDay <= 31;
+    if (schedule.frequency === 'occasional' && /^\d{4}-\d{2}-\d{2}$/.test(schedule.date)) {
+      const date = parseDate(schedule.date);
+      return !Number.isNaN(date.getTime()) && dateKey(date) === schedule.date;
+    }
+    return false;
+  });
+}
+
 function tasksOn(date) {
   return state.tasks.filter(task => occursOn(task, date));
 }
@@ -263,7 +288,11 @@ function renderTasks() {
     (memberFilter === 'all' || (memberFilter === 'unassigned' ? assignedMemberIds(task).length === 0 : assignedMemberIds(task).includes(memberFilter))));
   return `<div class="page-heading"><div><h1>Alle taken</h1><p>Alles wat er thuis gebeurt, op één plek.</p></div><button class="button" data-action="new-task"><span class="plus">+</span> Taak toevoegen</button></div>
     <div class="list-toolbar"><input class="search" id="task-search" type="search" placeholder="Zoek een taak..." aria-label="Zoek een taak" value="${escapeHtml(taskSearch)}"><select id="frequency-filter" aria-label="Filter op frequentie"><option value="all">Alle frequenties</option>${Object.entries(FREQUENCIES).map(([value, label]) => `<option value="${value}" ${frequencyFilter === value ? 'selected' : ''}>${label}</option>`).join('')}</select><select id="member-filter" aria-label="Filter op gezinslid"><option value="all">Iedereen</option><option value="unassigned" ${memberFilter === 'unassigned' ? 'selected' : ''}>Niet toegewezen</option>${state.members.map(member => `<option value="${escapeHtml(member.id)}" ${memberFilter === member.id ? 'selected' : ''}>${escapeHtml(member.name)}</option>`).join('')}</select></div>
-    <div class="list-summary">${filtered.length} ${filtered.length === 1 ? 'taak' : 'taken'}</div><div class="panel list-panel">${filtered.length ? filtered.map(task => `<button type="button" class="task-row task-list-item" data-action="edit-task" data-id="${escapeHtml(task.id)}" aria-label="${escapeHtml(task.title)} bewerken"><span class="stat-icon" style="width:34px;height:34px;font-size:15px">✓</span><span class="task-info"><strong>${escapeHtml(task.title)}</strong><small>${!task.schedules && (task.frequency === 'monthly' || task.frequency === 'occasional') ? `${escapeHtml(memberFor(task)?.name || 'Niet toegewezen')} · ` : ''}${escapeHtml(taskSchedule(task))}${task.group ? ` · ${escapeHtml(task.group)}` : ''}</small></span><span class="frequency-tag">${frequencyLabel(task)}</span><span class="task-action" aria-hidden="true">···</span></button>`).join('') : '<div class="empty" style="margin:20px 0">Geen taken gevonden.</div>'}</div>`;
+    <div class="list-summary">${filtered.length} ${filtered.length === 1 ? 'taak' : 'taken'}</div><div class="panel list-panel">${filtered.length ? filtered.map(task => {
+      const scheduled = isScheduled(task);
+      const status = scheduled ? 'Ingepland' : 'Niet ingepland';
+      return `<button type="button" class="task-row task-list-item" data-action="edit-task" data-id="${escapeHtml(task.id)}" aria-label="${escapeHtml(task.title)} — ${status} — bewerken"><span class="stat-icon" style="width:34px;height:34px;font-size:15px">✓</span><span class="task-info"><strong>${escapeHtml(task.title)}</strong><small>${!task.schedules && (task.frequency === 'monthly' || task.frequency === 'occasional') ? `${escapeHtml(memberFor(task)?.name || 'Niet toegewezen')} · ` : ''}${escapeHtml(taskSchedule(task))}${task.group ? ` · ${escapeHtml(task.group)}` : ''}</small><span class="schedule-status ${scheduled ? 'scheduled' : 'unscheduled'}">${status}</span></span><span class="frequency-tag">${frequencyLabel(task)}</span><span class="task-action" aria-hidden="true">···</span></button>`;
+    }).join('') : '<div class="empty" style="margin:20px 0">Geen taken gevonden.</div>'}</div>`;
 }
 
 function renderFamily() {
@@ -271,13 +300,120 @@ function renderFamily() {
     <div class="members-grid">${state.members.map((member, index) => `<div class="panel member-card">${avatar(member, index)}<h3>${escapeHtml(member.name)}</h3><p>${escapeHtml(memberDetails(member))} · ${state.tasks.filter(task => assignedMemberIds(task).includes(member.id)).length} toegewezen taken</p><button class="text-button" data-action="edit-member" data-id="${escapeHtml(member.id)}">Gegevens bewerken →</button></div>`).join('')}</div>`;
 }
 
+function renderBackup() {
+  return `<div class="page-heading"><div><h1>Back-up</h1><p>Bewaar je gegevens veilig of zet een eerdere back-up terug.</p></div></div>
+    <div class="panel backup-panel"><h2>Back-up downloaden</h2><p>Download een JSON-bestand met gezinsleden, taken, planningen en afvinkjes. Bewaar dit bestand op een veilige plek: het bevat persoonlijke gegevens.</p><button class="button" data-action="export-backup">Back-up downloaden</button></div>
+    <div class="panel backup-panel"><h2>Back-up terugzetten</h2><p>Een back-up terugzetten vervangt de huidige gegevens in deze browser. Download eventueel eerst een back-up van de huidige gegevens.</p><label for="backup-file" class="field-label">JSON-bestand kiezen</label><input id="backup-file" type="file" accept=".json,application/json"><button class="button secondary" data-action="import-backup">Back-up terugzetten</button></div>`;
+}
+
 function render() {
-  const view = ['overzicht', 'taken', 'gezin'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'overzicht';
-  document.querySelector('#content').innerHTML = view === 'taken' ? renderTasks() : view === 'gezin' ? renderFamily() : renderDashboard();
+  const view = ['overzicht', 'taken', 'gezin', 'backup'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'overzicht';
+  document.querySelector('#content').innerHTML = view === 'taken' ? renderTasks() : view === 'gezin' ? renderFamily() : view === 'backup' ? renderBackup() : renderDashboard();
   document.querySelectorAll('.navigation a').forEach(link => link.classList.toggle('active', link.dataset.view === view));
-  document.querySelector('#breadcrumb-current').textContent = view === 'gezin' ? 'ONS GEZIN' : view === 'taken' ? 'ALLE TAKEN' : 'OVERZICHT';
+  document.querySelector('#breadcrumb-current').textContent = view === 'gezin' ? 'ONS GEZIN' : view === 'taken' ? 'ALLE TAKEN' : view === 'backup' ? 'BACK-UP' : 'OVERZICHT';
   document.querySelector('#nav-count').textContent = state.tasks.length;
   document.querySelector('#today-label').textContent = formatDate(new Date(), { weekday: 'long', day: 'numeric', month: 'long' });
+}
+
+function validBackupDate(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = parseDate(value);
+  return !Number.isNaN(date.getTime()) && dateKey(date) === value;
+}
+
+function validateBackup(backup) {
+  const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+  const optionalString = value => value == null || typeof value === 'string';
+  const id = value => typeof value === 'string' && value.trim() !== '' && !value.includes('|');
+  if (!object(backup) || backup.format !== BACKUP_FORMAT || backup.version !== 1 || !object(backup.data)) throw new Error('Onbekend back-upformaat of versie.');
+  const data = backup.data;
+  if (!Array.isArray(data.members) || !Array.isArray(data.tasks) || !object(data.completed)) throw new Error('Gezinsleden, taken of afvinkjes ontbreken.');
+  const memberIds = new Set();
+  for (const member of data.members) {
+    if (!object(member) || !id(member.id) || memberIds.has(member.id) || typeof member.name !== 'string' || !member.name.trim() ||
+      (member.birthDate != null && (!validBackupDate(member.birthDate) || member.birthDate > dateKey(new Date()))) ||
+      (member.birthYear != null && (!Number.isInteger(member.birthYear) || member.birthYear < 1900 || member.birthYear > new Date().getFullYear())) ||
+      (member.age != null && (!Number.isInteger(member.age) || member.age < 0 || member.age > 130))) throw new Error('Een gezinslid bevat ongeldige gegevens.');
+    memberIds.add(member.id);
+  }
+  const validAssignment = value => value === '' || id(value);
+  const validSchedule = schedule => {
+    if (!object(schedule) || !Object.hasOwn(FREQUENCIES, schedule.frequency) || !optionalString(schedule.memberId) ||
+      (schedule.memberId && !validAssignment(schedule.memberId)) ||
+      (schedule.days != null && (!Array.isArray(schedule.days) || !schedule.days.every(day => Number.isInteger(day) && day >= 1 && day <= 7))) ||
+      (schedule.week != null && !['all', 'even', 'odd'].includes(schedule.week)) ||
+      (schedule.weekday != null && (!Number.isInteger(schedule.weekday) || schedule.weekday < 1 || schedule.weekday > 7)) ||
+      (schedule.monthDay != null && (!Number.isInteger(schedule.monthDay) || schedule.monthDay < 1 || schedule.monthDay > 31)) ||
+      (schedule.date != null && schedule.date !== '' && !validBackupDate(schedule.date))) return false;
+    if (schedule.dailyAssignments != null && (!object(schedule.dailyAssignments) ||
+      !Object.entries(schedule.dailyAssignments).every(([day, value]) => /^[1-7]$/.test(day) && validAssignment(value)))) return false;
+    if (schedule.weeklyAssignments != null && (!object(schedule.weeklyAssignments) ||
+      !['even', 'odd'].every(week => validAssignment(schedule.weeklyAssignments[week])))) return false;
+    return true;
+  };
+  const taskIds = new Set();
+  for (const task of data.tasks) {
+    if (!object(task) || !id(task.id) || taskIds.has(task.id) || typeof task.title !== 'string' || !task.title.trim() ||
+      !optionalString(task.group) || !validSchedule(task) ||
+      (task.schedules != null && (!Array.isArray(task.schedules) || !task.schedules.length ||
+        !task.schedules.every(part => validSchedule(part) && typeof part.title === 'string' && part.title.trim())))) {
+      throw new Error('Een taak bevat ongeldige gegevens of een ongeldig schema.');
+    }
+    taskIds.add(task.id);
+  }
+  for (const [key, value] of Object.entries(data.completed)) {
+    const parts = key.split('|');
+    if (parts.length !== 2 || !taskIds.has(parts[0]) || !validBackupDate(parts[1]) || typeof value !== 'boolean') throw new Error('Een afvinkje bevat ongeldige gegevens.');
+  }
+  return { ...data, tasks: data.tasks.map(task => {
+    const normalized = normalizeTask(task);
+    if (normalized.schedules) normalized.schedules = normalized.schedules.map(normalizeTask);
+    return normalized;
+  }) };
+}
+
+function exportBackup() {
+  if (!storageAvailable) {
+    alert('De gegevens zijn niet beschikbaar voor een back-up omdat ze niet konden worden geladen.');
+    return;
+  }
+  const backup = { format: BACKUP_FORMAT, version: 1, data: state };
+  const url = URL.createObjectURL(new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `huishouden-backup-${dateKey(new Date())}.json`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function importBackup() {
+  const file = document.querySelector('#backup-file').files[0];
+  if (!file) { alert('Kies eerst een JSON-back-upbestand.'); return; }
+  let restored;
+  try {
+    restored = validateBackup(JSON.parse(await file.text()));
+  } catch (error) {
+    console.error('Back-up lezen mislukt:', error);
+    alert(`De back-up kon niet worden teruggezet: ${error.message}`);
+    return;
+  }
+  if (!confirm('De huidige gegevens in deze browser worden volledig vervangen. Wil je deze back-up terugzetten?')) return;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(restored));
+  } catch (error) {
+    console.error('Back-up opslaan mislukt:', error);
+    alert('De back-up kon niet worden opgeslagen. De huidige gegevens zijn niet vervangen.');
+    return;
+  }
+  state = restored;
+  storageAvailable = true;
+  taskSearch = '';
+  frequencyFilter = 'all';
+  memberFilter = 'all';
+  render();
+  showToast('Back-up teruggezet');
 }
 
 function memberSelect(name, id) {
@@ -392,6 +528,8 @@ document.addEventListener('click', event => {
   const action = button.dataset.action;
   if (action === 'new-task') openTask();
   if (action === 'edit-task') openTask(button.dataset.id);
+  if (action === 'export-backup') exportBackup();
+  if (action === 'import-backup') importBackup();
   if (action === 'new-member') openMember();
   if (action === 'edit-member') openMember(button.dataset.id);
   if (action === 'close-modal') document.querySelector('#modal').close();
