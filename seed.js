@@ -64,3 +64,7 @@ const SEED_TASKS = [
     frequency: 'occasional'
   }
 ];
+
+if (typeof module !== 'undefined') {
+  module.exports = { SEED_MEMBERS, SEED_TASKS, SEED_MEAL_IDEAS };
+}

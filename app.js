@@ -1,15 +1,7 @@
-const STORAGE_KEY = 'ons-huishouden-v1';
 const THEME_KEY = 'ons-huishouden-thema';
 const BACKUP_FORMAT = 'ons-huishouden-backup';
 const DAYS = ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'];
 const FREQUENCIES = { daily: 'Dagelijks', weekly: 'Wekelijks', monthly: 'Maandelijks', occasional: 'Sporadisch' };
-const initialState = () => ({
-  members: structuredClone(SEED_MEMBERS),
-  tasks: structuredClone(SEED_TASKS),
-  completed: {},
-  groceries: [],
-  mealIdeas: structuredClone(SEED_MEAL_IDEAS)
-});
 
 function validateMealIdeas(ideas, members) {
   if (!Array.isArray(ideas)) throw new Error('De lijst met kookinspiratie is ongeldig.');
@@ -43,31 +35,10 @@ function normalizeTask(task) {
   };
 }
 
-function loadState() {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    const parsed = saved ? JSON.parse(saved) : initialState();
-    if (!Array.isArray(parsed.tasks) || !Array.isArray(parsed.members) || !parsed.completed || typeof parsed.completed !== 'object') {
-      throw new Error('Ongeldige opgeslagen gegevens');
-    }
-    if (parsed.groceries !== undefined && !Array.isArray(parsed.groceries)) throw new Error('Ongeldige boodschappenlijst');
-    parsed.groceries ??= [];
-    if (parsed.mealIdeas === undefined) parsed.mealIdeas = [];
-    validateMealIdeas(parsed.mealIdeas, parsed.members);
-    parsed.tasks = parsed.tasks.map(normalizeTask);
-    return parsed;
-  } catch (error) {
-    console.error('Gegevens laden mislukt:', error);
-    alert('De opgeslagen gegevens konden niet worden geladen. Controleer de browseropslag; wijzigingen worden niet opgeslagen om gegevensverlies te voorkomen.');
-    storageAvailable = false;
-    const fallback = initialState();
-    fallback.tasks = fallback.tasks.map(normalizeTask);
-    return fallback;
-  }
-}
-
-let storageAvailable = true;
-let state = loadState();
+let state = null;
+let revision = null;
+let saving = false;
+let needsRecovery = false;
 let selectedDate = dateKey(new Date());
 let taskSearch = '';
 let frequencyFilter = 'all';
@@ -96,18 +67,44 @@ function initializeTheme() {
   }
 }
 
-function save(nextState = state) {
-  if (!storageAvailable) {
-    alert('Opslaan is niet mogelijk omdat de opgeslagen gegevens niet konden worden geladen.');
-    return false;
+async function api(url, options = {}) {
+  const response = await fetch(url, { credentials: 'same-origin', ...options });
+  const result = await response.json();
+  if (!response.ok) {
+    const error = new Error(result.error || 'Het verzoek is mislukt.');
+    error.status = response.status;
+    throw error;
   }
+  return result;
+}
+
+async function save(nextState = state) {
+  const attempted = structuredClone(nextState);
+  saving = true;
+  document.querySelector('#app').inert = true;
+  document.querySelector('#modal').inert = true;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(nextState));
+    const result = await api('api/state', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: attempted, revision })
+    });
+    revision = result.revision;
     return true;
   } catch (error) {
     console.error('Gegevens opslaan mislukt:', error);
-    alert('Opslaan is mislukt. Controleer of browseropslag beschikbaar is en probeer opnieuw.');
+    state = attempted;
+    needsRecovery = true;
+    document.querySelector('#modal').close();
+    document.querySelector('#recovery-message').textContent = `De wijziging is niet bevestigd: ${error.message}`;
+    document.querySelector('#recovery').hidden = false;
     return false;
+  } finally {
+    saving = false;
+    if (!needsRecovery) {
+      document.querySelector('#app').inert = false;
+      document.querySelector('#modal').inert = false;
+    }
   }
 }
 
@@ -381,10 +378,11 @@ function renderMealIdeas() {
 function renderBackup() {
   return `<div class="page-heading"><div><h1>Back-up</h1><p>Bewaar je gegevens veilig of zet een eerdere back-up terug.</p></div></div>
     <div class="panel backup-panel"><h2>Back-up downloaden</h2><p>Download een JSON-bestand met gezinsleden, taken, planningen, afvinkjes, boodschappen en kookinspiratie. Bewaar dit bestand op een veilige plek: het bevat persoonlijke gegevens.</p><button class="button" data-action="export-backup">Back-up downloaden</button></div>
-    <div class="panel backup-panel"><h2>Back-up terugzetten</h2><p>Een back-up terugzetten vervangt de huidige gegevens in deze browser. Download eventueel eerst een back-up van de huidige gegevens.</p><label for="backup-file" class="field-label">JSON-bestand kiezen</label><input id="backup-file" type="file" accept=".json,application/json"><button class="button secondary" data-action="import-backup">Back-up terugzetten</button></div>`;
+    <div class="panel backup-panel"><h2>Back-up terugzetten</h2><p>Een back-up terugzetten vervangt de huidige gegevens van je account. Download eventueel eerst een back-up van de huidige gegevens.</p><label for="backup-file" class="field-label">JSON-bestand kiezen</label><input id="backup-file" type="file" accept=".json,application/json"><button class="button secondary" data-action="import-backup">Back-up terugzetten</button></div>`;
 }
 
 function render() {
+  if (!state) return;
   const view = ['overzicht', 'taken', 'gezin', 'backup', 'boodschappen', 'kookinspiratie'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'overzicht';
   document.querySelector('#content').innerHTML = view === 'taken' ? renderTasks() : view === 'gezin' ? renderFamily() : view === 'backup' ? renderBackup() : view === 'boodschappen' ? renderGroceries() : view === 'kookinspiratie' ? renderMealIdeas() : renderDashboard();
   document.querySelectorAll('.navigation a').forEach(link => link.classList.toggle('active', link.dataset.view === view));
@@ -460,10 +458,6 @@ function validateBackup(backup) {
 }
 
 function exportBackup() {
-  if (!storageAvailable) {
-    alert('De gegevens zijn niet beschikbaar voor een back-up omdat ze niet konden worden geladen.');
-    return;
-  }
   const backup = { format: BACKUP_FORMAT, version: 1, data: state };
   const url = URL.createObjectURL(new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }));
   const link = document.createElement('a');
@@ -486,16 +480,9 @@ async function importBackup() {
     alert(`De back-up kon niet worden teruggezet: ${error.message}`);
     return;
   }
-  if (!confirm('De huidige gegevens in deze browser worden volledig vervangen. Wil je deze back-up terugzetten?')) return;
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(restored));
-  } catch (error) {
-    console.error('Back-up opslaan mislukt:', error);
-    alert('De back-up kon niet worden opgeslagen. De huidige gegevens zijn niet vervangen.');
-    return;
-  }
+  if (!confirm('De huidige gegevens van je account worden volledig vervangen. Wil je deze back-up terugzetten?')) return;
+  if (!await save(restored)) return;
   state = restored;
-  storageAvailable = true;
   taskSearch = '';
   frequencyFilter = 'all';
   memberFilter = 'all';
@@ -556,7 +543,7 @@ function openTask(id) {
     form.elements.frequency.value = activeSchedule.frequency;
     document.querySelector('#schedule-fields').innerHTML = scheduleFields(activeSchedule);
   });
-  form.addEventListener('submit', event => {
+  form.addEventListener('submit', async event => {
     event.preventDefault();
     const data = new FormData(form);
     const title = String(data.get('title')).trim();
@@ -565,14 +552,14 @@ function openTask(id) {
     const updated = { ...task, id: existing?.id || crypto.randomUUID(), title };
     if (existing) state.tasks[state.tasks.indexOf(existing)] = updated;
     else state.tasks.push(updated);
-    if (save()) { document.querySelector('#modal').close(); render(); showToast('Taak opgeslagen'); }
+    if (await save()) { document.querySelector('#modal').close(); render(); showToast('Taak opgeslagen'); }
   });
   form.elements.title.addEventListener('input', () => form.elements.title.setCustomValidity(''));
-  form.querySelector('[data-action="delete-task"]')?.addEventListener('click', () => {
+  form.querySelector('[data-action="delete-task"]')?.addEventListener('click', async () => {
     if (!confirm(`Weet je zeker dat je "${existing.title}" wilt verwijderen?`)) return;
     state.tasks = state.tasks.filter(item => item.id !== existing.id);
     Object.keys(state.completed).filter(key => key.startsWith(`${existing.id}|`)).forEach(key => delete state.completed[key]);
-    if (save()) { document.querySelector('#modal').close(); render(); showToast('Taak verwijderd'); }
+    if (await save()) { document.querySelector('#modal').close(); render(); showToast('Taak verwijderd'); }
   });
   document.querySelector('#modal').showModal();
 }
@@ -583,7 +570,7 @@ function openMember(id) {
     <div class="form-grid"><div class="field"><label for="member-name">Naam</label><input id="member-name" name="name" required maxlength="80" value="${escapeHtml(existing?.name || '')}"></div><div class="field"><label for="birth-date">Geboortedatum</label><input id="birth-date" name="birthDate" type="date" min="1900-01-01" max="${dateKey(new Date())}" value="${escapeHtml(existing?.birthDate || '')}">${!existing?.birthDate && existing?.birthYear != null ? `<span class="field-help">Eerder opgegeven geboortejaar: ${escapeHtml(existing.birthYear)}. Vul de volledige geboortedatum in voor de juiste leeftijd.</span>` : !existing?.birthDate && existing?.age != null ? `<span class="field-help">Eerder opgegeven leeftijd: ${escapeHtml(existing.age)} jaar. Vul de geboortedatum in om dit te vervangen.</span>` : ''}</div></div>
     <div class="modal-actions">${existing ? '<button type="button" class="button danger" data-action="delete-member">Verwijderen</button>' : ''}<button type="button" class="button secondary" data-action="close-modal">Annuleren</button><button type="submit" class="button">Opslaan</button></div></form>`;
   const form = document.querySelector('#member-form');
-  form.addEventListener('submit', event => {
+  form.addEventListener('submit', async event => {
     event.preventDefault();
     const name = form.elements.name.value.trim();
     if (!name) { form.elements.name.setCustomValidity('Vul een naam in.'); form.elements.name.reportValidity(); return; }
@@ -592,10 +579,10 @@ function openMember(id) {
     if (birthDate !== null) { delete member.birthYear; delete member.age; }
     if (existing) state.members[state.members.indexOf(existing)] = member;
     else state.members.push(member);
-    if (save()) { document.querySelector('#modal').close(); render(); showToast('Gezinslid opgeslagen'); }
+    if (await save()) { document.querySelector('#modal').close(); render(); showToast('Gezinslid opgeslagen'); }
   });
   form.elements.name.addEventListener('input', () => form.elements.name.setCustomValidity(''));
-  form.querySelector('[data-action="delete-member"]')?.addEventListener('click', () => {
+  form.querySelector('[data-action="delete-member"]')?.addEventListener('click', async () => {
     if (!confirm(`${existing.name} verwijderen? Toegewezen taken blijven behouden, maar worden niet meer ingepland.`)) return;
     const nextState = {
       ...state,
@@ -611,12 +598,12 @@ function openMember(id) {
         }
       }
     });
-    if (save(nextState)) { state = nextState; document.querySelector('#modal').close(); render(); showToast('Gezinslid verwijderd'); }
+    if (await save(nextState)) { state = nextState; document.querySelector('#modal').close(); render(); showToast('Gezinslid verwijderd'); }
   });
   document.querySelector('#modal').showModal();
 }
 
-document.addEventListener('click', event => {
+document.addEventListener('click', async event => {
   const button = event.target.closest('[data-action]');
   if (!button) return;
   const action = button.dataset.action;
@@ -633,10 +620,10 @@ document.addEventListener('click', event => {
     document.querySelector('#task-search').focus();
   }
   if (action === 'export-backup') exportBackup();
-  if (action === 'import-backup') importBackup();
+  if (action === 'import-backup') await importBackup();
   if (action === 'toggle-grocery-urgent') {
     const nextState = { ...state, groceries: state.groceries.map(item => item.id === button.dataset.id ? { ...item, urgent: !item.urgent } : item) };
-    if (save(nextState)) {
+    if (await save(nextState)) {
       state = nextState;
       render();
       [...document.querySelectorAll('[data-action="toggle-grocery-urgent"]')].find(item => item.dataset.id === button.dataset.id)?.focus();
@@ -644,11 +631,11 @@ document.addEventListener('click', event => {
   }
   if (action === 'delete-grocery') {
     const nextState = { ...state, groceries: state.groceries.filter(item => item.id !== button.dataset.id) };
-    if (save(nextState)) { state = nextState; render(); showToast('Boodschap verwijderd'); }
+    if (await save(nextState)) { state = nextState; render(); showToast('Boodschap verwijderd'); }
   }
   if (action === 'delete-meal-idea') {
     const nextState = { ...state, mealIdeas: state.mealIdeas.filter(idea => idea.id !== button.dataset.id) };
-    if (save(nextState)) { state = nextState; render(); showToast('Gerecht verwijderd'); }
+    if (await save(nextState)) { state = nextState; render(); showToast('Gerecht verwijderd'); }
   }
   if (action === 'new-member') openMember();
   if (action === 'edit-member') openMember(button.dataset.id);
@@ -658,13 +645,13 @@ document.addEventListener('click', event => {
   if (action === 'previous-week' || action === 'next-week') { selectedDate = dateKey(addDays(parseDate(selectedDate), action === 'previous-week' ? -7 : 7)); render(); }
 });
 
-document.addEventListener('change', event => {
+document.addEventListener('change', async event => {
   const target = event.target;
   if (target.dataset.action === 'meal-wish') {
     const nextState = { ...state, mealIdeas: state.mealIdeas.map(idea => idea.id === target.dataset.id ? {
       ...idea, wishedBy: target.checked ? [...idea.wishedBy, target.dataset.memberId] : idea.wishedBy.filter(id => id !== target.dataset.memberId)
     } : idea) };
-    if (save(nextState)) {
+    if (await save(nextState)) {
       state = nextState;
       render();
       [...document.querySelectorAll('[data-action="meal-wish"]')].find(input => input.dataset.id === target.dataset.id && input.dataset.memberId === target.dataset.memberId)?.focus();
@@ -672,7 +659,7 @@ document.addEventListener('change', event => {
   }
   if (target.dataset.action === 'grocery-done') {
     const nextState = { ...state, groceries: state.groceries.map(item => item.id === target.dataset.id ? { ...item, done: target.checked } : item) };
-    if (save(nextState)) { state = nextState; render(); }
+    if (await save(nextState)) { state = nextState; render(); }
     else target.checked = !target.checked;
   }
   if (target.dataset.action === 'complete') {
@@ -681,14 +668,14 @@ document.addEventListener('change', event => {
     const key = completionKey(task, parseDate(selectedDate));
     if (target.checked) state.completed[key] = true;
     else delete state.completed[key];
-    if (save()) render();
+    if (await save()) render();
   }
   if (target.id === 'frequency-filter') { frequencyFilter = target.value; render(); }
   if (target.id === 'member-filter') { memberFilter = target.value; render(); }
   if (target.id === 'status-filter') { statusFilter = target.value; render(); }
 });
 
-document.addEventListener('submit', event => {
+document.addEventListener('submit', async event => {
   if (!['groceries-form', 'meal-ideas-form'].includes(event.target.id)) return;
   event.preventDefault();
   const input = event.target.elements.name;
@@ -698,7 +685,7 @@ document.addEventListener('submit', event => {
   const nextState = meal
     ? { ...state, mealIdeas: [...state.mealIdeas, { id: crypto.randomUUID(), name, wishedBy: [] }] }
     : { ...state, groceries: [...state.groceries, { id: crypto.randomUUID(), name, done: false, urgent: false }] };
-  if (save(nextState)) { state = nextState; render(); document.querySelector(meal ? '#meal-idea-name' : '#grocery-name').focus(); }
+  if (await save(nextState)) { state = nextState; render(); document.querySelector(meal ? '#meal-idea-name' : '#grocery-name').focus(); }
 });
 
 document.addEventListener('input', event => {
@@ -727,4 +714,72 @@ window.addEventListener('storage', event => {
   if (event.key === THEME_KEY || event.key === null) applyTheme(event.newValue);
 });
 initializeTheme();
-render();
+
+async function openAccount() {
+  const result = await api('api/state');
+  state = validateBackup({ format: BACKUP_FORMAT, version: 1, data: result.data });
+  revision = result.revision;
+  document.querySelector('#account-email').textContent = result.email;
+  document.querySelector('#auth-screen').hidden = true;
+  document.querySelector('#app').hidden = false;
+  render();
+}
+
+const authForm = document.querySelector('#auth-form');
+authForm.inert = true;
+openAccount().catch(error => {
+  if (error.status !== 401) {
+    console.error('Account laden mislukt:', error);
+    document.querySelector('#auth-error').textContent = `Gegevens laden mislukt: ${error.message}`;
+  }
+}).finally(() => { authForm.inert = false; });
+
+authForm.addEventListener('submit', async event => {
+  event.preventDefault();
+  const action = event.submitter?.value || 'login';
+  const data = new FormData(authForm);
+  const errorBox = document.querySelector('#auth-error');
+  errorBox.textContent = '';
+  authForm.inert = true;
+  try {
+    await api(`api/${action}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: data.get('email'), password: data.get('password') })
+    });
+    authForm.reset();
+    await openAccount();
+  } catch (error) {
+    console.error('Aanmelden mislukt:', error);
+    errorBox.textContent = error.message;
+  } finally {
+    authForm.inert = false;
+  }
+});
+
+document.querySelector('#logout').addEventListener('click', async () => {
+  document.querySelector('#app').inert = true;
+  try {
+    await api('api/logout', { method: 'POST' });
+    state = null;
+    revision = null;
+    document.querySelector('#app').hidden = true;
+    document.querySelector('#auth-screen').hidden = false;
+    document.querySelector('#content').replaceChildren();
+    document.querySelector('#account-email').textContent = '';
+    document.querySelector('#auth-error').textContent = '';
+  } catch (error) {
+    console.error('Uitloggen mislukt:', error);
+    alert(`Uitloggen is niet gelukt: ${error.message}`);
+  } finally {
+    document.querySelector('#app').inert = false;
+  }
+});
+document.querySelector('#recovery-export').addEventListener('click', exportBackup);
+document.querySelector('#recovery-reload').addEventListener('click', () => {
+  needsRecovery = false;
+  location.reload();
+});
+window.addEventListener('beforeunload', event => {
+  if (saving || needsRecovery) event.preventDefault();
+});
