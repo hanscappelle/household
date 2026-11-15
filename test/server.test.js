@@ -117,6 +117,26 @@ test(`accounts en opslag op ${basePath || '/'}`, { skip: !configured, timeout: 3
   assert.equal(childAccount.status, 201);
   const childFamily = await request('/api/household', { cookie: childAccount.cookie });
   assert.equal(childFamily.json.canInvite, false);
+  assert.equal((await request('/api/password-resets', {
+    method: 'POST', cookie: childAccount.cookie, body: { email: emails[0] }
+  })).status, 403);
+  const passwordReset = await request('/api/password-resets', {
+    method: 'POST', cookie: first.cookie, body: { email: emails[3] }
+  });
+  assert.equal(passwordReset.status, 201);
+  assert.equal((await request(`/api/password-resets/${passwordReset.json.token}`)).json.email, emails[3]);
+  const changedPassword = 'een-nieuw-veilig-testwachtwoord';
+  assert.equal((await request('/api/password-resets/complete', {
+    method: 'POST', body: { token: passwordReset.json.token, password: changedPassword }
+  })).status, 200);
+  assert.equal((await request('/api/state', { cookie: childAccount.cookie })).status, 401);
+  assert.equal((await request(`/api/password-resets/${passwordReset.json.token}`)).status, 404);
+  assert.equal((await request('/api/login', {
+    method: 'POST', body: { email: emails[3], password: credentials.password }
+  })).status, 401);
+  assert.equal((await request('/api/login', {
+    method: 'POST', body: { email: emails[3], password: changedPassword }
+  })).status, 200);
   const revoked = await request('/api/invitations', {
     method: 'POST', cookie: first.cookie, body: { email: emails[4], role: 'parent', memberId: null }
   });

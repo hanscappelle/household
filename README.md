@@ -127,8 +127,13 @@ exacte betrouwbare proxyadressen bekend zijn; zonder deze instelling kan de
 aanmeldlimiet achter een proxy voor alle gebruikers samen gelden.
 
 Registratie staat open voor iedereen die de site kan bereiken. Het e-mailadres
-is een gebruikersnaam en wordt niet geverifieerd; er is geen
-wachtwoordherstel, e-mailverificatie of accountverwijdering ingebouwd.
+is een gebruikersnaam en wordt niet geverifieerd; er is geen e-mailverificatie
+of zelfstandig wachtwoordherstel via e-mail. Een ouder kan op **Ons gezin** bij
+een ander account in hetzelfde huishouden een eenmalige resetlink maken. Deel
+die link rechtstreeks met de betreffende gebruiker: de link is één uur geldig,
+wordt na gebruik onbruikbaar en laat de gebruiker zelf een nieuw wachtwoord
+kiezen. Bestaande sessies van dat account worden na de reset beëindigd. Deel de
+link niet openbaar; iedereen die de link ontvangt kan het wachtwoord resetten.
 Bewaar je wachtwoord veilig. Wachtwoorden worden met scrypt gehasht; sessies
 verlopen na zeven dagen. Aanmeldpogingen zijn per proces en IP beperkt, dus
 voor publieke of grotere installaties zijn aanvullende bescherming tegen
@@ -254,6 +259,12 @@ begint de boodschappenlijst leeg. Boodschappen uit oudere back-ups zonder
 dringendheidsmarkering zijn niet dringend.
 Bij oudere back-ups zonder kookinspiratie begint die lijst leeg.
 
+## Help voor gebruikers
+
+In de app vind je via **Help** een praktische uitleg over aanmelden, het
+overzicht en taken, gezinsleden uitnodigen, boodschappen, kookinspiratie,
+instellingen, back-ups en het gebruik op meerdere apparaten.
+
 ## Weergave
 
 Met de knop **Donker** bovenaan schakel je donkere modus in. Met **Licht**
@@ -274,3 +285,4 @@ verwijdert deze weer. Zonder databaseconfiguratie wordt de test overgeslagen.
 - app vertaling voorzien
 - feature requests voorzien (link naar github)
 - opensource project, github
+- taken kunnen prioritair zijn

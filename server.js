@@ -162,6 +162,91 @@ router.post('/api/login', authLimit, async (req, res) => {
   res.json({ email });
 });
 
+router.post('/api/password-resets', authenticate, authLimit, async (req, res) => {
+  const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+  if (!emailValid(email) || email === req.user.email) {
+    return res.status(400).json({ error: 'Kies een ander account met een geldig e-mailadres.' });
+  }
+  if (req.user.household_role === 'child') {
+    return res.status(403).json({ error: 'Alleen ouders kunnen wachtwoorden van andere gezinsaccounts resetten.' });
+  }
+  const token = randomBytes(32).toString('base64url');
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [users] = await connection.execute(
+      'SELECT id FROM users WHERE email = ? AND household_id = ? FOR UPDATE',
+      [email, req.user.household_id]
+    );
+    if (!users.length) {
+      await connection.rollback();
+      return res.status(404).json({ error: 'Dit account is niet gevonden in je huishouden.' });
+    }
+    await connection.execute(
+      'UPDATE password_resets SET used_at = UTC_TIMESTAMP() WHERE user_id = ? AND used_at IS NULL',
+      [users[0].id]
+    );
+    await connection.execute(
+      'INSERT INTO password_resets (token_hash, user_id, household_id, requested_by_user_id, expires_at) VALUES (?, ?, ?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 1 HOUR))',
+      [hashToken(token), users[0].id, req.user.household_id, req.user.id]
+    );
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+  res.status(201).json({ token });
+});
+
+router.get('/api/password-resets/:token', async (req, res) => {
+  const token = req.params.token;
+  if (!/^[A-Za-z0-9_-]{43}$/.test(token)) return res.status(404).json({ error: 'Deze resetlink is ongeldig of verlopen.' });
+  const [rows] = await pool.execute(
+    'SELECT users.email FROM password_resets JOIN users ON users.id = password_resets.user_id WHERE password_resets.token_hash = ? AND password_resets.used_at IS NULL AND password_resets.expires_at > UTC_TIMESTAMP()',
+    [hashToken(token)]
+  );
+  if (!rows.length) return res.status(404).json({ error: 'Deze resetlink is ongeldig of verlopen.' });
+  res.json({ email: rows[0].email });
+});
+
+router.post('/api/password-resets/complete', authLimit, async (req, res) => {
+  const { token, password } = req.body || {};
+  if (typeof token !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(token) || !passwordValid(password)) {
+    return res.status(400).json({ error: 'Deze resetlink of dit wachtwoord is ongeldig.' });
+  }
+  const salt = randomBytes(16).toString('hex');
+  const passwordHash = (await scrypt(password, salt, 64)).toString('hex');
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [rows] = await connection.execute(
+      'SELECT user_id FROM password_resets WHERE token_hash = ? AND used_at IS NULL AND expires_at > UTC_TIMESTAMP() FOR UPDATE',
+      [hashToken(token)]
+    );
+    if (!rows.length) {
+      await connection.rollback();
+      return res.status(404).json({ error: 'Deze resetlink is ongeldig of verlopen.' });
+    }
+    const userId = rows[0].user_id;
+    await connection.execute('UPDATE users SET password_salt = ?, password_hash = ? WHERE id = ?', [salt, passwordHash, userId]);
+    await connection.execute('DELETE FROM sessions WHERE user_id = ?', [userId]);
+    await connection.execute('UPDATE password_resets SET used_at = UTC_TIMESTAMP() WHERE token_hash = ?', [hashToken(token)]);
+    await connection.execute(
+      'UPDATE password_resets SET used_at = UTC_TIMESTAMP() WHERE user_id = ? AND used_at IS NULL',
+      [userId]
+    );
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+  res.json({ ok: true });
+});
+
 router.post('/api/invitations', authenticate, async (req, res) => {
   const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
   const role = req.body?.role;
@@ -254,14 +339,18 @@ router.post('/api/invitations/accept', authLimit, async (req, res) => {
 
 router.get('/api/household', authenticate, async (req, res) => {
   const [members] = await pool.execute(
-    "SELECT email, household_role AS role FROM users WHERE household_id = ? ORDER BY FIELD(household_role, 'owner', 'partner', 'child'), email",
+    "SELECT id, email, household_role AS role FROM users WHERE household_id = ? ORDER BY FIELD(household_role, 'owner', 'partner', 'child'), email",
     [req.user.household_id]
   );
   const [invitations] = await pool.execute(
     "SELECT id, email, role, DATE_FORMAT(expires_at, '%Y-%m-%dT%H:%i:%sZ') AS expiresAt FROM invitations WHERE household_id = ? AND accepted_at IS NULL AND expires_at > UTC_TIMESTAMP() ORDER BY id DESC",
     [req.user.household_id]
   );
-  res.json({ members, invitations, canInvite: req.user.household_role !== 'child' });
+  res.json({
+    members: members.map(member => ({ ...member, canReset: req.user.household_role !== 'child' && member.id !== req.user.id })),
+    invitations,
+    canInvite: req.user.household_role !== 'child'
+  });
 });
 
 router.delete('/api/invitations/:id', authenticate, async (req, res) => {
@@ -360,6 +449,19 @@ async function start() {
     INDEX (household_id, email),
     FOREIGN KEY (household_id) REFERENCES households(id) ON DELETE CASCADE,
     FOREIGN KEY (invited_by_user_id) REFERENCES users(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS password_resets (
+    token_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL PRIMARY KEY,
+    user_id BIGINT UNSIGNED NOT NULL,
+    household_id BIGINT UNSIGNED NOT NULL,
+    requested_by_user_id BIGINT UNSIGNED NOT NULL,
+    expires_at DATETIME NOT NULL,
+    used_at DATETIME NULL,
+    INDEX (user_id, used_at),
+    INDEX (expires_at),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (household_id) REFERENCES households(id) ON DELETE CASCADE,
+    FOREIGN KEY (requested_by_user_id) REFERENCES users(id) ON DELETE CASCADE
   ) ENGINE=InnoDB`);
   const [invitationColumns] = await pool.execute("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'invitations'");
   if (!invitationColumns.some(column => column.COLUMN_NAME === 'member_id')) {

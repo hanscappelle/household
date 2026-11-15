@@ -9,7 +9,7 @@
 .auth-panel input{width:100%;padding:10px;border:1px solid #dfe7df;border-radius:8px}
 .auth-panel label{font-weight:700}
 #auth-error{color:#ad4439}
-#invite-error,#household-invite-error{color:#ad4439}
+#invite-error,#household-invite-error,#password-reset-error{color:#ad4439}
 .recovery{position:fixed;inset:0;z-index:100;background:rgba(20,35,25,.75)}
 .recovery .button{margin:8px 8px 0 0}
 body{margin:0;font-size:14px}
@@ -32,6 +32,7 @@ a{color:inherit;text-decoration:none}
 .navigation a.active{background:#e8f1e9;color:#416d54}
 .nav-icon{font-size:19px;width:20px;text-align:center;line-height:1}
 .nav-count{margin-left:auto;background:#f0f3ef;border-radius:6px;color:#9ba79d;font-size:10px;padding:4px 6px}
+.nav-beta{margin-left:auto;border-radius:5px;background:#fff0d9;color:#92651e;font-size:8px;font-weight:700;letter-spacing:.5px;padding:3px 5px}
 .sidebar-bottom{margin-top:auto;background:#f3f6ed;border-radius:11px;padding:18px 15px 14px;color:#54725b}
 .sidebar-illustration{height:50px;display:flex;align-items:center;gap:5px;color:#96b69d;font-size:24px}
 .sidebar-illustration span:nth-child(2){font-size:40px;color:#6b9673}
@@ -175,6 +176,12 @@ input:focus,select:focus{border-color:#85ad8d;box-shadow:0 0 0 3px #e9f2e9}
 .backup-panel p{color:#7a8a7d;font-size:12px;line-height:1.6;margin:10px 0 16px}
 .backup-panel label{display:block;margin-bottom:7px}
 .backup-panel input[type="file"]{display:block;max-width:100%;margin-bottom:14px}
+.help-content{display:grid;gap:14px;max-width:900px}
+.help-panel{padding:22px}
+.help-panel h2{font-size:20px;margin-bottom:10px}
+.help-panel p{font-size:12px;line-height:1.7;color:#718676;margin-top:8px}
+.help-panel a{color:#507a60;font-weight:700;text-decoration:underline;text-underline-offset:2px}
+.help-panel a:hover{color:#345a40}
 .household-access{margin-top:32px;max-width:760px}
 .household-account-list{margin-bottom:15px}
 .invite-list-title{font-size:13px;margin:18px 0 4px}
@@ -231,11 +238,14 @@ dialog::backdrop{background:rgba(34,50,38,.42)}
 [data-theme="dark"] .sidebar,[data-theme="dark"] .topbar,[data-theme="dark"] .panel,[data-theme="dark"] .stat,[data-theme="dark"] dialog{background:#202f25;border-color:#35483a}
 [data-theme="dark"] .navigation a{color:#bdcbbf}
 [data-theme="dark"] .navigation a:hover,[data-theme="dark"] .navigation a.active,[data-theme="dark"] .nav-count{background:#344a39;color:#d4e5d6}
+[data-theme="dark"] .nav-beta{background:#51452e;color:#f0d39a}
 [data-theme="dark"] .brand-mark,[data-theme="dark"] .top-avatar,[data-theme="dark"] .stat-icon,[data-theme="dark"] .frequency-tag{background:#354b39;color:#c0ddc4}
 [data-theme="dark"] .top-avatar{border-color:#202f25;box-shadow:0 0 0 1px #425746}
 [data-theme="dark"] .sidebar-bottom,[data-theme="dark"] .tip{background:#29392b;border-color:#40503d;color:#d0dfcb}
 [data-theme="dark"] .sidebar-bottom p,[data-theme="dark"] .tip p,[data-theme="dark"] .tip strong{color:#c3d0bb}
 [data-theme="dark"] .backup-panel p{color:#b4c5b7}
+[data-theme="dark"] .help-panel p{color:#b4c5b7}
+[data-theme="dark"] .help-panel a{color:#a7d0ac}
 [data-theme="dark"] .sidebar-foot{border-color:#455a47}
 [data-theme="dark"] .breadcrumb span:last-child,[data-theme="dark"] .page-heading p,[data-theme="dark"] .section-heading p,[data-theme="dark"] .stat small,[data-theme="dark"] .family-row small,[data-theme="dark"] .task-info small,[data-theme="dark"] .member-card p,[data-theme="dark"] .field-help{color:#b4c5b7}
 [data-theme="dark"] .hero{background:#304d37}

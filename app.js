@@ -48,6 +48,8 @@ let state = null;
 let revision = null;
 let householdInfo = { members: [], invitations: [], canInvite: false };
 let createdInvitationUrl = '';
+let createdPasswordResetUrl = '';
+let createdPasswordResetEmail = '';
 let saving = false;
 let needsRecovery = false;
 let selectedDate = dateKey(new Date());
@@ -367,7 +369,7 @@ function renderFamily() {
       <div class="section-heading"><div><h2>Samen in hetzelfde dashboard</h2><p>Nodig je partner of kinderen uit met hun eigen e-mailadres en wachtwoord.</p></div></div>
       <div class="panel backup-panel">
         <h2>Gezinsaccounts</h2>
-        <div class="household-account-list">${householdInfo.members.map(member => `<div class="family-row"><span class="avatar">${escapeHtml(member.email.slice(0, 1).toUpperCase())}</span><div><strong>${escapeHtml(member.email)}</strong><small>${roles[member.role] || 'Gezinslid'} · eigen login</small></div></div>`).join('')}</div>
+        <div class="household-account-list">${householdInfo.members.map(member => `<div class="family-row"><span class="avatar">${escapeHtml(member.email.slice(0, 1).toUpperCase())}</span><div><strong>${escapeHtml(member.email)}</strong><small>${roles[member.role] || 'Gezinslid'} · eigen login</small></div>${member.canReset ? `<button type="button" class="text-button" data-action="create-password-reset" data-email="${escapeHtml(member.email)}">Wachtwoord resetten</button>` : ''}</div>`).join('')}</div>
         ${householdInfo.invitations.length ? `<h3 class="invite-list-title">Openstaande uitnodigingen</h3>${householdInfo.invitations.map(invite => `<div class="family-row"><div><strong>${escapeHtml(invite.email)}</strong><small>${roles[invite.role]} · geldig tot ${escapeHtml(new Date(invite.expiresAt).toLocaleDateString('nl-BE'))}</small></div>${householdInfo.canInvite ? `<button type="button" class="text-button" data-action="revoke-invitation" data-id="${escapeHtml(invite.id)}">Intrekken</button>` : ''}</div>`).join('')}` : ''}
         ${householdInfo.canInvite ? `<form id="household-invite-form" class="invite-form">
           <label for="invite-member">Gezinslid</label><select id="invite-member" name="memberId"><option value="">Nieuw gezinslid</option>${state.members.map(member => `<option value="${escapeHtml(member.id)}">${escapeHtml(member.name)}${member.email ? ` · ${escapeHtml(member.email)}` : ''}</option>`).join('')}</select>
@@ -379,6 +381,10 @@ function renderFamily() {
         <div id="created-invitation" class="created-invitation" ${createdInvitationUrl ? '' : 'hidden'}>
           <label for="created-invitation-url">Deel deze link binnen je gezin</label><input id="created-invitation-url" readonly value="${escapeHtml(createdInvitationUrl)}">
           <button type="button" class="button secondary" data-action="copy-invitation">Link kopiëren</button><p>De link is 7 dagen geldig. De ontvanger stelt zelf een wachtwoord in.</p>
+        </div>
+        <div id="created-password-reset" class="created-invitation" ${createdPasswordResetUrl ? '' : 'hidden'}>
+          <label for="created-password-reset-url">Resetlink voor ${escapeHtml(createdPasswordResetEmail)}</label><input id="created-password-reset-url" readonly value="${escapeHtml(createdPasswordResetUrl)}">
+          <button type="button" class="button secondary" data-action="copy-password-reset">Link kopiëren</button><p>Deel deze link rechtstreeks met de gebruiker. De link is eenmalig geldig voor 1 uur; daarna kiest de gebruiker zelf een nieuw wachtwoord. Na de reset worden bestaande sessies beëindigd.</p>
         </div>
       </div>
     </section>`;
@@ -425,6 +431,36 @@ function renderBackup() {
     <div class="panel backup-panel"><h2>Back-up terugzetten</h2><p>Een back-up terugzetten vervangt de huidige gegevens van je account. Download eventueel eerst een back-up van de huidige gegevens.</p><label for="backup-file" class="field-label">JSON-bestand kiezen</label><input id="backup-file" type="file" accept=".json,application/json"><button class="button secondary" data-action="import-backup">Back-up terugzetten</button></div>`;
 }
 
+function renderHelp() {
+  return `<div class="page-heading"><div><h1>Help</h1><p>Praktische uitleg over het gebruik van jullie huishoudapp.</p></div></div>
+    <div class="help-content">
+      <section class="panel help-panel"><h2>Aanmelden en samen gebruiken</h2>
+        <p>Log in met je e-mailadres en wachtwoord. Een ouder kan via <a href="#gezin">Ons gezin</a> een partner of kind uitnodigen met een persoonlijke link. De genodigde kiest zelf een wachtwoord. Een geaccepteerde uitnodiging geeft toegang tot hetzelfde gezinsdashboard.</p>
+        <p>Is een gezinslid het wachtwoord vergeten? Een ouder kan bij <a href="#gezin">Gezinsaccounts</a> een eenmalige resetlink maken en deze rechtstreeks met die gebruiker delen. De link verloopt na een uur; de gebruiker kiest zelf het nieuwe wachtwoord.</p>
+        <p>De uitnodigingslink is zeven dagen geldig. Deel hem alleen met de bedoelde persoon. Kindaccounts kunnen het dashboard gebruiken, maar geen gezinsleden uitnodigen of uitnodigingen intrekken.</p>
+      </section>
+      <section class="panel help-panel"><h2>Overzicht en taken</h2>
+        <p>Op <a href="#overzicht">Overzicht</a> zie je de weekplanning, taken en verjaardagen. Kies een dag in de agenda of gebruik de pijlen om naar een andere week te gaan. Vink een taak af wanneer die klaar is.</p>
+        <p>Op <a href="#taken">Alle taken</a> kun je een taak openen om de planning te wijzigen. Kies per dag, week, maand of eenmalige datum wie de taak uitvoert. Gebruik de zoekbalk en filters om taken terug te vinden.</p>
+      </section>
+      <section class="panel help-panel"><h2>Gezinsleden</h2>
+        <p>Voeg op <a href="#gezin">Ons gezin</a> gezinsleden toe en bewerk hun naam, geboortedatum en optioneel e-mailadres. Een geboortedatum wordt gebruikt om de leeftijd te tonen en verjaardagen op het overzicht te markeren.</p>
+        <p>Om iemand een eigen login te geven, kies je bij de uitnodiging een bestaand gezinslid of maak je een uitnodiging voor een nieuw gezinslid. Vul het login-e-mailadres in en deel de link. Na acceptatie wordt het e-mailadres van een gekoppeld gezinslid gelijk aan het e-mailadres van de login.</p>
+      </section>
+      <section class="panel help-panel"><h2>Boodschappen en kookinspiratie</h2>
+        <p>Op <a href="#boodschappen">Boodschappen</a> voeg je producten toe. Vink ze af na aankoop, markeer ze zo nodig als dringend of verwijder ze als ze niet meer nodig zijn.</p>
+        <p>Op <a href="#kookinspiratie">Kookinspiratie</a> bewaar je gerechten en vink je per gezinslid aan wie er zin in heeft. De lijst sorteert gerechten met de meeste wensen bovenaan.</p>
+      </section>
+      <section class="panel help-panel"><h2>Instellingen en gegevens bewaren</h2>
+        <p>Bij <a href="#instellingen">Instellingen</a> pas je de websitetitel, de ondertekst van het logo en de welkomst- en zijpaneelteksten aan. Deze teksten zijn zichtbaar voor het hele gezin.</p>
+        <p>Je kunt daar ook een JSON-back-up downloaden of terugzetten. Terugzetten vervangt de huidige gezinsgegevens; maak eventueel eerst een back-up. Bewaar het bestand veilig, want het bevat persoonlijke gegevens.</p>
+      </section>
+      <section class="panel help-panel"><h2>Wijzigingen op meerdere apparaten</h2>
+        <p>Wijzigingen worden op de server opgeslagen en zijn beschikbaar voor alle gezinsaccounts. Een ander geopend tabblad wordt niet automatisch bijgewerkt; herlaad de pagina voordat je daar verder werkt. Bij gelijktijdige wijzigingen kan de app een conflict melden. Herlaad dan om de meest recente gegevens te bekijken.</p>
+      </section>
+    </div>`;
+}
+
 function render() {
   if (!state) return;
   const requestedView = location.hash.slice(1);
@@ -432,8 +468,8 @@ function render() {
     location.hash = 'instellingen';
     return;
   }
-  const view = ['overzicht', 'taken', 'gezin', 'instellingen', 'boodschappen', 'kookinspiratie'].includes(requestedView) ? requestedView : 'overzicht';
-  document.querySelector('#content').innerHTML = view === 'taken' ? renderTasks() : view === 'gezin' ? renderFamily() : view === 'instellingen' ? renderBackup() : view === 'boodschappen' ? renderGroceries() : view === 'kookinspiratie' ? renderMealIdeas() : renderDashboard();
+  const view = ['overzicht', 'taken', 'gezin', 'instellingen', 'help', 'boodschappen', 'kookinspiratie'].includes(requestedView) ? requestedView : 'overzicht';
+  document.querySelector('#content').innerHTML = view === 'taken' ? renderTasks() : view === 'gezin' ? renderFamily() : view === 'instellingen' ? renderBackup() : view === 'help' ? renderHelp() : view === 'boodschappen' ? renderGroceries() : view === 'kookinspiratie' ? renderMealIdeas() : renderDashboard();
   document.querySelector('#brand-title').textContent = state.customization.websiteTitle;
   document.querySelector('#brand-subtitle').textContent = state.customization.brandSubtitle;
   document.querySelector('.brand').setAttribute('aria-label', `${state.customization.websiteTitle}, naar overzicht`);
@@ -442,7 +478,7 @@ function render() {
   document.querySelector('#sidebar-custom-title').textContent = state.customization.sidebarTitle;
   document.querySelector('#sidebar-custom-text').textContent = state.customization.sidebarText;
   document.querySelectorAll('.navigation a').forEach(link => link.classList.toggle('active', link.dataset.view === view));
-  document.querySelector('#breadcrumb-current').textContent = view === 'gezin' ? 'ONS GEZIN' : view === 'taken' ? 'ALLE TAKEN' : view === 'instellingen' ? 'INSTELLINGEN' : view === 'boodschappen' ? 'BOODSCHAPPEN' : view === 'kookinspiratie' ? 'KOOKINSPIRATIE' : 'OVERZICHT';
+  document.querySelector('#breadcrumb-current').textContent = view === 'gezin' ? 'ONS GEZIN' : view === 'taken' ? 'ALLE TAKEN' : view === 'instellingen' ? 'INSTELLINGEN' : view === 'help' ? 'HELP' : view === 'boodschappen' ? 'BOODSCHAPPEN' : view === 'kookinspiratie' ? 'KOOKINSPIRATIE' : 'OVERZICHT';
   document.querySelector('#nav-count').textContent = state.tasks.length;
   document.querySelector('#today-label').textContent = formatDate(new Date(), { weekday: 'long', day: 'numeric', month: 'long' });
 }
@@ -727,6 +763,38 @@ document.addEventListener('click', async event => {
       document.querySelector('#created-invitation-url')?.select();
     }
   }
+  if (action === 'create-password-reset') {
+    button.disabled = true;
+    try {
+      const result = await api('api/password-resets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: button.dataset.email })
+      });
+      const url = new URL(location.href);
+      url.search = '';
+      url.hash = '';
+      url.searchParams.set('wachtwoord-reset', result.token);
+      createdPasswordResetUrl = url.toString();
+      createdPasswordResetEmail = button.dataset.email;
+      render();
+      showToast('Resetlink aangemaakt');
+    } catch (error) {
+      console.error('Resetlink maken mislukt:', error);
+      showToast(`Resetlink maken is niet gelukt: ${error.message}`);
+      button.disabled = false;
+    }
+  }
+  if (action === 'copy-password-reset') {
+    try {
+      await navigator.clipboard.writeText(createdPasswordResetUrl);
+      showToast('Resetlink gekopieerd');
+    } catch (error) {
+      console.error('Resetlink kopiëren mislukt:', error);
+      showToast('Kopiëren is niet gelukt. Selecteer de link om deze te kopiëren.');
+      document.querySelector('#created-password-reset-url')?.select();
+    }
+  }
   if (action === 'revoke-invitation') {
     button.disabled = true;
     try {
@@ -899,6 +967,8 @@ async function openAccount() {
 const authForm = document.querySelector('#auth-form');
 const inviteToken = new URLSearchParams(location.search).get('uitnodiging');
 const inviteForm = document.querySelector('#invite-form');
+const passwordResetToken = new URLSearchParams(location.search).get('wachtwoord-reset');
+const passwordResetForm = document.querySelector('#password-reset-form');
 const authEmail = authForm.elements.email;
 const authError = document.querySelector('#auth-error');
 authEmail.addEventListener('invalid', () => {
@@ -907,7 +977,18 @@ authEmail.addEventListener('invalid', () => {
 authEmail.addEventListener('input', () => {
   authError.textContent = '';
 });
-if (inviteToken) {
+if (passwordResetToken) {
+  document.querySelector('#auth-screen').hidden = true;
+  document.querySelector('#password-reset-screen').hidden = false;
+  passwordResetForm.inert = true;
+  api(`api/password-resets/${encodeURIComponent(passwordResetToken)}`).then(result => {
+    document.querySelector('#password-reset-description').textContent = `Kies een nieuw wachtwoord voor ${result.email}.`;
+  }).catch(error => {
+    console.error('Resetlink laden mislukt:', error);
+    document.querySelector('#password-reset-error').textContent = error.message;
+    passwordResetForm.querySelector('button[type="submit"]').disabled = true;
+  }).finally(() => { passwordResetForm.inert = false; });
+} else if (inviteToken) {
   document.querySelector('#auth-screen').hidden = true;
   document.querySelector('#invite-screen').hidden = false;
   inviteForm.inert = true;
@@ -977,6 +1058,29 @@ inviteForm.addEventListener('submit', async event => {
   }
 });
 
+passwordResetForm.addEventListener('submit', async event => {
+  event.preventDefault();
+  document.querySelector('#password-reset-error').textContent = '';
+  passwordResetForm.inert = true;
+  try {
+    await api('api/password-resets/complete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: passwordResetToken, password: passwordResetForm.elements.password.value })
+    });
+    passwordResetForm.reset();
+    history.replaceState(null, '', `${location.pathname}${location.hash}`);
+    document.querySelector('#password-reset-screen').hidden = true;
+    document.querySelector('#auth-screen').hidden = false;
+    document.querySelector('#auth-error').textContent = 'Je wachtwoord is gewijzigd. Log in met je nieuwe wachtwoord.';
+  } catch (error) {
+    console.error('Wachtwoord resetten mislukt:', error);
+    document.querySelector('#password-reset-error').textContent = error.message;
+  } finally {
+    passwordResetForm.inert = false;
+  }
+});
+
 document.querySelector('#logout').addEventListener('click', async () => {
   document.querySelector('#app').inert = true;
   try {
@@ -985,6 +1089,8 @@ document.querySelector('#logout').addEventListener('click', async () => {
     revision = null;
     householdInfo = { members: [], invitations: [], canInvite: false };
     createdInvitationUrl = '';
+    createdPasswordResetUrl = '';
+    createdPasswordResetEmail = '';
     document.querySelector('#app').hidden = true;
     document.querySelector('#auth-screen').hidden = false;
     document.querySelector('#content').replaceChildren();
