@@ -202,11 +202,17 @@ input:focus,select:focus{border-color:#85ad8d;box-shadow:0 0 0 3px #e9f2e9}
 .created-invitation .button{justify-self:start}
 .created-invitation p{font-size:11px;line-height:1.5;color:#7a8a7d}
 .groceries-panel{max-width:680px;padding:20px}
+.meal-ideas-panel{max-width:none;width:100%}
 .groceries-form{display:flex;gap:10px;margin-bottom:20px}
 .groceries-form input{flex:1;min-width:0}
 .groceries-panel .list-summary{margin-bottom:12px}
 .meal-idea{display:grid;grid-template-columns:minmax(80px,1fr) minmax(0,2fr) auto auto;align-items:center;gap:8px 12px;padding:8px 0;border-bottom:1px solid #f0f2ef}
 .meal-idea:last-child{border-bottom:0}
+.meal-title{display:flex;align-items:center;gap:10px;min-width:0}
+.meal-avatar{width:35px;height:35px;flex-shrink:0}
+.meal-heading{display:grid;gap:5px;min-width:0}
+.recipe-search{font-size:10px;font-weight:700;color:#507a60;text-decoration:underline;text-underline-offset:2px}
+.recipe-search:hover{color:#345a40}
 .meal-name{font-size:13px;overflow-wrap:anywhere;min-width:0}
 .meal-wishes{display:flex;flex-wrap:wrap;gap:6px 12px;border:0;padding:0;margin:0;min-width:0}
 .meal-empty-members{font-size:11px;color:#718676}
@@ -268,6 +274,7 @@ dialog::backdrop{background:rgba(34,50,38,.42)}
 [data-theme="dark"] .search-clear:hover{background:#3c5541}
 [data-theme="dark"] .grocery-urgent[aria-pressed="true"]{background:#503b2b;border-color:#a57952;color:#ffd7b1}
 [data-theme="dark"] .meal-idea{border-color:#3a4e3e}
+[data-theme="dark"] .recipe-search{color:#a7d0ac}
 [data-theme="dark"] .meal-wishes legend,[data-theme="dark"] .meal-empty-members{color:#c0d9c3}
 [data-theme="dark"] .meal-count{color:#c0d9c3}
 [data-theme="dark"] .invite-form label,[data-theme="dark"] .created-invitation label,[data-theme="dark"] .invite-list-title{color:#c0d9c3}

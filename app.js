@@ -253,6 +253,12 @@ function avatar(member, index) {
   return `<span class="avatar c${index % 5}">${escapeHtml(initials)}</span>`;
 }
 
+function mealAvatar(idea) {
+  const initials = idea.name.trim().split(/\s+/).slice(0, 2).map(part => part[0]).join('').toUpperCase();
+  const color = [...idea.id].reduce((sum, character) => sum + character.charCodeAt(0), 0) % 5;
+  return `<span class="avatar c${color} meal-avatar" aria-hidden="true">${escapeHtml(initials)}</span>`;
+}
+
 function memberDetails(member) {
   const today = new Date();
   if (member.birthDate) {
@@ -299,6 +305,7 @@ function renderDashboard() {
   const weekDates = Array.from({ length: 7 }, (_, index) => addDays(start, index));
   const weekTasks = weekDates.flatMap(day => tasksOn(day).map(task => ({ task, day })));
   const done = weekTasks.filter(item => isDone(item.task, item.day)).length;
+  const importantTasks = weekTasks.filter(item => item.task.important).length;
   const todayTasks = tasksOn(date);
   const birthdays = birthdaysOn(date);
   const memberLoads = state.members.map(member => ({
@@ -318,7 +325,7 @@ function renderDashboard() {
     <div class="stats">
       <div class="stat"><span class="stat-icon">◷</span><div><strong>${weekTasks.length}</strong><small>Gepland deze week</small></div></div>
       <div class="stat"><span class="stat-icon">✓</span><div><strong>${done}</strong><small>Afgerond deze week</small></div></div>
-      <div class="stat"><span class="stat-icon">♧</span><div><strong>${state.members.length}</strong><small>Gezinsleden</small></div></div>
+      <div class="stat"><span class="stat-icon">!</span><div><strong>${importantTasks}</strong><small>Belangrijke taken deze week</small></div></div>
     </div>
     <div class="dashboard-grid">
       <section><div class="section-heading"><div><h2>De week in beeld</h2><p>Een klein beetje planning, een groot verschil.</p></div><button class="text-button" data-action="today">Vandaag</button></div>
@@ -404,9 +411,9 @@ function renderGroceries() {
 function renderMealIdeas() {
   const sortedIdeas = [...state.mealIdeas].sort((a, b) => b.wishedBy.length - a.wishedBy.length);
   return `<div class="page-heading"><div><h1>Kookinspiratie</h1><p>Bewaar gerechten en ontdek waar iedereen zin in heeft.</p></div></div>
-    <div class="panel groceries-panel">
+    <div class="panel groceries-panel meal-ideas-panel">
       <form id="meal-ideas-form" class="groceries-form"><label class="sr-only" for="meal-idea-name">Gerecht of voeding</label><input id="meal-idea-name" name="name" required maxlength="120" placeholder="Voeg een gerecht of voeding toe"><button class="button" type="submit"><span class="plus">+</span> Toevoegen</button></form>
-      ${sortedIdeas.length ? sortedIdeas.map(idea => `<div class="meal-idea"><strong class="meal-name">${escapeHtml(idea.name)}</strong>
+      ${sortedIdeas.length ? sortedIdeas.map(idea => `<div class="meal-idea"><div class="meal-title">${mealAvatar(idea)}<div class="meal-heading"><strong class="meal-name">${escapeHtml(idea.name)}</strong><a class="recipe-search" href="https://www.google.com/search?${new URLSearchParams({ q: `recept ${idea.name}` })}" target="_blank" rel="noopener noreferrer">Recept zoeken ↗</a></div></div>
         ${state.members.length ? `<fieldset class="meal-wishes"><legend class="sr-only">Wie heeft er zin in ${escapeHtml(idea.name)}?</legend>${state.members.map(member => `<label><input type="checkbox" class="check" data-action="meal-wish" data-id="${escapeHtml(idea.id)}" data-member-id="${escapeHtml(member.id)}" ${idea.wishedBy.includes(member.id) ? 'checked' : ''}><span>${escapeHtml(member.name)}</span></label>`).join('')}</fieldset>` : '<p class="meal-empty-members">Voeg een gezinslid toe om wensen aan te duiden.</p>'}
         <span class="meal-count ${idea.wishedBy.length > state.members.length / 2 ? 'majority' : ''}">${idea.wishedBy.length} ${idea.wishedBy.length === 1 ? 'persoon' : 'personen'}${idea.wishedBy.length > state.members.length / 2 ? ' · Meerderheid' : ''}</span>
         <button type="button" class="text-button meal-delete" data-action="delete-meal-idea" data-id="${escapeHtml(idea.id)}" aria-label="${escapeHtml(idea.name)} verwijderen">Verwijderen</button></div>`).join('') : '<div class="empty"><strong>Nog geen kookinspiratie</strong>Voeg een gerecht of voeding toe.</div>'}
@@ -450,7 +457,7 @@ function renderHelp() {
       </section>
       <section class="panel help-panel"><h2>Boodschappen en kookinspiratie</h2>
         <p>Op <a href="#boodschappen">Boodschappen</a> voeg je producten toe. Vink ze af na aankoop, markeer ze zo nodig als dringend of verwijder ze als ze niet meer nodig zijn.</p>
-        <p>Op <a href="#kookinspiratie">Kookinspiratie</a> bewaar je gerechten en vink je per gezinslid aan wie er zin in heeft. De lijst sorteert gerechten met de meeste wensen bovenaan.</p>
+        <p>Op <a href="#kookinspiratie">Kookinspiratie</a> bewaar je gerechten en vink je per gezinslid aan wie er zin in heeft. De lijst sorteert gerechten met de meeste wensen bovenaan. Gebruik **Recept zoeken** bij een gerecht om online recepten ervoor te vinden.</p>
       </section>
       <section class="panel help-panel"><h2>Instellingen en gegevens bewaren</h2>
         <p>Bij <a href="#instellingen">Instellingen</a> pas je de websitetitel, de ondertekst van het logo en de welkomst- en zijpaneelteksten aan. Deze teksten zijn zichtbaar voor het hele gezin.</p>

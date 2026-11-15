@@ -200,6 +200,8 @@ Een taak zonder gezinslid of een sporadische taak zonder datum staat wel in de
 takenlijst, maar niet op de kalender. Afvinken geldt voor de afzonderlijke
 geplande datum. Bestaande planningen worden automatisch overgenomen.
 In de weekplanning staat bij elke dag met taken het aantal geplande taken.
+Op het overzicht toont de derde tegel het aantal ingeplande belangrijke taken
+deze week.
 Voor de geselecteerde dag toont de staafgrafiek **Verdeling per gezinslid**
 hoeveel taken ieder gezinslid heeft, inclusief afgevinkte taken. De langste
 staaf geeft het hoogste aantal van die dag weer. Verjaardagen tellen niet mee.
@@ -237,8 +239,10 @@ Via **Kookinspiratie** kun je gerechten of voeding toevoegen en verwijderen.
 Vink per gerecht aan welke gezinsleden er zin in hebben; je kunt die wensen
 ook weer uitvinken. De gerechten met de meeste wensen staan bovenaan. Per
 gerecht zie je het aantal geïnteresseerde gezinsleden en een markering als
-meer dan de helft van de gezinsleden er zin in heeft. Bij het verwijderen van een gezinslid verdwijnen diens
-wensen, maar de gerechten blijven staan. De lijst hoort bij je account.
+meer dan de helft van de gezinsleden er zin in heeft. Met **Recept zoeken**
+open je een zoekopdracht voor recepten van dat gerecht in een nieuw tabblad.
+Bij het verwijderen van een gezinslid verdwijnen diens wensen, maar de
+gerechten blijven staan. De lijst hoort bij je account.
 
 ## Instellingen en back-up
 
