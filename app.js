@@ -343,7 +343,7 @@ function renderTasks() {
   }
   const sortLabel = statusSort === 'none' ? 'niet gesorteerd' : statusSort === 'scheduled-first' ? 'ingepland eerst' : 'niet ingepland eerst';
   return `<div class="page-heading"><div><h1>Alle taken</h1><p>Alles wat er thuis gebeurt, op één plek.</p></div><button class="button" data-action="new-task"><span class="plus">+</span> Taak toevoegen</button></div>
-    <div class="list-toolbar"><input class="search" id="task-search" type="search" placeholder="Zoek een taak..." aria-label="Zoek een taak" value="${escapeHtml(taskSearch)}"><select id="frequency-filter" aria-label="Filter op frequentie"><option value="all">Alle frequenties</option>${Object.entries(FREQUENCIES).map(([value, label]) => `<option value="${value}" ${frequencyFilter === value ? 'selected' : ''}>${label}</option>`).join('')}</select><select id="member-filter" aria-label="Filter op gezinslid"><option value="all">Iedereen</option><option value="unassigned" ${memberFilter === 'unassigned' ? 'selected' : ''}>Niet toegewezen</option>${state.members.map(member => `<option value="${escapeHtml(member.id)}" ${memberFilter === member.id ? 'selected' : ''}>${escapeHtml(member.name)}</option>`).join('')}</select><select id="status-filter" aria-label="Filter op planningsstatus"><option value="all">Alle statussen</option><option value="scheduled" ${statusFilter === 'scheduled' ? 'selected' : ''}>Ingepland</option><option value="unscheduled" ${statusFilter === 'unscheduled' ? 'selected' : ''}>Niet ingepland</option></select></div>
+    <div class="list-toolbar"><div class="search"><input id="task-search" type="search" placeholder="Zoek een taak..." aria-label="Zoek een taak" value="${escapeHtml(taskSearch)}">${taskSearch ? '<button type="button" class="search-clear" data-action="clear-task-search" aria-label="Zoekveld leegmaken">×</button>' : ''}</div><select id="frequency-filter" aria-label="Filter op frequentie"><option value="all">Alle frequenties</option>${Object.entries(FREQUENCIES).map(([value, label]) => `<option value="${value}" ${frequencyFilter === value ? 'selected' : ''}>${label}</option>`).join('')}</select><select id="member-filter" aria-label="Filter op gezinslid"><option value="all">Iedereen</option><option value="unassigned" ${memberFilter === 'unassigned' ? 'selected' : ''}>Niet toegewezen</option>${state.members.map(member => `<option value="${escapeHtml(member.id)}" ${memberFilter === member.id ? 'selected' : ''}>${escapeHtml(member.name)}</option>`).join('')}</select><select id="status-filter" aria-label="Filter op planningsstatus"><option value="all">Alle statussen</option><option value="scheduled" ${statusFilter === 'scheduled' ? 'selected' : ''}>Ingepland</option><option value="unscheduled" ${statusFilter === 'unscheduled' ? 'selected' : ''}>Niet ingepland</option></select></div>
     <div class="list-summary">${filtered.length} ${filtered.length === 1 ? 'taak' : 'taken'}</div><div class="panel list-panel"><table class="task-table"><thead><tr><th scope="col">Taak</th><th scope="col" class="status-column" aria-sort="${statusSort === 'none' ? 'none' : statusSort === 'scheduled-first' ? 'ascending' : 'descending'}"><button type="button" class="status-sort" data-action="sort-status" aria-label="Sorteer op planningsstatus, ${sortLabel}">Status <span aria-hidden="true">${statusSort === 'none' ? '↕' : statusSort === 'scheduled-first' ? '↑' : '↓'}</span></button></th><th scope="col" class="frequency-column">Frequentie</th></tr></thead><tbody>${filtered.length ? filtered.map(task => {
       const scheduled = isScheduled(task);
       const status = scheduled ? 'Ingepland' : 'Niet ingepland';
@@ -626,6 +626,11 @@ document.addEventListener('click', event => {
     statusSort = statusSort === 'scheduled-first' ? 'unscheduled-first' : 'scheduled-first';
     render();
     document.querySelector('[data-action="sort-status"]').focus();
+  }
+  if (action === 'clear-task-search') {
+    taskSearch = '';
+    render();
+    document.querySelector('#task-search').focus();
   }
   if (action === 'export-backup') exportBackup();
   if (action === 'import-backup') importBackup();

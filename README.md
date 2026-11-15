@@ -51,6 +51,8 @@ minstens één moment met een gezinslid is ingesteld. Een sporadische taak met
 een datum in het verleden blijft als ingepland aangeduid.
 Filter op planningsstatus via **Alle statussen** of klik op de kolomkop
 **Status** om de volgorde om te keren.
+Met het kruisje in het zoekveld maak je de zoektekst leeg zonder de andere
+filters te wijzigen.
 
 Eerder samengevoegde taken behouden hun schema's en afvinkjes. Hun schema's
 kun je via **bewerken** afzonderlijk aanpassen; bij overlap heeft het eerste
@@ -99,9 +101,6 @@ Bij oudere back-ups zonder kookinspiratie begint die lijst leeg.
 Met de knop **Donker** bovenaan schakel je donkere modus in. Met **Licht**
 schakel je terug. Je keuze wordt afzonderlijk in de lokale browser bewaard.
 
-## TODO
-- voor bewerken van dashboard is een login nodig
-
 ## Niet doen
 - beheer van familieleden enkel door ouders, elk lid heeft een rol: kind of ouder
 - samenvoegen van taken, onnodig complex en weinig meerwaarde
@@ -109,5 +108,4 @@ schakel je terug. Je keuze wordt afzonderlijk in de lokale browser bewaard.
 
 ## Nog te bekijken
 - app publiek zetten en bv hosten via alwaysdata
-- this will require users to create a login if everything is public + manage a family
 - android app nodig? 

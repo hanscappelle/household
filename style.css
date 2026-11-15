@@ -127,7 +127,12 @@ h1{font-size:36px;letter-spacing:-.7px;line-height:1.15}
 .tip{margin-top:17px;padding:17px;background:#faf5e8;border:1px solid #f5eeda;border-radius:10px;display:flex;gap:12px}
 .tip-icon{font-size:19px;color:#d0aa67}.tip strong{font-size:11px;color:#a18550}.tip p{font-size:10px;line-height:1.6;color:#b4a07c;margin-top:5px}
 .list-toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:20px 0}
-.search{min-width:0;flex:1}
+.search{min-width:0;flex:1;position:relative}
+.search input{width:100%;padding-right:42px}
+.search input::-webkit-search-cancel-button{-webkit-appearance:none}
+.search-clear{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:34px;height:34px;border:0;border-radius:6px;background:transparent;color:#5d7563;font-size:20px;line-height:1}
+.search-clear:hover{background:#edf3ed}
+.search-clear:focus-visible{outline:2px solid #507a60;outline-offset:-2px}
 input,select{border:1px solid #e2e8e0;background:#fff;color:#334b39;border-radius:8px;padding:11px 12px;outline:none}
 input:focus,select:focus{border-color:#85ad8d;box-shadow:0 0 0 3px #e9f2e9}
 .list-toolbar select{max-width:170px}
@@ -217,6 +222,8 @@ dialog::backdrop{background:rgba(34,50,38,.42)}
 [data-theme="dark"] .theme-toggle:hover,[data-theme="dark"] .button.secondary:hover,[data-theme="dark"] .icon-button:hover,[data-theme="dark"] .day:hover{background:#3c5541}
 [data-theme="dark"] .button.danger{background:#53362f;color:#ffd2c5}
 [data-theme="dark"] .grocery-urgent{background:#293c2e;border-color:#506554;color:#d4e5d6}
+[data-theme="dark"] .search-clear{color:#d4e5d6}
+[data-theme="dark"] .search-clear:hover{background:#3c5541}
 [data-theme="dark"] .grocery-urgent[aria-pressed="true"]{background:#503b2b;border-color:#a57952;color:#ffd7b1}
 [data-theme="dark"] .meal-idea{border-color:#3a4e3e}
 [data-theme="dark"] .meal-wishes legend,[data-theme="dark"] .meal-empty-members{color:#c0d9c3}
