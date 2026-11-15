@@ -11,7 +11,7 @@
 <body>
   <main class="auth-screen" id="auth-screen">
     <div class="panel auth-panel">
-      <h1>Ons huishouden</h1>
+      <h1 id="auth-title">Ons huishouden</h1>
       <p>Log in om je gegevens op al je apparaten te gebruiken.</p>
       <form id="auth-form">
         <label for="auth-email">E-mailadres</label>
@@ -25,11 +25,26 @@
       </form>
     </div>
   </main>
+  <main class="auth-screen" id="invite-screen" hidden>
+    <div class="panel auth-panel">
+      <h1>Je bent uitgenodigd</h1>
+      <p id="invite-description">Maak een eigen login om samen deel te nemen aan het gezinsdashboard.</p>
+      <form id="invite-form">
+        <label for="invite-email">E-mailadres</label>
+        <input id="invite-email" name="email" type="email" autocomplete="username" readonly>
+        <label for="invite-password">Kies een wachtwoord</label>
+        <input id="invite-password" name="password" type="password" autocomplete="new-password" required minlength="12" maxlength="1024">
+        <p>Gebruik minimaal 12 tekens.</p>
+        <div id="invite-error" role="alert"></div>
+        <button class="button" type="submit">Uitnodiging accepteren</button>
+      </form>
+    </div>
+  </main>
   <div class="app" id="app" hidden>
     <aside class="sidebar">
       <a class="brand" href="#overzicht" aria-label="Ons huishouden, naar overzicht">
         <span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9.5V20h13V9.5M9.5 20v-6h5v6"/></svg></span>
-        <span><strong>ons huishouden</strong><small>SAMEN THUIS</small></span>
+        <span><strong id="brand-title">ons huishouden</strong><small id="brand-subtitle">SAMEN THUIS</small></span>
       </a>
       <div class="sidebar-label">MENU</div>
       <nav class="navigation" aria-label="Hoofdnavigatie">
@@ -38,12 +53,12 @@
         <a href="#boodschappen" data-view="boodschappen"><span class="nav-icon">▤</span> Boodschappen</a>
         <a href="#kookinspiratie" data-view="kookinspiratie"><span class="nav-icon">♨</span> Kookinspiratie</a>
         <a href="#gezin" data-view="gezin"><span class="nav-icon">♧</span> Ons gezin</a>
-        <a href="#backup" data-view="backup"><span class="nav-icon">⇩</span> Back-up</a>
+        <a href="#instellingen" data-view="instellingen"><span class="nav-icon">⚙</span> Instellingen</a>
       </nav>
       <div class="sidebar-bottom">
         <div class="sidebar-illustration"><span>✳</span><span>✿</span><span>✳</span></div>
-        <strong>Een fijn thuis,<br>doen we samen.</strong>
-        <p>Een beetje overzicht maakt ruimte voor de leuke dingen.</p>
+        <strong id="sidebar-custom-title">Een fijn thuis,<br>doen we samen.</strong>
+        <p id="sidebar-custom-text">Een beetje overzicht maakt ruimte voor de leuke dingen.</p>
         <div class="sidebar-foot">GEMAAKT VOOR THUIS <span>♡</span></div>
       </div>
     </aside>

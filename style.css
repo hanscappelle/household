@@ -9,6 +9,7 @@
 .auth-panel input{width:100%;padding:10px;border:1px solid #dfe7df;border-radius:8px}
 .auth-panel label{font-weight:700}
 #auth-error{color:#ad4439}
+#invite-error,#household-invite-error{color:#ad4439}
 .recovery{position:fixed;inset:0;z-index:100;background:rgba(20,35,25,.75)}
 .recovery .button{margin:8px 8px 0 0}
 body{margin:0;font-size:14px}
@@ -174,6 +175,19 @@ input:focus,select:focus{border-color:#85ad8d;box-shadow:0 0 0 3px #e9f2e9}
 .backup-panel p{color:#7a8a7d;font-size:12px;line-height:1.6;margin:10px 0 16px}
 .backup-panel label{display:block;margin-bottom:7px}
 .backup-panel input[type="file"]{display:block;max-width:100%;margin-bottom:14px}
+.household-access{margin-top:32px;max-width:760px}
+.household-account-list{margin-bottom:15px}
+.invite-list-title{font-size:13px;margin:18px 0 4px}
+.invite-form{display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:10px;margin-top:18px;padding-top:18px;border-top:1px solid #edf0eb}
+.invite-form label{font-size:11px;font-weight:700;color:#6e8072}
+.invite-form input,.invite-form select{width:100%}
+.invite-form .button,#household-invite-error{grid-column:1/-1}
+.invite-form .invite-help{grid-column:1/-1}
+.created-invitation{display:grid;gap:9px;margin-top:18px;padding:15px;background:#f3f7f1;border-radius:9px}
+.created-invitation label{font-size:11px;font-weight:700;color:#6e8072}
+.created-invitation input{width:100%}
+.created-invitation .button{justify-self:start}
+.created-invitation p{font-size:11px;line-height:1.5;color:#7a8a7d}
 .groceries-panel{max-width:680px;padding:20px}
 .groceries-form{display:flex;gap:10px;margin-bottom:20px}
 .groceries-form input{flex:1;min-width:0}
@@ -240,6 +254,9 @@ dialog::backdrop{background:rgba(34,50,38,.42)}
 [data-theme="dark"] .meal-idea{border-color:#3a4e3e}
 [data-theme="dark"] .meal-wishes legend,[data-theme="dark"] .meal-empty-members{color:#c0d9c3}
 [data-theme="dark"] .meal-count{color:#c0d9c3}
+[data-theme="dark"] .invite-form label,[data-theme="dark"] .created-invitation label,[data-theme="dark"] .invite-list-title{color:#c0d9c3}
+[data-theme="dark"] .created-invitation{background:#29392b}
+[data-theme="dark"] .created-invitation p{color:#b4c5b7}
 [data-theme="dark"] .meal-count.majority{background:#354b39;color:#d0ebd2}
 [data-theme="dark"] .day.selected{background:#668f70;color:#fff}
 [data-theme="dark"] .day-number{color:#dce9dd}

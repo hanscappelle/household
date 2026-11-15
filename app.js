@@ -2,6 +2,15 @@ const THEME_KEY = 'ons-huishouden-thema';
 const BACKUP_FORMAT = 'ons-huishouden-backup';
 const DAYS = ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'];
 const FREQUENCIES = { daily: 'Dagelijks', weekly: 'Wekelijks', monthly: 'Maandelijks', occasional: 'Sporadisch' };
+const CUSTOM_TEXT_DEFAULTS = {
+  websiteTitle: 'Ons huishouden',
+  brandSubtitle: 'SAMEN THUIS',
+  welcomeTitle: 'Fijn dat je er bent',
+  welcomeText: 'Samen maken we van ons huis een fijne plek.',
+  sidebarTitle: 'Een fijn thuis, doen we samen.',
+  sidebarText: 'Een beetje overzicht maakt ruimte voor de leuke dingen.'
+};
+const CUSTOM_TEXT_LIMITS = { websiteTitle: 60, brandSubtitle: 40, welcomeTitle: 80, welcomeText: 160, sidebarTitle: 100, sidebarText: 200 };
 
 function validateMealIdeas(ideas, members) {
   if (!Array.isArray(ideas)) throw new Error('De lijst met kookinspiratie is ongeldig.');
@@ -37,6 +46,8 @@ function normalizeTask(task) {
 
 let state = null;
 let revision = null;
+let householdInfo = { members: [], invitations: [], canInvite: false };
+let createdInvitationUrl = '';
 let saving = false;
 let needsRecovery = false;
 let selectedDate = dateKey(new Date());
@@ -295,7 +306,7 @@ function renderDashboard() {
   const week = isoWeek(date);
   const range = `${formatDate(start, { day: 'numeric', month: 'short' })} – ${formatDate(weekDates[6], { day: 'numeric', month: 'short', year: 'numeric' })}`;
   return `
-    <div class="page-heading"><div><h1>Fijn dat je er bent <span style="color:#9cbd9f">✳</span></h1><p>Samen maken we van ons huis een fijne plek.</p></div><button class="button" data-action="new-task"><span class="plus">+</span> Taak toevoegen</button></div>
+    <div class="page-heading"><div><h1>${escapeHtml(state.customization.welcomeTitle)} <span style="color:#9cbd9f">✳</span></h1><p>${escapeHtml(state.customization.welcomeText)}</p></div><button class="button" data-action="new-task"><span class="plus">+</span> Taak toevoegen</button></div>
     <section class="hero">
       <div class="hero-copy"><div class="eyebrow">SAMEN VOOR EEN FIJN THUIS</div><h2>Een opgeruimd huis,<br><em>een beetje meer rust.</em></h2><p>Alle taken en plannen voor jullie gezin, overzichtelijk op één plek.</p></div>
       <span class="hero-badge">♡ &nbsp; SAMEN DOEN</span>
@@ -324,7 +335,7 @@ function renderDashboard() {
         </div>
       </section>
       <section><div class="section-heading"><div><h2>Ons gezin</h2><p>Samen staan we sterker.</p></div><a class="text-button" href="#gezin">Bekijken →</a></div>
-        <div class="panel family-panel">${state.members.length ? state.members.map((member, index) => `<div class="family-row">${avatar(member, index)}<div><strong>${escapeHtml(member.name)}</strong><small>${escapeHtml(memberDetails(member))}</small></div></div>`).join('') : '<div class="empty">Voeg een gezinslid toe om te beginnen.</div>'}</div>
+        <div class="panel family-panel">${state.members.length ? state.members.map((member, index) => `<div class="family-row">${avatar(member, index)}<div><strong>${escapeHtml(member.name)}</strong><small>${escapeHtml(memberDetails(member))}${member.email ? ` · ${escapeHtml(member.email)}` : ''}</small></div></div>`).join('') : '<div class="empty">Voeg een gezinslid toe om te beginnen.</div>'}</div>
         <div class="tip"><span class="tip-icon">✧</span><div><strong>Goed om te weten</strong><p>De taken uit jullie lijst staan al klaar. Wijs ze toe en kies wanneer ze terugkomen.</p><a class="text-button" href="#taken" style="padding-left:0">Bekijk alle taken →</a></div></div>
       </section>
     </div>`;
@@ -349,8 +360,28 @@ function renderTasks() {
 }
 
 function renderFamily() {
+  const roles = { owner: 'Ouder', parent: 'Ouder', partner: 'Ouder', child: 'Kind' };
   return `<div class="page-heading"><div><h1>Ons gezin</h1><p>Iedereen draagt op zijn eigen manier bij.</p></div><button class="button" data-action="new-member"><span class="plus">+</span> Gezinslid toevoegen</button></div>
-    <div class="members-grid">${state.members.map((member, index) => `<div class="panel member-card">${avatar(member, index)}<h3>${escapeHtml(member.name)}</h3><p>${escapeHtml(memberDetails(member))} · ${state.tasks.filter(task => assignedMemberIds(task).includes(member.id)).length} toegewezen taken</p><button class="text-button" data-action="edit-member" data-id="${escapeHtml(member.id)}">Gegevens bewerken →</button></div>`).join('')}</div>`;
+    <div class="members-grid">${state.members.map((member, index) => `<div class="panel member-card">${avatar(member, index)}<h3>${escapeHtml(member.name)}</h3><p>${escapeHtml(memberDetails(member))}${member.email ? `<br>${escapeHtml(member.email)}` : ''}<br>${state.tasks.filter(task => assignedMemberIds(task).includes(member.id)).length} toegewezen taken</p><button class="text-button" data-action="edit-member" data-id="${escapeHtml(member.id)}">Gegevens bewerken →</button></div>`).join('')}</div>
+    <section class="household-access">
+      <div class="section-heading"><div><h2>Samen in hetzelfde dashboard</h2><p>Nodig je partner of kinderen uit met hun eigen e-mailadres en wachtwoord.</p></div></div>
+      <div class="panel backup-panel">
+        <h2>Gezinsaccounts</h2>
+        <div class="household-account-list">${householdInfo.members.map(member => `<div class="family-row"><span class="avatar">${escapeHtml(member.email.slice(0, 1).toUpperCase())}</span><div><strong>${escapeHtml(member.email)}</strong><small>${roles[member.role] || 'Gezinslid'} · eigen login</small></div></div>`).join('')}</div>
+        ${householdInfo.invitations.length ? `<h3 class="invite-list-title">Openstaande uitnodigingen</h3>${householdInfo.invitations.map(invite => `<div class="family-row"><div><strong>${escapeHtml(invite.email)}</strong><small>${roles[invite.role]} · geldig tot ${escapeHtml(new Date(invite.expiresAt).toLocaleDateString('nl-BE'))}</small></div>${householdInfo.canInvite ? `<button type="button" class="text-button" data-action="revoke-invitation" data-id="${escapeHtml(invite.id)}">Intrekken</button>` : ''}</div>`).join('')}` : ''}
+        ${householdInfo.canInvite ? `<form id="household-invite-form" class="invite-form">
+          <label for="invite-member">Gezinslid</label><select id="invite-member" name="memberId"><option value="">Nieuw gezinslid</option>${state.members.map(member => `<option value="${escapeHtml(member.id)}">${escapeHtml(member.name)}${member.email ? ` · ${escapeHtml(member.email)}` : ''}</option>`).join('')}</select>
+          <label for="invite-role">Rol voor de login</label><select id="invite-role" name="role"><option value="parent">Ouder</option><option value="child">Kind</option></select>
+          <label for="invite-new-email">E-mailadres voor de login</label><input id="invite-new-email" name="email" type="email" autocomplete="email" required maxlength="254" placeholder="naam@voorbeeld.nl">
+          <span class="field-help invite-help">Kies een bestaand gezinslid om het account eraan te koppelen, of laat ‘Nieuw gezinslid’ staan en kies alleen de rol.</span>
+          <button class="button" type="submit">Uitnodigingslink maken</button><div id="household-invite-error" role="alert"></div>
+        </form>` : '<p class="field-help">Alleen ouders kunnen nieuwe gezinsleden uitnodigen.</p>'}
+        <div id="created-invitation" class="created-invitation" ${createdInvitationUrl ? '' : 'hidden'}>
+          <label for="created-invitation-url">Deel deze link binnen je gezin</label><input id="created-invitation-url" readonly value="${escapeHtml(createdInvitationUrl)}">
+          <button type="button" class="button secondary" data-action="copy-invitation">Link kopiëren</button><p>De link is 7 dagen geldig. De ontvanger stelt zelf een wachtwoord in.</p>
+        </div>
+      </div>
+    </section>`;
 }
 
 function renderGroceries() {
@@ -376,17 +407,42 @@ function renderMealIdeas() {
 }
 
 function renderBackup() {
-  return `<div class="page-heading"><div><h1>Back-up</h1><p>Bewaar je gegevens veilig of zet een eerdere back-up terug.</p></div></div>
+  return `<div class="page-heading"><div><h1>Instellingen</h1><p>Personaliseer de teksten en beheer de back-up van jullie gezinsgegevens.</p></div></div>
+    <form id="customization-form" class="panel backup-panel">
+      <h2>Teksten personaliseren</h2>
+      <p>Deze teksten zijn zichtbaar voor iedereen in jullie gezinsdashboard.</p>
+      <div class="form-grid">
+        <div class="field"><label for="custom-website-title">Titel van de website</label><input id="custom-website-title" name="websiteTitle" required maxlength="${CUSTOM_TEXT_LIMITS.websiteTitle}" value="${escapeHtml(state.customization.websiteTitle)}"></div>
+        <div class="field"><label for="custom-brand-subtitle">Ondertekst van het logo</label><input id="custom-brand-subtitle" name="brandSubtitle" required maxlength="${CUSTOM_TEXT_LIMITS.brandSubtitle}" value="${escapeHtml(state.customization.brandSubtitle)}"></div>
+        <div class="field"><label for="custom-welcome-title">Welkomsttitel</label><input id="custom-welcome-title" name="welcomeTitle" required maxlength="${CUSTOM_TEXT_LIMITS.welcomeTitle}" value="${escapeHtml(state.customization.welcomeTitle)}"></div>
+        <div class="field"><label for="custom-welcome-text">Korte welkomsttekst</label><input id="custom-welcome-text" name="welcomeText" required maxlength="${CUSTOM_TEXT_LIMITS.welcomeText}" value="${escapeHtml(state.customization.welcomeText)}"></div>
+        <div class="field"><label for="custom-sidebar-title">Kleine boodschap: titel</label><input id="custom-sidebar-title" name="sidebarTitle" required maxlength="${CUSTOM_TEXT_LIMITS.sidebarTitle}" value="${escapeHtml(state.customization.sidebarTitle)}"></div>
+        <div class="field"><label for="custom-sidebar-text">Kleine boodschap: tekst</label><input id="custom-sidebar-text" name="sidebarText" required maxlength="${CUSTOM_TEXT_LIMITS.sidebarText}" value="${escapeHtml(state.customization.sidebarText)}"></div>
+      </div>
+      <div class="modal-actions"><button type="button" class="button secondary" data-action="reset-customization">Standaardteksten herstellen</button><button type="submit" class="button">Teksten opslaan</button></div>
+    </form>
     <div class="panel backup-panel"><h2>Back-up downloaden</h2><p>Download een JSON-bestand met gezinsleden, taken, planningen, afvinkjes, boodschappen en kookinspiratie. Bewaar dit bestand op een veilige plek: het bevat persoonlijke gegevens.</p><button class="button" data-action="export-backup">Back-up downloaden</button></div>
     <div class="panel backup-panel"><h2>Back-up terugzetten</h2><p>Een back-up terugzetten vervangt de huidige gegevens van je account. Download eventueel eerst een back-up van de huidige gegevens.</p><label for="backup-file" class="field-label">JSON-bestand kiezen</label><input id="backup-file" type="file" accept=".json,application/json"><button class="button secondary" data-action="import-backup">Back-up terugzetten</button></div>`;
 }
 
 function render() {
   if (!state) return;
-  const view = ['overzicht', 'taken', 'gezin', 'backup', 'boodschappen', 'kookinspiratie'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'overzicht';
-  document.querySelector('#content').innerHTML = view === 'taken' ? renderTasks() : view === 'gezin' ? renderFamily() : view === 'backup' ? renderBackup() : view === 'boodschappen' ? renderGroceries() : view === 'kookinspiratie' ? renderMealIdeas() : renderDashboard();
+  const requestedView = location.hash.slice(1);
+  if (requestedView === 'backup') {
+    location.hash = 'instellingen';
+    return;
+  }
+  const view = ['overzicht', 'taken', 'gezin', 'instellingen', 'boodschappen', 'kookinspiratie'].includes(requestedView) ? requestedView : 'overzicht';
+  document.querySelector('#content').innerHTML = view === 'taken' ? renderTasks() : view === 'gezin' ? renderFamily() : view === 'instellingen' ? renderBackup() : view === 'boodschappen' ? renderGroceries() : view === 'kookinspiratie' ? renderMealIdeas() : renderDashboard();
+  document.querySelector('#brand-title').textContent = state.customization.websiteTitle;
+  document.querySelector('#brand-subtitle').textContent = state.customization.brandSubtitle;
+  document.querySelector('.brand').setAttribute('aria-label', `${state.customization.websiteTitle}, naar overzicht`);
+  document.querySelector('#auth-title').textContent = state.customization.websiteTitle;
+  document.title = `${state.customization.websiteTitle} — samen voor een fijn thuis`;
+  document.querySelector('#sidebar-custom-title').textContent = state.customization.sidebarTitle;
+  document.querySelector('#sidebar-custom-text').textContent = state.customization.sidebarText;
   document.querySelectorAll('.navigation a').forEach(link => link.classList.toggle('active', link.dataset.view === view));
-  document.querySelector('#breadcrumb-current').textContent = view === 'gezin' ? 'ONS GEZIN' : view === 'taken' ? 'ALLE TAKEN' : view === 'backup' ? 'BACK-UP' : view === 'boodschappen' ? 'BOODSCHAPPEN' : view === 'kookinspiratie' ? 'KOOKINSPIRATIE' : 'OVERZICHT';
+  document.querySelector('#breadcrumb-current').textContent = view === 'gezin' ? 'ONS GEZIN' : view === 'taken' ? 'ALLE TAKEN' : view === 'instellingen' ? 'INSTELLINGEN' : view === 'boodschappen' ? 'BOODSCHAPPEN' : view === 'kookinspiratie' ? 'KOOKINSPIRATIE' : 'OVERZICHT';
   document.querySelector('#nav-count').textContent = state.tasks.length;
   document.querySelector('#today-label').textContent = formatDate(new Date(), { weekday: 'long', day: 'numeric', month: 'long' });
 }
@@ -404,9 +460,15 @@ function validateBackup(backup) {
   if (!object(backup) || backup.format !== BACKUP_FORMAT || backup.version !== 1 || !object(backup.data)) throw new Error('Onbekend back-upformaat of versie.');
   const data = backup.data;
   if (!Array.isArray(data.members) || !Array.isArray(data.tasks) || !object(data.completed)) throw new Error('Gezinsleden, taken of afvinkjes ontbreken.');
+  if (data.customization != null && (!object(data.customization) ||
+      Object.entries(CUSTOM_TEXT_LIMITS).some(([key, limit]) => data.customization[key] !== undefined &&
+        (typeof data.customization[key] !== 'string' || !data.customization[key].trim() || data.customization[key].length > limit)))) {
+    throw new Error('De persoonlijke teksten bevatten ongeldige gegevens.');
+  }
   const memberIds = new Set();
   for (const member of data.members) {
     if (!object(member) || !id(member.id) || memberIds.has(member.id) || typeof member.name !== 'string' || !member.name.trim() ||
+      (member.email != null && (typeof member.email !== 'string' || member.email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(member.email))) ||
       (member.birthDate != null && (!validBackupDate(member.birthDate) || member.birthDate > dateKey(new Date()))) ||
       (member.birthYear != null && (!Number.isInteger(member.birthYear) || member.birthYear < 1900 || member.birthYear > new Date().getFullYear())) ||
       (member.age != null && (!Number.isInteger(member.age) || member.age < 0 || member.age > 130))) throw new Error('Een gezinslid bevat ongeldige gegevens.');
@@ -450,7 +512,7 @@ function validateBackup(backup) {
     groceryIds.add(item.id);
   }
   if (data.mealIdeas !== undefined) validateMealIdeas(data.mealIdeas, data.members);
-  return { ...data, groceries: data.groceries ?? [], mealIdeas: data.mealIdeas === undefined ? [] : data.mealIdeas, tasks: data.tasks.map(task => {
+  return { ...data, customization: { ...CUSTOM_TEXT_DEFAULTS, ...data.customization }, groceries: data.groceries ?? [], mealIdeas: data.mealIdeas === undefined ? [] : data.mealIdeas, tasks: data.tasks.map(task => {
     const normalized = normalizeTask(task);
     if (normalized.schedules) normalized.schedules = normalized.schedules.map(normalizeTask);
     return normalized;
@@ -567,7 +629,7 @@ function openTask(id) {
 function openMember(id) {
   const existing = state.members.find(member => member.id === id);
   document.querySelector('#modal-content').innerHTML = `<form id="member-form" class="modal-inner"><div class="modal-head"><div><h2 id="modal-title">${existing ? 'Gezinslid bewerken' : 'Gezinslid toevoegen'}</h2><p>Iedereen hoort erbij.</p></div><button type="button" class="close" data-action="close-modal" aria-label="Sluiten">×</button></div>
-    <div class="form-grid"><div class="field"><label for="member-name">Naam</label><input id="member-name" name="name" required maxlength="80" value="${escapeHtml(existing?.name || '')}"></div><div class="field"><label for="birth-date">Geboortedatum</label><input id="birth-date" name="birthDate" type="date" min="1900-01-01" max="${dateKey(new Date())}" value="${escapeHtml(existing?.birthDate || '')}">${!existing?.birthDate && existing?.birthYear != null ? `<span class="field-help">Eerder opgegeven geboortejaar: ${escapeHtml(existing.birthYear)}. Vul de volledige geboortedatum in voor de juiste leeftijd.</span>` : !existing?.birthDate && existing?.age != null ? `<span class="field-help">Eerder opgegeven leeftijd: ${escapeHtml(existing.age)} jaar. Vul de geboortedatum in om dit te vervangen.</span>` : ''}</div></div>
+    <div class="form-grid"><div class="field"><label for="member-name">Naam</label><input id="member-name" name="name" required maxlength="80" value="${escapeHtml(existing?.name || '')}"></div><div class="field"><label for="birth-date">Geboortedatum</label><input id="birth-date" name="birthDate" type="date" min="1900-01-01" max="${dateKey(new Date())}" value="${escapeHtml(existing?.birthDate || '')}">${!existing?.birthDate && existing?.birthYear != null ? `<span class="field-help">Eerder opgegeven geboortejaar: ${escapeHtml(existing.birthYear)}. Vul de volledige geboortedatum in voor de juiste leeftijd.</span>` : !existing?.birthDate && existing?.age != null ? `<span class="field-help">Eerder opgegeven leeftijd: ${escapeHtml(existing.age)} jaar. Vul de geboortedatum in om dit te vervangen.</span>` : ''}</div><div class="field full"><label for="member-email">E-mailadres (optioneel)</label><input id="member-email" name="email" type="email" autocomplete="email" maxlength="254" value="${escapeHtml(existing?.email || '')}" placeholder="naam@voorbeeld.nl"><span class="field-help">Het e-mailadres waarmee dit gezinslid inlogt, indien diegene een eigen account heeft.</span></div></div>
     <div class="modal-actions">${existing ? '<button type="button" class="button danger" data-action="delete-member">Verwijderen</button>' : ''}<button type="button" class="button secondary" data-action="close-modal">Annuleren</button><button type="submit" class="button">Opslaan</button></div></form>`;
   const form = document.querySelector('#member-form');
   form.addEventListener('submit', async event => {
@@ -575,13 +637,21 @@ function openMember(id) {
     const name = form.elements.name.value.trim();
     if (!name) { form.elements.name.setCustomValidity('Vul een naam in.'); form.elements.name.reportValidity(); return; }
     const birthDate = form.elements.birthDate.value || null;
-    const member = { ...existing, id: existing?.id || crypto.randomUUID(), name, birthDate };
+    const email = form.elements.email.value.trim().toLowerCase();
+    if (email && !form.elements.email.validity.valid) {
+      form.elements.email.setCustomValidity('Vul een geldig e-mailadres in.');
+      form.elements.email.reportValidity();
+      return;
+    }
+    form.elements.email.setCustomValidity('');
+    const member = { ...existing, id: existing?.id || crypto.randomUUID(), name, birthDate, email: email || null };
     if (birthDate !== null) { delete member.birthYear; delete member.age; }
     if (existing) state.members[state.members.indexOf(existing)] = member;
     else state.members.push(member);
     if (await save()) { document.querySelector('#modal').close(); render(); showToast('Gezinslid opgeslagen'); }
   });
   form.elements.name.addEventListener('input', () => form.elements.name.setCustomValidity(''));
+  form.elements.email.addEventListener('input', () => form.elements.email.setCustomValidity(''));
   form.querySelector('[data-action="delete-member"]')?.addEventListener('click', async () => {
     if (!confirm(`${existing.name} verwijderen? Toegewezen taken blijven behouden, maar worden niet meer ingepland.`)) return;
     const nextState = {
@@ -621,6 +691,14 @@ document.addEventListener('click', async event => {
   }
   if (action === 'export-backup') exportBackup();
   if (action === 'import-backup') await importBackup();
+  if (action === 'reset-customization') {
+    const nextState = { ...state, customization: { ...CUSTOM_TEXT_DEFAULTS } };
+    if (await save(nextState)) {
+      state = nextState;
+      render();
+      showToast('Standaardteksten hersteld');
+    }
+  }
   if (action === 'toggle-grocery-urgent') {
     const nextState = { ...state, groceries: state.groceries.map(item => item.id === button.dataset.id ? { ...item, urgent: !item.urgent } : item) };
     if (await save(nextState)) {
@@ -639,6 +717,29 @@ document.addEventListener('click', async event => {
   }
   if (action === 'new-member') openMember();
   if (action === 'edit-member') openMember(button.dataset.id);
+  if (action === 'copy-invitation') {
+    try {
+      await navigator.clipboard.writeText(createdInvitationUrl);
+      showToast('Uitnodigingslink gekopieerd');
+    } catch (error) {
+      console.error('Uitnodigingslink kopiëren mislukt:', error);
+      showToast('Kopiëren is niet gelukt. Selecteer de link om deze te kopiëren.');
+      document.querySelector('#created-invitation-url')?.select();
+    }
+  }
+  if (action === 'revoke-invitation') {
+    button.disabled = true;
+    try {
+      await api(`api/invitations/${encodeURIComponent(button.dataset.id)}`, { method: 'DELETE' });
+      householdInfo.invitations = householdInfo.invitations.filter(invite => String(invite.id) !== button.dataset.id);
+      render();
+      showToast('Uitnodiging ingetrokken');
+    } catch (error) {
+      console.error('Uitnodiging intrekken mislukt:', error);
+      button.disabled = false;
+      showToast(`Uitnodiging intrekken is niet gelukt: ${error.message}`);
+    }
+  }
   if (action === 'close-modal') document.querySelector('#modal').close();
   if (action === 'select-day') { selectedDate = button.dataset.date; render(); }
   if (action === 'today') { selectedDate = dateKey(new Date()); render(); }
@@ -675,7 +776,71 @@ document.addEventListener('change', async event => {
   if (target.id === 'status-filter') { statusFilter = target.value; render(); }
 });
 
+document.addEventListener('change', event => {
+  if (event.target.id !== 'invite-member') return;
+  const member = state.members.find(item => item.id === event.target.value);
+  const email = document.querySelector('#invite-new-email');
+  email.value = member?.email || '';
+});
+
 document.addEventListener('submit', async event => {
+  if (event.target.id === 'customization-form') {
+    event.preventDefault();
+    const form = event.target;
+    const customization = Object.fromEntries(Object.keys(CUSTOM_TEXT_LIMITS).map(key => [key, form.elements[key].value.trim()]));
+    const invalidEntry = Object.entries(customization).find(([key, value]) => !value || value.length > CUSTOM_TEXT_LIMITS[key]);
+    if (invalidEntry) {
+      const input = form.elements[invalidEntry[0]];
+      input.setCustomValidity('Vul een tekst in die binnen de aangegeven lengte past.');
+      input.reportValidity();
+      return;
+    }
+    const nextState = { ...state, customization };
+    if (await save(nextState)) {
+      state = nextState;
+      render();
+      showToast('Persoonlijke teksten opgeslagen');
+    }
+    return;
+  }
+  if (event.target.id === 'household-invite-form') {
+    event.preventDefault();
+    const form = event.target;
+    const errorBox = form.querySelector('#household-invite-error');
+    errorBox.textContent = '';
+    form.inert = true;
+    try {
+      const result = await api('api/invitations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: form.elements.email.value,
+          role: form.elements.role.value,
+          memberId: form.elements.memberId.value || null
+        })
+      });
+      const url = new URL(location.href);
+      url.search = '';
+      url.searchParams.set('uitnodiging', result.token);
+      createdInvitationUrl = url.toString();
+      let refreshError;
+      try {
+        householdInfo = await api('api/household');
+      } catch (error) {
+        refreshError = error;
+        console.error('Gezinsaccounts vernieuwen mislukt:', refreshError);
+      }
+      render();
+      showToast(refreshError
+        ? `Uitnodiging is gemaakt, maar de lijst kon niet worden vernieuwd: ${refreshError.message}`
+        : 'Uitnodigingslink aangemaakt');
+    } catch (error) {
+      console.error('Uitnodiging maken mislukt:', error);
+      errorBox.textContent = error.message;
+      form.inert = false;
+    }
+    return;
+  }
   if (!['groceries-form', 'meal-ideas-form'].includes(event.target.id)) return;
   event.preventDefault();
   const input = event.target.elements.name;
@@ -690,6 +855,7 @@ document.addEventListener('submit', async event => {
 
 document.addEventListener('input', event => {
   if (event.target.id === 'grocery-name' || event.target.id === 'meal-idea-name') event.target.setCustomValidity('');
+  if (event.target.form?.id === 'customization-form') event.target.setCustomValidity('');
   if (event.target.id !== 'task-search') return;
   taskSearch = event.target.value;
   const position = event.target.selectionStart;
@@ -717,22 +883,50 @@ initializeTheme();
 
 async function openAccount() {
   const result = await api('api/state');
+  householdInfo = await api('api/household');
   state = validateBackup({ format: BACKUP_FORMAT, version: 1, data: result.data });
   revision = result.revision;
   document.querySelector('#account-email').textContent = result.email;
   document.querySelector('#auth-screen').hidden = true;
+  document.querySelector('#invite-screen').hidden = true;
   document.querySelector('#app').hidden = false;
+  if (new URLSearchParams(location.search).has('uitnodiging')) {
+    history.replaceState(null, '', `${location.pathname}${location.hash}`);
+  }
   render();
 }
 
 const authForm = document.querySelector('#auth-form');
-authForm.inert = true;
-openAccount().catch(error => {
-  if (error.status !== 401) {
-    console.error('Account laden mislukt:', error);
-    document.querySelector('#auth-error').textContent = `Gegevens laden mislukt: ${error.message}`;
-  }
-}).finally(() => { authForm.inert = false; });
+const inviteToken = new URLSearchParams(location.search).get('uitnodiging');
+const inviteForm = document.querySelector('#invite-form');
+const authEmail = authForm.elements.email;
+const authError = document.querySelector('#auth-error');
+authEmail.addEventListener('invalid', () => {
+  authError.textContent = 'Vul een geldig e-mailadres in.';
+});
+authEmail.addEventListener('input', () => {
+  authError.textContent = '';
+});
+if (inviteToken) {
+  document.querySelector('#auth-screen').hidden = true;
+  document.querySelector('#invite-screen').hidden = false;
+  inviteForm.inert = true;
+  api(`api/invitations/${encodeURIComponent(inviteToken)}`).then(invitation => {
+    inviteForm.elements.email.value = invitation.email;
+  }).catch(error => {
+    console.error('Uitnodiging laden mislukt:', error);
+    document.querySelector('#invite-error').textContent = error.message;
+    inviteForm.querySelector('button[type="submit"]').disabled = true;
+  }).finally(() => { inviteForm.inert = false; });
+} else {
+  authForm.inert = true;
+  openAccount().catch(error => {
+    if (error.status !== 401) {
+      console.error('Account laden mislukt:', error);
+      document.querySelector('#auth-error').textContent = `Gegevens laden mislukt: ${error.message}`;
+    }
+  }).finally(() => { authForm.inert = false; });
+}
 
 authForm.addEventListener('submit', async event => {
   event.preventDefault();
@@ -740,12 +934,18 @@ authForm.addEventListener('submit', async event => {
   const data = new FormData(authForm);
   const errorBox = document.querySelector('#auth-error');
   errorBox.textContent = '';
+  const email = String(data.get('email') || '').trim();
+  if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    errorBox.textContent = 'Vul een geldig e-mailadres in.';
+    authEmail.focus();
+    return;
+  }
   authForm.inert = true;
   try {
     await api(`api/${action}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: data.get('email'), password: data.get('password') })
+      body: JSON.stringify({ email, password: data.get('password') })
     });
     authForm.reset();
     await openAccount();
@@ -757,12 +957,34 @@ authForm.addEventListener('submit', async event => {
   }
 });
 
+inviteForm.addEventListener('submit', async event => {
+  event.preventDefault();
+  document.querySelector('#invite-error').textContent = '';
+  inviteForm.inert = true;
+  try {
+    await api('api/invitations/accept', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: inviteToken, password: inviteForm.elements.password.value })
+    });
+    inviteForm.reset();
+    await openAccount();
+  } catch (error) {
+    console.error('Uitnodiging accepteren mislukt:', error);
+    document.querySelector('#invite-error').textContent = error.message;
+  } finally {
+    inviteForm.inert = false;
+  }
+});
+
 document.querySelector('#logout').addEventListener('click', async () => {
   document.querySelector('#app').inert = true;
   try {
     await api('api/logout', { method: 'POST' });
     state = null;
     revision = null;
+    householdInfo = { members: [], invitations: [], canInvite: false };
+    createdInvitationUrl = '';
     document.querySelector('#app').hidden = true;
     document.querySelector('#auth-screen').hidden = false;
     document.querySelector('#content').replaceChildren();

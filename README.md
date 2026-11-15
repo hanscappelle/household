@@ -1,7 +1,8 @@
 # Ons huishouden
 
 Een dashboard voor huishoudelijke taken en de planning per gezinslid.
-Ieder account heeft een eigen dataset in een MySQL/MariaDB-database.
+Een huishouden deelt één dataset in een MySQL/MariaDB-database; elk gezinslid
+kan met een eigen account inloggen.
 
 ## Lokaal starten
 
@@ -137,10 +138,10 @@ de host en de back-ups en houd Node.js en dependencies bijgewerkt.
 
 ## Bestaande browsergegevens overzetten
 
-Maak **vóór het vervangen van de oude versie** via **Back-up** een
+Maak **vóór het vervangen van de oude versie** via **Instellingen** een
 JSON-export op het apparaat en in de browser waar de gegevens staan. Maak
 vervolgens een account in de nieuwe versie en zet het bestand daar terug via
-**Back-up**. Dit vervangt de accountgegevens en wordt niet samengevoegd.
+**Instellingen**. Dit vervangt de accountgegevens en wordt niet samengevoegd.
 Herhaal dit niet zomaar voor meerdere apparaten: elke import vervangt de vorige.
 De oude browsergegevens worden niet automatisch overgenomen of gewist. Is de
 oude site al vervangen zonder export, dan moet de oude versie weer op
@@ -148,7 +149,10 @@ dezelfde browser-origin (protocol, host en poort) beschikbaar zijn om daar
 de gegevens te kunnen exporteren.
 
 Via **Bekijken** bij **Ons gezin** op het overzicht kun je gezinsleden
-beheren. Bij elk gezinslid kun je optioneel een geboortedatum invullen. De app toont
+beheren. Bij elk gezinslid kun je optioneel een geboortedatum en e-mailadres
+invullen. Gebruik het e-mailadres waarmee diegene inlogt als het gezinslid
+een eigen account heeft; dit is een profielgegeven en koppelt accounts niet
+automatisch. De app toont
 de leeftijd rekening houdend met de verjaardag; voor 29 februari is dat in
 een niet-schrikkeljaar vanaf 1 maart. Als alleen een eerder opgegeven
 geboortejaar bekend is, toont de app het verschil met het huidige jaar met
@@ -157,6 +161,19 @@ blijft zichtbaar totdat je een geboortedatum invult.
 Verjaardagen verschijnen jaarlijks met een taartje in de weekagenda, vanaf de
 eerste verjaardag. Voor 29 februari verschijnt de verjaardag in een
 niet-schrikkeljaar op 1 maart. Verjaardagen tellen niet mee als taken.
+
+Op **Ons gezin** kun je ook gezinsleden uitnodigen voor hetzelfde dashboard.
+Selecteer desgewenst een bestaand gezinslid om het account na acceptatie aan
+dat profiel te koppelen, of kies **Nieuw gezinslid** en selecteer alleen de
+rol (ouder of kind). Vul het e-mailadres voor de login in en deel de link
+persoonlijk; de app verstuurt zelf geen e-mail. De ontvanger stelt via die link
+een eigen wachtwoord in en krijgt een aparte login. Uitnodigingen zijn zeven
+dagen geldig en kunnen worden ingetrokken zolang ze niet zijn geaccepteerd.
+Alle accounts in het huishouden zien en wijzigen dezelfde gezinsgegevens;
+alleen ouders kunnen uitnodigingen maken of intrekken. Een genodigde heeft een
+nieuw account nodig: een bestaand account kan niet aan een uitnodiging worden
+gekoppeld. Bij acceptatie wordt het e-mailadres van het gekozen profiel
+bijgewerkt naar het e-mailadres waarmee het account inlogt.
 
 ## Plannen
 
@@ -214,14 +231,21 @@ gerecht zie je het aantal geïnteresseerde gezinsleden en een markering als
 meer dan de helft van de gezinsleden er zin in heeft. Bij het verwijderen van een gezinslid verdwijnen diens
 wensen, maar de gerechten blijven staan. De lijst hoort bij je account.
 
-## Back-up
+## Instellingen en back-up
 
-Via **Back-up** kun je handmatig een JSON-bestand downloaden met gezinsleden,
-taken, planningen, afvinkjes, boodschappen en kookinspiratie. Bewaar dit bestand veilig: het bevat persoonlijke
-gegevens. De instelling voor lichte of donkere modus staat niet in de back-up.
+Via **Instellingen** kun je de titel van de website (standaard **Ons
+huishouden**), de ondertekst van het logo (standaard **SAMEN THUIS**), de
+welkomsttitel en -tekst en de kleine boodschap in het zijpaneel aanpassen. Deze teksten worden
+gedeeld met alle gezinsaccounts en opgenomen in de back-up. Met
+**Standaardteksten herstellen** zet je ze terug naar de oorspronkelijke tekst.
+
+Je kunt hier ook handmatig een JSON-bestand downloaden met gezinsleden, taken,
+planningen, afvinkjes, boodschappen, kookinspiratie en persoonlijke teksten.
+Bewaar dit bestand veilig: het bevat persoonlijke gegevens. De instelling
+voor lichte of donkere modus staat niet in de back-up.
 
 Kies op dezelfde pagina een eerder gedownload bestand en klik op **Back-up
-terugzetten**. Na bevestiging worden de huidige gegevens van je account
+terugzetten**. Na bevestiging worden de huidige gegevens van je huishouden
 vervangen, niet samengevoegd. Maak eventueel eerst een back-up van de huidige
 gegevens. Een JSON-back-up wordt niet automatisch gemaakt of bijgewerkt. Zorg daarnaast
 als beheerder voor regelmatige databaseback-ups en test het terugzetten.
@@ -242,16 +266,11 @@ Stel de databasevariabelen in voor een afzonderlijke testdatabase en voer
 verwijdert deze weer. Zonder databaseconfiguratie wordt de test overgeslagen.
 
 ## Niet doen
-- beheer van familieleden enkel door ouders, elk lid heeft een rol: kind of ouder
 - samenvoegen van taken, onnodig complex en weinig meerwaarde
 - elk gezinslid krijgt een eigen kijk op het dashboard met een persoonlijke weekplanning en herinneringen voor taken
 
 ## Nog te bekijken
-- app publiek zetten via alwaysdata
 - android app nodig? voorlopig enkel via browser, anders api nodig ook 
 - app vertaling voorzien
 - feature requests voorzien (link naar github)
 - opensource project, github
-- backup onder instellingen zetten
-- bij instellingen ook andere opties zoals een aantal van de teksten op het dashboard configureerbaar maken
-- toelaten als gebruiker andere gebruikers uit te nodigen als gezinslid 
