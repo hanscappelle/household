@@ -6,7 +6,8 @@ const FREQUENCIES = { daily: 'Dagelijks', weekly: 'Wekelijks', monthly: 'Maandel
 const initialState = () => ({
   members: ['Papa', 'Mama', 'Stella', 'Tilde', 'Eljot'].map((name, index) => ({ id: `member-${index + 1}`, name, birthDate: null })),
   tasks: structuredClone(SEED_TASKS),
-  completed: {}
+  completed: {},
+  groceries: []
 });
 
 function normalizeTask(task) {
@@ -32,6 +33,8 @@ function loadState() {
     if (!Array.isArray(parsed.tasks) || !Array.isArray(parsed.members) || !parsed.completed || typeof parsed.completed !== 'object') {
       throw new Error('Ongeldige opgeslagen gegevens');
     }
+    if (parsed.groceries !== undefined && !Array.isArray(parsed.groceries)) throw new Error('Ongeldige boodschappenlijst');
+    parsed.groceries ??= [];
     parsed.tasks = parsed.tasks.map(normalizeTask);
     return parsed;
   } catch (error) {
@@ -327,17 +330,27 @@ function renderFamily() {
     <div class="members-grid">${state.members.map((member, index) => `<div class="panel member-card">${avatar(member, index)}<h3>${escapeHtml(member.name)}</h3><p>${escapeHtml(memberDetails(member))} · ${state.tasks.filter(task => assignedMemberIds(task).includes(member.id)).length} toegewezen taken</p><button class="text-button" data-action="edit-member" data-id="${escapeHtml(member.id)}">Gegevens bewerken →</button></div>`).join('')}</div>`;
 }
 
+function renderGroceries() {
+  const remaining = state.groceries.filter(item => !item.done).length;
+  return `<div class="page-heading"><div><h1>Boodschappen</h1><p>Wat is op, of wat wil je graag in huis halen?</p></div></div>
+    <div class="panel groceries-panel">
+      <form id="groceries-form" class="groceries-form"><label class="sr-only" for="grocery-name">Boodschap</label><input id="grocery-name" name="name" required maxlength="120" placeholder="Voeg iets toe aan de lijst"><button class="button" type="submit"><span class="plus">+</span> Toevoegen</button></form>
+      <p class="list-summary">${remaining} ${remaining === 1 ? 'boodschap' : 'boodschappen'} te halen</p>
+      ${state.groceries.length ? state.groceries.map(item => `<div class="task-row ${item.done ? 'done' : ''}"><input type="checkbox" class="check" data-action="grocery-done" data-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(item.name)} gekocht" ${item.done ? 'checked' : ''}><div class="task-info"><strong>${escapeHtml(item.name)}</strong></div><button type="button" class="text-button grocery-delete" data-action="delete-grocery" data-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(item.name)} verwijderen">Verwijderen</button></div>`).join('') : '<div class="empty"><strong>Je lijst is leeg</strong>Voeg toe wat jullie nodig hebben.</div>'}
+    </div>`;
+}
+
 function renderBackup() {
   return `<div class="page-heading"><div><h1>Back-up</h1><p>Bewaar je gegevens veilig of zet een eerdere back-up terug.</p></div></div>
-    <div class="panel backup-panel"><h2>Back-up downloaden</h2><p>Download een JSON-bestand met gezinsleden, taken, planningen en afvinkjes. Bewaar dit bestand op een veilige plek: het bevat persoonlijke gegevens.</p><button class="button" data-action="export-backup">Back-up downloaden</button></div>
+    <div class="panel backup-panel"><h2>Back-up downloaden</h2><p>Download een JSON-bestand met gezinsleden, taken, planningen, afvinkjes en boodschappen. Bewaar dit bestand op een veilige plek: het bevat persoonlijke gegevens.</p><button class="button" data-action="export-backup">Back-up downloaden</button></div>
     <div class="panel backup-panel"><h2>Back-up terugzetten</h2><p>Een back-up terugzetten vervangt de huidige gegevens in deze browser. Download eventueel eerst een back-up van de huidige gegevens.</p><label for="backup-file" class="field-label">JSON-bestand kiezen</label><input id="backup-file" type="file" accept=".json,application/json"><button class="button secondary" data-action="import-backup">Back-up terugzetten</button></div>`;
 }
 
 function render() {
-  const view = ['overzicht', 'taken', 'gezin', 'backup'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'overzicht';
-  document.querySelector('#content').innerHTML = view === 'taken' ? renderTasks() : view === 'gezin' ? renderFamily() : view === 'backup' ? renderBackup() : renderDashboard();
+  const view = ['overzicht', 'taken', 'gezin', 'backup', 'boodschappen'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'overzicht';
+  document.querySelector('#content').innerHTML = view === 'taken' ? renderTasks() : view === 'gezin' ? renderFamily() : view === 'backup' ? renderBackup() : view === 'boodschappen' ? renderGroceries() : renderDashboard();
   document.querySelectorAll('.navigation a').forEach(link => link.classList.toggle('active', link.dataset.view === view));
-  document.querySelector('#breadcrumb-current').textContent = view === 'gezin' ? 'ONS GEZIN' : view === 'taken' ? 'ALLE TAKEN' : view === 'backup' ? 'BACK-UP' : 'OVERZICHT';
+  document.querySelector('#breadcrumb-current').textContent = view === 'gezin' ? 'ONS GEZIN' : view === 'taken' ? 'ALLE TAKEN' : view === 'backup' ? 'BACK-UP' : view === 'boodschappen' ? 'BOODSCHAPPEN' : 'OVERZICHT';
   document.querySelector('#nav-count').textContent = state.tasks.length;
   document.querySelector('#today-label').textContent = formatDate(new Date(), { weekday: 'long', day: 'numeric', month: 'long' });
 }
@@ -392,7 +405,15 @@ function validateBackup(backup) {
     const parts = key.split('|');
     if (parts.length !== 2 || !taskIds.has(parts[0]) || !validBackupDate(parts[1]) || typeof value !== 'boolean') throw new Error('Een afvinkje bevat ongeldige gegevens.');
   }
-  return { ...data, tasks: data.tasks.map(task => {
+  if (data.groceries !== undefined && !Array.isArray(data.groceries)) throw new Error('De boodschappenlijst is ongeldig.');
+  const groceryIds = new Set();
+  for (const item of data.groceries ?? []) {
+    if (!object(item) || !id(item.id) || groceryIds.has(item.id) || typeof item.name !== 'string' || !item.name.trim() || item.name.length > 120 || typeof item.done !== 'boolean') {
+      throw new Error('Een boodschap bevat ongeldige gegevens.');
+    }
+    groceryIds.add(item.id);
+  }
+  return { ...data, groceries: data.groceries ?? [], tasks: data.tasks.map(task => {
     const normalized = normalizeTask(task);
     if (normalized.schedules) normalized.schedules = normalized.schedules.map(normalizeTask);
     return normalized;
@@ -564,6 +585,10 @@ document.addEventListener('click', event => {
   }
   if (action === 'export-backup') exportBackup();
   if (action === 'import-backup') importBackup();
+  if (action === 'delete-grocery') {
+    const nextState = { ...state, groceries: state.groceries.filter(item => item.id !== button.dataset.id) };
+    if (save(nextState)) { state = nextState; render(); showToast('Boodschap verwijderd'); }
+  }
   if (action === 'new-member') openMember();
   if (action === 'edit-member') openMember(button.dataset.id);
   if (action === 'close-modal') document.querySelector('#modal').close();
@@ -574,6 +599,11 @@ document.addEventListener('click', event => {
 
 document.addEventListener('change', event => {
   const target = event.target;
+  if (target.dataset.action === 'grocery-done') {
+    const nextState = { ...state, groceries: state.groceries.map(item => item.id === target.dataset.id ? { ...item, done: target.checked } : item) };
+    if (save(nextState)) { state = nextState; render(); }
+    else target.checked = !target.checked;
+  }
   if (target.dataset.action === 'complete') {
     const task = state.tasks.find(item => item.id === target.dataset.id);
     if (!task) return;
@@ -587,7 +617,18 @@ document.addEventListener('change', event => {
   if (target.id === 'status-filter') { statusFilter = target.value; render(); }
 });
 
+document.addEventListener('submit', event => {
+  if (event.target.id !== 'groceries-form') return;
+  event.preventDefault();
+  const input = event.target.elements.name;
+  const name = input.value.trim();
+  if (!name) { input.setCustomValidity('Vul een boodschap in.'); input.reportValidity(); return; }
+  const nextState = { ...state, groceries: [...state.groceries, { id: crypto.randomUUID(), name, done: false }] };
+  if (save(nextState)) { state = nextState; render(); document.querySelector('#grocery-name').focus(); }
+});
+
 document.addEventListener('input', event => {
+  if (event.target.id === 'grocery-name') event.target.setCustomValidity('');
   if (event.target.id !== 'task-search') return;
   taskSearch = event.target.value;
   const position = event.target.selectionStart;

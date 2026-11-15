@@ -53,16 +53,25 @@ Wijzigingen worden alleen in de lokale browseropslag bewaard: ze worden niet
 gesynchroniseerd met andere apparaten of gebruikers en kunnen verdwijnen als
 browsergegevens worden gewist. De app heeft geen login of gedeelde server.
 
+## Boodschappen
+
+Via **Boodschappen** kun je producten toevoegen, afvinken als ze gekocht zijn
+en verwijderen. Afgevinkte producten blijven staan totdat je ze verwijdert;
+je kunt ze ook opnieuw aanvinken als nodig. De lijst wordt net als de taken
+lokaal in deze browser bewaard en niet met andere apparaten gesynchroniseerd.
+
 ## Back-up
 
 Via **Back-up** kun je handmatig een JSON-bestand downloaden met gezinsleden,
-taken, planningen en afvinkjes. Bewaar dit bestand veilig: het bevat persoonlijke
+taken, planningen, afvinkjes en boodschappen. Bewaar dit bestand veilig: het bevat persoonlijke
 gegevens. De instelling voor lichte of donkere modus staat niet in de back-up.
 
 Kies op dezelfde pagina een eerder gedownload bestand en klik op **Back-up
 terugzetten**. Na bevestiging worden de huidige gegevens in deze browser
 vervangen, niet samengevoegd. Maak eventueel eerst een back-up van de huidige
 gegevens. Een back-up wordt niet automatisch gemaakt of bijgewerkt.
+Oudere back-ups zonder boodschappen kunnen ook worden teruggezet; daarbij
+begint de boodschappenlijst leeg.
 
 ## Weergave
 
@@ -71,7 +80,6 @@ schakel je terug. Je keuze wordt afzonderlijk in de lokale browser bewaard.
 
 ## TODO
 - voor bewerken van dashboard is een login nodig
-- optie voor boodschappen, als iets op is of iemand wil iets dan kan die dat toevoegen
 
 ## Niet doen
 - beheer van familieleden enkel door ouders, elk lid heeft een rol: kind of ouder
