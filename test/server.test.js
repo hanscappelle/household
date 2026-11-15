@@ -68,6 +68,11 @@ test(`accounts en opslag op ${basePath || '/'}`, { skip: !configured, timeout: 3
   assert.equal((await request('/api/state', {
     method: 'PUT', cookie: first.cookie, body: { data: invalidCustomization, revision: state.json.revision }
   })).status, 400);
+  const invalidNotes = structuredClone(state.json.data);
+  invalidNotes.notes = [{ id: 'invalid-note', title: '', description: 'Beschrijving', author: 'Gebruiker', archived: false }];
+  assert.equal((await request('/api/state', {
+    method: 'PUT', cookie: first.cookie, body: { data: invalidNotes, revision: state.json.revision }
+  })).status, 400);
   assert.equal((await request('/api/invitations', {
     method: 'POST', cookie: first.cookie, body: { email: emails[2], role: 'parent', memberId: 'not-a-family-member' }
   })).status, 400);
@@ -76,6 +81,7 @@ test(`accounts en opslag op ${basePath || '/'}`, { skip: !configured, timeout: 3
   changed.customization.brandSubtitle = 'SAMEN STERK';
   changed.tasks[0].important = true;
   changed.groceries.push({ id: 'test', name: 'Melk', done: false, urgent: false });
+  changed.notes = [{ id: 'note-test', title: 'Testnotitie', description: 'Een beschrijving', author: 'Niet vertrouwen', archived: false }];
   const saved = await request('/api/state', { method: 'PUT', cookie: first.cookie, body: { data: changed, revision: state.json.revision } });
   assert.equal(saved.status, 200);
   assert.equal((await request('/api/state', { method: 'PUT', cookie: first.cookie, body: { data: changed, revision: state.json.revision } })).status, 409);
@@ -83,6 +89,7 @@ test(`accounts en opslag op ${basePath || '/'}`, { skip: !configured, timeout: 3
   assert.equal((await request('/api/state', { cookie: first.cookie })).json.data.customization.websiteTitle, 'De familie test');
   assert.equal((await request('/api/state', { cookie: first.cookie })).json.data.customization.brandSubtitle, 'SAMEN STERK');
   assert.equal((await request('/api/state', { cookie: first.cookie })).json.data.tasks[0].important, true);
+  assert.equal((await request('/api/state', { cookie: first.cookie })).json.data.notes[0].author, emails[0]);
   assert.deepEqual((await request('/api/state', { cookie: second.cookie })).json.data.groceries, []);
   const invitation = await request('/api/invitations', {
     method: 'POST', cookie: first.cookie, body: { email: emails[2], role: 'parent', memberId: 'member-3' }
@@ -151,10 +158,14 @@ test(`accounts en opslag op ${basePath || '/'}`, { skip: !configured, timeout: 3
   assert.equal((await request(`/api/invitations/${revoked.json.token}`)).status, 404);
   const invitedChanged = structuredClone(invitedState.json.data);
   invitedChanged.groceries.push({ id: 'guest-test', name: 'Brood', done: false, urgent: false });
+  invitedChanged.notes[0].description = 'Aangepast door een ander gezinslid';
   const invitedSave = await request('/api/state', {
     method: 'PUT', cookie: invited.cookie, body: { data: invitedChanged, revision: invitedState.json.revision }
   });
   assert.equal(invitedSave.status, 200);
+  const noteAfterEdit = (await request('/api/state', { cookie: first.cookie })).json.data.notes[0];
+  assert.equal(noteAfterEdit.author, emails[0]);
+  assert.equal(noteAfterEdit.editedBy, invitedState.json.data.members.find(member => member.email === emails[2]).name);
   assert.deepEqual((await request('/api/state', { cookie: first.cookie })).json.data.groceries, invitedChanged.groceries);
   const login = await request('/api/login', { method: 'POST', body: credentials });
   assert.equal(login.status, 200);

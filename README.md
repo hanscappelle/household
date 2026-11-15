@@ -180,6 +180,16 @@ nieuw account nodig: een bestaand account kan niet aan een uitnodiging worden
 gekoppeld. Bij acceptatie wordt het e-mailadres van het gekozen profiel
 bijgewerkt naar het e-mailadres waarmee het account inlogt.
 
+## Notities
+
+Onder de weekplanning op **Overzicht** staat het notitieblok voor het hele
+huishouden. Plaats een notitie met titel en beschrijving; de auteur wordt
+automatisch ingevuld met je profielnaam, of met je login-e-mailadres als er
+geen gekoppeld profiel is. Een ander gezinslid kan de notitie bewerken; de app
+vermeldt dan diens naam en het tijdstip als bewerker.
+Archiveer notities om ze van het overzicht te halen. Via **Notitiearchief**
+kun je ze herstellen of definitief verwijderen.
+
 ## Plannen
 
 Klik op een taak in **Alle taken** om de planning te bewerken. Per ingepland
@@ -255,7 +265,7 @@ gedeeld met alle gezinsaccounts en opgenomen in de back-up. Met
 **Standaardteksten herstellen** zet je ze terug naar de oorspronkelijke tekst.
 
 Je kunt hier ook handmatig een JSON-bestand downloaden met gezinsleden, taken,
-planningen, afvinkjes, boodschappen, kookinspiratie en persoonlijke teksten.
+planningen, afvinkjes, boodschappen, kookinspiratie, notities en persoonlijke teksten.
 Bewaar dit bestand veilig: het bevat persoonlijke gegevens. De instelling
 voor lichte of donkere modus staat niet in de back-up.
 

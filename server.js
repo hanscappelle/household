@@ -82,6 +82,19 @@ const cookieName = basePath ? 'household_session' : 'session';
 const cookieOptions = { httpOnly: true, secure: secureCookie, sameSite: 'strict', path: basePath || '/', maxAge: 7 * 24 * 60 * 60 * 1000 };
 const emailValid = email => typeof email === 'string' && email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 const passwordValid = password => typeof password === 'string' && password.length >= 12 && Buffer.byteLength(password, 'utf8') <= 1024;
+const notesValid = notes => Array.isArray(notes) && notes.length <= 1000 &&
+  new Set(notes.map(note => note?.id)).size === notes.length &&
+  notes.every(note => note && typeof note === 'object' && !Array.isArray(note) &&
+    typeof note.id === 'string' && Boolean(note.id.trim()) && note.id.length <= 100 && !note.id.includes('|') &&
+    typeof note.title === 'string' && Boolean(note.title.trim()) && note.title.length <= 120 &&
+    typeof note.description === 'string' && Boolean(note.description.trim()) && note.description.length <= 2000 &&
+    typeof note.author === 'string' && Boolean(note.author.trim()) && note.author.length <= 254 &&
+    typeof note.archived === 'boolean' &&
+    (note.authorUserId == null || ['string', 'number'].includes(typeof note.authorUserId)) &&
+    (note.editedByUserId == null || ['string', 'number'].includes(typeof note.editedByUserId)) &&
+    (note.editedBy == null || typeof note.editedBy === 'string' && note.editedBy.length <= 254) &&
+    (note.editedAt == null || typeof note.editedAt === 'string' &&
+      (note.editedAt === '' || Number.isFinite(Date.parse(note.editedAt)))));
 const customizationLimits = { websiteTitle: 60, brandSubtitle: 40, welcomeTitle: 80, welcomeText: 160, sidebarTitle: 100, sidebarText: 200 };
 const defaultCustomization = {
   websiteTitle: 'Ons huishouden',
@@ -92,7 +105,7 @@ const defaultCustomization = {
   sidebarText: 'Een beetje overzicht maakt ruimte voor de leuke dingen.'
 };
 const initialState = () => ({
-  members: SEED_MEMBERS, tasks: SEED_TASKS, completed: {}, groceries: [], mealIdeas: SEED_MEAL_IDEAS,
+  members: SEED_MEMBERS, tasks: SEED_TASKS, completed: {}, groceries: [], notes: [], mealIdeas: SEED_MEAL_IDEAS,
   customization: { ...defaultCustomization }
 });
 
@@ -375,12 +388,38 @@ router.get('/api/state', authenticate, async (req, res) => {
 
 router.put('/api/state', authenticate, async (req, res) => {
   const { data, revision } = req.body || {};
+  const notesInvalid = data?.notes !== undefined && !notesValid(data.notes);
   if (!Number.isSafeInteger(revision) || revision < 1 || !data || typeof data !== 'object' || Array.isArray(data) ||
       !Array.isArray(data.members) || !Array.isArray(data.tasks) || !Array.isArray(data.groceries) ||
-      !Array.isArray(data.mealIdeas) || !data.completed || typeof data.completed !== 'object' || Array.isArray(data.completed)) {
+      !Array.isArray(data.mealIdeas) || !data.completed || typeof data.completed !== 'object' || Array.isArray(data.completed) ||
+      notesInvalid) {
     return res.status(400).json({ error: 'Ongeldige gegevens of revisie.' });
   }
-  let nextData = data;
+  const [currentRows] = await pool.execute('SELECT data FROM households WHERE id = ? AND revision = ?', [req.user.household_id, revision]);
+  if (!currentRows.length) return res.status(409).json({ error: 'De gegevens zijn ondertussen op een ander apparaat gewijzigd.' });
+  const currentData = JSON.parse(currentRows[0].data);
+  const previousNotes = currentData.notes || [];
+  const submittedNotes = data.notes || previousNotes;
+  const author = currentData.members.find(member =>
+    typeof member.email === 'string' && member.email.toLowerCase() === req.user.email.toLowerCase())?.name || req.user.email;
+  const previousById = new Map(previousNotes.map(note => [note.id, note]));
+  const notes = submittedNotes.map(note => {
+    const previous = previousById.get(note.id);
+    if (!previous) return { ...note, author, authorUserId: req.user.id, archived: false, editedBy: '', editedByUserId: '', editedAt: '' };
+    const changed = note.title !== previous.title || note.description !== previous.description;
+    const editorIsAuthor = previous.authorUserId != null
+      ? String(previous.authorUserId) === String(req.user.id)
+      : author === previous.author;
+    return {
+      ...note,
+      author: previous.author,
+      authorUserId: previous.authorUserId,
+      editedBy: changed ? (editorIsAuthor ? '' : author) : previous.editedBy || '',
+      editedByUserId: changed ? (editorIsAuthor ? '' : req.user.id) : previous.editedByUserId || '',
+      editedAt: changed ? (editorIsAuthor ? '' : new Date().toISOString()) : previous.editedAt || ''
+    };
+  });
+  let nextData = { ...data, notes };
   if (data.customization !== undefined) {
     if (!data.customization || typeof data.customization !== 'object' || Array.isArray(data.customization) ||
         Object.entries(customizationLimits).some(([key, limit]) =>
@@ -388,10 +427,7 @@ router.put('/api/state', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'De persoonlijke teksten bevatten ongeldige gegevens.' });
     }
   } else {
-    const [currentRows] = await pool.execute('SELECT data FROM households WHERE id = ? AND revision = ?', [req.user.household_id, revision]);
-    if (!currentRows.length) return res.status(409).json({ error: 'De gegevens zijn ondertussen op een ander apparaat gewijzigd.' });
-    const currentData = JSON.parse(currentRows[0].data);
-    nextData = { ...data, customization: currentData.customization || { ...defaultCustomization } };
+    nextData.customization = currentData.customization || { ...defaultCustomization };
   }
   const [result] = await pool.execute('UPDATE households SET data = ?, revision = revision + 1 WHERE id = ? AND revision = ?', [JSON.stringify(nextData), req.user.household_id, revision]);
   if (!result.affectedRows) return res.status(409).json({ error: 'De gegevens zijn ondertussen op een ander apparaat gewijzigd.' });

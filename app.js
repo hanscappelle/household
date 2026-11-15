@@ -51,6 +51,8 @@ let householdInfo = { members: [], invitations: [], canInvite: false };
 let createdInvitationUrl = '';
 let createdPasswordResetUrl = '';
 let createdPasswordResetEmail = '';
+let accountEmail = '';
+let currentUserId = '';
 let saving = false;
 let needsRecovery = false;
 let selectedDate = dateKey(new Date());
@@ -272,6 +274,11 @@ function memberDetails(member) {
   return 'Geboortedatum nog niet ingevuld';
 }
 
+function currentAuthorName() {
+  const member = state.members.find(item => item.email?.toLowerCase() === accountEmail.toLowerCase());
+  return member?.name || accountEmail;
+}
+
 function taskMenu(task) {
   const id = escapeHtml(task.id);
   const title = escapeHtml(task.title);
@@ -327,7 +334,7 @@ function renderDashboard() {
       <div class="stat"><span class="stat-icon">✓</span><div><strong>${done}</strong><small>Afgerond deze week</small></div></div>
       <div class="stat"><span class="stat-icon">!</span><div><strong>${importantTasks}</strong><small>Belangrijke taken deze week</small></div></div>
     </div>
-    <div class="dashboard-grid">
+    <div class="dashboard-grid dashboard-stack">
       <section><div class="section-heading"><div><h2>De week in beeld</h2><p>Een klein beetje planning, een groot verschil.</p></div><button class="text-button" data-action="today">Vandaag</button></div>
         <div class="panel"><div class="calendar-head"><div><strong>Week ${week} <span style="color:#9eaca0;font-weight:400">· ${week % 2 ? 'oneven' : 'even'} week</span></strong><small>${escapeHtml(range)}</small></div><div class="calendar-controls"><button class="icon-button" data-action="previous-week" aria-label="Vorige week">‹</button><button class="icon-button" data-action="next-week" aria-label="Volgende week">›</button></div></div>
           <div class="weekdays">${weekDates.map(day => {
@@ -344,11 +351,61 @@ function renderDashboard() {
           </div>
         </div>
       </section>
+      <section class="dashboard-notes"><div class="section-heading"><div><h2>Notities</h2><p>Deel een mededeling met het gezin.</p></div><a class="text-button" href="#notitiearchief">Archief beheren →</a></div>
+        <div class="panel notes-panel">
+          <form id="note-form" class="note-form"><div class="note-field"><label for="note-title">Titel</label><input id="note-title" name="title" required maxlength="120" placeholder="Titel van de notitie"></div><div class="note-field"><label for="note-description">Beschrijving</label><textarea id="note-description" name="description" required maxlength="2000" rows="3" placeholder="Schrijf een notitie voor het gezin"></textarea></div><button class="button" type="submit">Notitie plaatsen</button><div id="note-error" role="alert"></div></form>
+          <div class="note-list">${state.notes.filter(note => !note.archived).length ? state.notes.filter(note => !note.archived).map(note => `<article class="note-card"><div class="note-card-heading"><h3>${escapeHtml(note.title)}</h3><div><button type="button" class="text-button" data-action="edit-note" data-id="${escapeHtml(note.id)}">Bewerken</button><button type="button" class="text-button" data-action="archive-note" data-id="${escapeHtml(note.id)}">Archiveren</button></div></div><p>${escapeHtml(note.description).replace(/\n/g, '<br>')}</p><small>Door ${escapeHtml(note.author)}${note.editedBy ? ` · Bewerkt door ${escapeHtml(note.editedBy)}${note.editedAt ? ` op ${escapeHtml(new Date(note.editedAt).toLocaleString('nl-BE'))}` : ''}` : ''}</small></article>`).join('') : '<div class="empty"><strong>Nog geen notities</strong>Plaats hieronder een notitie voor het gezin.</div>'}</div>
+        </div>
+      </section>
       <section><div class="section-heading"><div><h2>Ons gezin</h2><p>Samen staan we sterker.</p></div><a class="text-button" href="#gezin">Bekijken →</a></div>
         <div class="panel family-panel">${state.members.length ? state.members.map((member, index) => `<div class="family-row">${avatar(member, index)}<div><strong>${escapeHtml(member.name)}</strong><small>${escapeHtml(memberDetails(member))}${member.email ? ` · ${escapeHtml(member.email)}` : ''}</small></div></div>`).join('') : '<div class="empty">Voeg een gezinslid toe om te beginnen.</div>'}</div>
         <div class="tip"><span class="tip-icon">✧</span><div><strong>Goed om te weten</strong><p>De taken uit jullie lijst staan al klaar. Wijs ze toe en kies wanneer ze terugkomen.</p><a class="text-button" href="#taken" style="padding-left:0">Bekijk alle taken →</a></div></div>
       </section>
     </div>`;
+}
+
+function renderNoteArchive() {
+  const archived = state.notes.filter(note => note.archived);
+  return `<div class="page-heading"><div><h1>Notitiearchief</h1><p>Herstel een gearchiveerde notitie of verwijder die definitief.</p></div><a class="button secondary" href="#overzicht">Terug naar overzicht</a></div>
+    <div class="panel notes-panel"><div class="note-list">${archived.length ? archived.map(note => `<article class="note-card"><div class="note-card-heading"><h3>${escapeHtml(note.title)}</h3><div><button type="button" class="text-button" data-action="restore-note" data-id="${escapeHtml(note.id)}">Herstellen</button><button type="button" class="text-button" data-action="delete-note" data-id="${escapeHtml(note.id)}">Definitief verwijderen</button></div></div><p>${escapeHtml(note.description).replace(/\n/g, '<br>')}</p><small>Door ${escapeHtml(note.author)}${note.editedBy ? ` · Bewerkt door ${escapeHtml(note.editedBy)}${note.editedAt ? ` op ${escapeHtml(new Date(note.editedAt).toLocaleString('nl-BE'))}` : ''}` : ''}</small></article>`).join('') : '<div class="empty"><strong>Het archief is leeg</strong>Gearchiveerde notities verschijnen hier.</div>'}</div></div>`;
+}
+
+function openNote(id) {
+  const existing = state.notes.find(note => note.id === id);
+  if (!existing) return;
+  document.querySelector('#modal-content').innerHTML = `<form id="note-edit-form" class="modal-inner"><div class="modal-head"><div><h2 id="modal-title">Notitie bewerken</h2><p>Door ${escapeHtml(existing.author)}</p></div><button type="button" class="close" data-action="close-modal" aria-label="Sluiten">×</button></div><div class="form-grid"><div class="field full"><label for="edit-note-title">Titel</label><input id="edit-note-title" name="title" required maxlength="120" value="${escapeHtml(existing.title)}"></div><div class="field full"><label for="edit-note-description">Beschrijving</label><textarea id="edit-note-description" name="description" required maxlength="2000" rows="5">${escapeHtml(existing.description)}</textarea></div></div><div class="modal-actions"><button type="button" class="button secondary" data-action="close-modal">Annuleren</button><button type="submit" class="button">Opslaan</button></div></form>`;
+  const form = document.querySelector('#note-edit-form');
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    const title = form.elements.title.value.trim();
+    const description = form.elements.description.value.trim();
+    if (!title || !description) {
+      const field = title ? form.elements.description : form.elements.title;
+      field.setCustomValidity('Vul een titel en beschrijving in.');
+      field.reportValidity();
+      return;
+    }
+    const editor = currentAuthorName();
+    const editedByAuthor = existing.authorUserId != null
+      ? String(existing.authorUserId) === currentUserId
+      : editor === existing.author;
+    const updated = {
+      ...existing,
+      title,
+      description,
+      editedBy: editedByAuthor ? '' : editor,
+      editedByUserId: editedByAuthor ? '' : currentUserId,
+      editedAt: editedByAuthor ? '' : new Date().toISOString()
+    };
+    const nextState = { ...state, notes: state.notes.map(note => note.id === existing.id ? updated : note) };
+    if (await save(nextState)) {
+      state = nextState;
+      document.querySelector('#modal').close();
+      render();
+      showToast('Notitie opgeslagen');
+    }
+  });
+  document.querySelector('#modal').showModal();
 }
 
 function renderTasks() {
@@ -436,7 +493,7 @@ function renderBackup() {
       </div>
       <div class="modal-actions"><button type="button" class="button secondary" data-action="reset-customization">Standaardteksten herstellen</button><button type="submit" class="button">Teksten opslaan</button></div>
     </form>
-    <div class="panel backup-panel"><h2>Back-up downloaden</h2><p>Download een JSON-bestand met gezinsleden, taken, planningen, afvinkjes, boodschappen en kookinspiratie. Bewaar dit bestand op een veilige plek: het bevat persoonlijke gegevens.</p><button class="button" data-action="export-backup">Back-up downloaden</button></div>
+    <div class="panel backup-panel"><h2>Back-up downloaden</h2><p>Download een JSON-bestand met gezinsleden, taken, planningen, afvinkjes, boodschappen, kookinspiratie en notities. Bewaar dit bestand op een veilige plek: het bevat persoonlijke gegevens.</p><button class="button" data-action="export-backup">Back-up downloaden</button></div>
     <div class="panel backup-panel"><h2>Back-up terugzetten</h2><p>Een back-up terugzetten vervangt de huidige gegevens van je account. Download eventueel eerst een back-up van de huidige gegevens.</p><label for="backup-file" class="field-label">JSON-bestand kiezen</label><input id="backup-file" type="file" accept=".json,application/json"><button class="button secondary" data-action="import-backup">Back-up terugzetten</button></div>`;
 }
 
@@ -450,6 +507,7 @@ function renderHelp() {
       </section>
       <section class="panel help-panel"><h2>Overzicht en taken</h2>
         <p>Op <a href="#overzicht">Overzicht</a> zie je de weekplanning, taken en verjaardagen. Kies een dag in de agenda of gebruik de pijlen om naar een andere week te gaan. Vink een taak af wanneer die klaar is.</p>
+        <p>Onder de weekplanning kun je een notitie voor het hele huishouden plaatsen. De auteur wordt automatisch ingevuld. Andere gezinsleden kunnen notities bewerken; hun naam en bewerktijd worden dan getoond. Archiveer een notitie om die van het overzicht te halen en beheer die via <a href="#notitiearchief">Notitiearchief</a>.</p>
         <p>Op <a href="#taken">Alle taken</a> kun je een taak openen om de planning te wijzigen. Kies per dag, week, maand of eenmalige datum wie de taak uitvoert. Markeer in het taakformulier belangrijke taken; die herken je aan het label <strong>Belangrijk</strong>. Gebruik de zoekbalk en filters om taken terug te vinden.</p>
       </section>
       <section class="panel help-panel"><h2>Gezinsleden</h2>
@@ -477,8 +535,8 @@ function render() {
     location.hash = 'instellingen';
     return;
   }
-  const view = ['overzicht', 'taken', 'gezin', 'instellingen', 'help', 'boodschappen', 'kookinspiratie'].includes(requestedView) ? requestedView : 'overzicht';
-  document.querySelector('#content').innerHTML = view === 'taken' ? renderTasks() : view === 'gezin' ? renderFamily() : view === 'instellingen' ? renderBackup() : view === 'help' ? renderHelp() : view === 'boodschappen' ? renderGroceries() : view === 'kookinspiratie' ? renderMealIdeas() : renderDashboard();
+  const view = ['overzicht', 'taken', 'gezin', 'instellingen', 'help', 'boodschappen', 'kookinspiratie', 'notitiearchief'].includes(requestedView) ? requestedView : 'overzicht';
+  document.querySelector('#content').innerHTML = view === 'taken' ? renderTasks() : view === 'gezin' ? renderFamily() : view === 'instellingen' ? renderBackup() : view === 'help' ? renderHelp() : view === 'boodschappen' ? renderGroceries() : view === 'kookinspiratie' ? renderMealIdeas() : view === 'notitiearchief' ? renderNoteArchive() : renderDashboard();
   document.querySelector('#brand-title').textContent = state.customization.websiteTitle;
   document.querySelector('#brand-subtitle').textContent = state.customization.brandSubtitle;
   document.querySelector('.brand').setAttribute('aria-label', `${state.customization.websiteTitle}, naar overzicht`);
@@ -487,7 +545,7 @@ function render() {
   document.querySelector('#sidebar-custom-title').textContent = state.customization.sidebarTitle;
   document.querySelector('#sidebar-custom-text').textContent = state.customization.sidebarText;
   document.querySelectorAll('.navigation a').forEach(link => link.classList.toggle('active', link.dataset.view === view));
-  document.querySelector('#breadcrumb-current').textContent = view === 'gezin' ? 'ONS GEZIN' : view === 'taken' ? 'ALLE TAKEN' : view === 'instellingen' ? 'INSTELLINGEN' : view === 'help' ? 'HELP' : view === 'boodschappen' ? 'BOODSCHAPPEN' : view === 'kookinspiratie' ? 'KOOKINSPIRATIE' : 'OVERZICHT';
+  document.querySelector('#breadcrumb-current').textContent = view === 'gezin' ? 'ONS GEZIN' : view === 'taken' ? 'ALLE TAKEN' : view === 'instellingen' ? 'INSTELLINGEN' : view === 'help' ? 'HELP' : view === 'boodschappen' ? 'BOODSCHAPPEN' : view === 'kookinspiratie' ? 'KOOKINSPIRATIE' : view === 'notitiearchief' ? 'NOTITIEARCHIEF' : 'OVERZICHT';
   document.querySelector('#nav-count').textContent = state.tasks.length;
   document.querySelector('#today-label').textContent = formatDate(new Date(), { weekday: 'long', day: 'numeric', month: 'long' });
 }
@@ -557,8 +615,26 @@ function validateBackup(backup) {
     }
     groceryIds.add(item.id);
   }
+  if (data.notes !== undefined) {
+    if (!Array.isArray(data.notes)) throw new Error('De notities zijn ongeldig.');
+    const noteIds = new Set();
+    for (const note of data.notes) {
+      if (!object(note) || !id(note.id) || noteIds.has(note.id) ||
+        typeof note.title !== 'string' || !note.title.trim() || note.title.length > 120 ||
+        typeof note.description !== 'string' || !note.description.trim() || note.description.length > 2000 ||
+        typeof note.author !== 'string' || !note.author.trim() || note.author.length > 254 ||
+        typeof note.archived !== 'boolean' ||
+        (note.authorUserId != null && !['string', 'number'].includes(typeof note.authorUserId)) ||
+        (note.editedByUserId != null && !['string', 'number'].includes(typeof note.editedByUserId)) ||
+        (note.editedBy != null && (typeof note.editedBy !== 'string' || note.editedBy.length > 254)) ||
+        (note.editedAt != null && (typeof note.editedAt !== 'string' || (note.editedAt !== '' && !Number.isFinite(Date.parse(note.editedAt)))))) {
+        throw new Error('Een notitie bevat ongeldige gegevens.');
+      }
+      noteIds.add(note.id);
+    }
+  }
   if (data.mealIdeas !== undefined) validateMealIdeas(data.mealIdeas, data.members);
-  return { ...data, customization: { ...CUSTOM_TEXT_DEFAULTS, ...data.customization }, groceries: data.groceries ?? [], mealIdeas: data.mealIdeas === undefined ? [] : data.mealIdeas, tasks: data.tasks.map(task => {
+  return { ...data, customization: { ...CUSTOM_TEXT_DEFAULTS, ...data.customization }, groceries: data.groceries ?? [], notes: data.notes ?? [], mealIdeas: data.mealIdeas === undefined ? [] : data.mealIdeas, tasks: data.tasks.map(task => {
     const normalized = normalizeTask(task);
     if (normalized.schedules) normalized.schedules = normalized.schedules.map(normalizeTask);
     return normalized;
@@ -806,6 +882,29 @@ document.addEventListener('click', async event => {
       document.querySelector('#created-password-reset-url')?.select();
     }
   }
+  if (action === 'edit-note') openNote(button.dataset.id);
+  if (action === 'archive-note' || action === 'restore-note') {
+    const archived = action === 'archive-note';
+    const nextState = {
+      ...state,
+      notes: state.notes.map(note => note.id === button.dataset.id ? { ...note, archived } : note)
+    };
+    if (await save(nextState)) {
+      state = nextState;
+      render();
+      showToast(archived ? 'Notitie gearchiveerd' : 'Notitie hersteld');
+    }
+  }
+  if (action === 'delete-note') {
+    const note = state.notes.find(item => item.id === button.dataset.id);
+    if (!note || !confirm(`Notitie "${note.title}" definitief verwijderen?`)) return;
+    const nextState = { ...state, notes: state.notes.filter(item => item.id !== note.id) };
+    if (await save(nextState)) {
+      state = nextState;
+      render();
+      showToast('Notitie definitief verwijderd');
+    }
+  }
   if (action === 'revoke-invitation') {
     button.disabled = true;
     try {
@@ -863,6 +962,39 @@ document.addEventListener('change', event => {
 });
 
 document.addEventListener('submit', async event => {
+  if (event.target.id === 'note-form') {
+    event.preventDefault();
+    const form = event.target;
+    const errorBox = form.querySelector('#note-error');
+    errorBox.textContent = '';
+    const title = form.elements.title.value.trim();
+    const description = form.elements.description.value.trim();
+    if (!title || !description) {
+      const field = title ? form.elements.description : form.elements.title;
+      field.setCustomValidity('Vul een titel en beschrijving in.');
+      field.reportValidity();
+      return;
+    }
+    form.inert = true;
+    const note = {
+      id: crypto.randomUUID(),
+      title,
+      description,
+      author: currentAuthorName(),
+      authorUserId: currentUserId,
+      archived: false,
+      editedBy: '',
+      editedByUserId: '',
+      editedAt: ''
+    };
+    const nextState = { ...state, notes: [...state.notes, note] };
+    if (await save(nextState)) {
+      state = nextState;
+      render();
+      showToast('Notitie geplaatst');
+    }
+    return;
+  }
   if (event.target.id === 'customization-form') {
     event.preventDefault();
     const form = event.target;
@@ -934,6 +1066,7 @@ document.addEventListener('submit', async event => {
 
 document.addEventListener('input', event => {
   if (event.target.id === 'grocery-name' || event.target.id === 'meal-idea-name') event.target.setCustomValidity('');
+  if (event.target.form?.id === 'note-form' || event.target.form?.id === 'note-edit-form') event.target.setCustomValidity('');
   if (event.target.form?.id === 'customization-form') event.target.setCustomValidity('');
   if (event.target.id !== 'task-search') return;
   taskSearch = event.target.value;
@@ -965,6 +1098,8 @@ async function openAccount() {
   householdInfo = await api('api/household');
   state = validateBackup({ format: BACKUP_FORMAT, version: 1, data: result.data });
   revision = result.revision;
+  accountEmail = result.email;
+  currentUserId = String(householdInfo.members.find(member => member.email.toLowerCase() === result.email.toLowerCase())?.id || '');
   document.querySelector('#account-email').textContent = result.email;
   document.querySelector('#auth-screen').hidden = true;
   document.querySelector('#invite-screen').hidden = true;
@@ -1106,6 +1241,8 @@ document.querySelector('#logout').addEventListener('click', async () => {
     document.querySelector('#auth-screen').hidden = false;
     document.querySelector('#content').replaceChildren();
     document.querySelector('#account-email').textContent = '';
+    accountEmail = '';
+    currentUserId = '';
     document.querySelector('#auth-error').textContent = '';
   } catch (error) {
     console.error('Uitloggen mislukt:', error);

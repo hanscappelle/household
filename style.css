@@ -13,7 +13,7 @@
 .recovery{position:fixed;inset:0;z-index:100;background:rgba(20,35,25,.75)}
 .recovery .button{margin:8px 8px 0 0}
 body{margin:0;font-size:14px}
-button,input,select{font:inherit}
+button,input,select,textarea{font:inherit}
 button,a{ -webkit-tap-highlight-color:transparent}
 button{cursor:pointer}
 a{color:inherit;text-decoration:none}
@@ -79,6 +79,7 @@ h1{font-size:36px;letter-spacing:-.7px;line-height:1.15}
 .stat strong{font-family:"DM Serif Display",Georgia,serif;font-weight:400;font-size:23px;line-height:1}
 .stat small{display:block;color:#9aa69c;font-size:11px;margin-top:5px}
 .dashboard-grid{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(270px,.85fr);gap:20px;margin-top:28px;align-items:start}
+.dashboard-stack{grid-template-columns:minmax(0,1fr)}
 .section-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:15px}
 .section-heading h2{font-size:22px;letter-spacing:-.3px}
 .section-heading p{font-size:11px;color:#9aa79d;margin-top:5px}
@@ -146,6 +147,23 @@ h1{font-size:36px;letter-spacing:-.7px;line-height:1.15}
 .family-row strong{font-size:12px;display:block}.family-row small{font-size:10px;color:#a2aea3;display:block;margin-top:4px}
 .tip{margin-top:17px;padding:17px;background:#faf5e8;border:1px solid #f5eeda;border-radius:10px;display:flex;gap:12px}
 .tip-icon{font-size:19px;color:#d0aa67}.tip strong{font-size:11px;color:#a18550}.tip p{font-size:10px;line-height:1.6;color:#b4a07c;margin-top:5px}
+.notes-panel{padding:20px}
+.note-form{display:grid;grid-template-columns:minmax(150px,.8fr) minmax(0,2fr) auto;align-items:start;gap:8px 12px}
+.note-field{display:grid;gap:7px;min-width:0}
+.note-form label{font-size:11px;font-weight:700;color:#6e8072}
+.note-form input,.note-form textarea{width:100%;min-width:0}
+.note-form textarea,.field textarea{resize:vertical;border:1px solid #e2e8e0;background:#fff;color:#334b39;border-radius:8px;padding:11px 12px;outline:none}
+.note-form textarea:focus,.field textarea:focus{border-color:#85ad8d;box-shadow:0 0 0 3px #e9f2e9}
+.note-form .button{align-self:end}
+#note-error{grid-column:1/-1;color:#ad4439}
+.note-list{display:grid;gap:10px;margin-top:18px}
+.note-card{padding:15px 0;border-top:1px solid #edf0eb}
+.note-card-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.note-card-heading h3{font-size:14px;overflow-wrap:anywhere}
+.note-card-heading>div{display:flex;gap:8px;flex-shrink:0}
+.note-card>p{margin-top:9px;font-size:12px;line-height:1.6;overflow-wrap:anywhere}
+.note-card>small{display:block;margin-top:9px;color:#87988a;font-size:10px}
+.note-card .text-button{white-space:nowrap}
 .list-toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:20px 0}
 .search{min-width:0;flex:1;position:relative}
 .search input{width:100%;padding-right:42px}
@@ -274,6 +292,11 @@ dialog::backdrop{background:rgba(34,50,38,.42)}
 [data-theme="dark"] .search-clear:hover{background:#3c5541}
 [data-theme="dark"] .grocery-urgent[aria-pressed="true"]{background:#503b2b;border-color:#a57952;color:#ffd7b1}
 [data-theme="dark"] .meal-idea{border-color:#3a4e3e}
+[data-theme="dark"] .note-card{border-color:#3a4e3e}
+[data-theme="dark"] .note-card>small{color:#b4c5b7}
+[data-theme="dark"] .note-form label{color:#c0d9c3}
+[data-theme="dark"] .note-form textarea,[data-theme="dark"] .field textarea{background:#293c2e;border-color:#506554;color:#e1ebe1}
+[data-theme="dark"] .note-form textarea:focus,[data-theme="dark"] .field textarea:focus{border-color:#a1c9a6;box-shadow:0 0 0 3px #405d45}
 [data-theme="dark"] .recipe-search{color:#a7d0ac}
 [data-theme="dark"] .meal-wishes legend,[data-theme="dark"] .meal-empty-members{color:#c0d9c3}
 [data-theme="dark"] .meal-count{color:#c0d9c3}
@@ -316,3 +339,4 @@ dialog::backdrop{background:rgba(34,50,38,.42)}
 @media(max-width:400px){.grocery-urgent-label{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}}
 @media(max-width:600px){.meal-idea{grid-template-columns:minmax(0,1fr) auto auto}.meal-wishes,.meal-empty-members{grid-column:1/-1;grid-row:2}.meal-count{grid-column:2;grid-row:1}.meal-delete{grid-column:3;grid-row:1}}
 @media(max-width:650px){#account-email,.top-avatar{display:none}}
+@media(max-width:650px){.note-form{grid-template-columns:1fr}.note-form .button{justify-self:start}.note-card-heading{display:block}.note-card-heading>div{margin-top:8px}}
