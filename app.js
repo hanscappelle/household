@@ -7,8 +7,25 @@ const initialState = () => ({
   members: structuredClone(SEED_MEMBERS),
   tasks: structuredClone(SEED_TASKS),
   completed: {},
-  groceries: []
+  groceries: [],
+  mealIdeas: structuredClone(SEED_MEAL_IDEAS)
 });
+
+function validateMealIdeas(ideas, members) {
+  if (!Array.isArray(ideas)) throw new Error('De lijst met kookinspiratie is ongeldig.');
+  const memberIds = new Set(members.map(member => member.id));
+  const ids = new Set();
+  for (const idea of ideas) {
+    if (!idea || typeof idea !== 'object' || Array.isArray(idea) ||
+      typeof idea.id !== 'string' || !idea.id.trim() || idea.id.includes('|') || ids.has(idea.id) ||
+      typeof idea.name !== 'string' || !idea.name.trim() || idea.name.length > 120 ||
+      !Array.isArray(idea.wishedBy) || new Set(idea.wishedBy).size !== idea.wishedBy.length ||
+      !idea.wishedBy.every(id => typeof id === 'string' && memberIds.has(id))) {
+      throw new Error('Een gerecht bevat ongeldige gegevens of onbekende gezinsleden.');
+    }
+    ids.add(idea.id);
+  }
+}
 
 function normalizeTask(task) {
   return {
@@ -35,6 +52,8 @@ function loadState() {
     }
     if (parsed.groceries !== undefined && !Array.isArray(parsed.groceries)) throw new Error('Ongeldige boodschappenlijst');
     parsed.groceries ??= [];
+    if (parsed.mealIdeas === undefined) parsed.mealIdeas = [];
+    validateMealIdeas(parsed.mealIdeas, parsed.members);
     parsed.tasks = parsed.tasks.map(normalizeTask);
     return parsed;
   } catch (error) {
@@ -347,17 +366,29 @@ function renderGroceries() {
     </div>`;
 }
 
+function renderMealIdeas() {
+  const sortedIdeas = [...state.mealIdeas].sort((a, b) => b.wishedBy.length - a.wishedBy.length);
+  return `<div class="page-heading"><div><h1>Kookinspiratie</h1><p>Bewaar gerechten en ontdek waar iedereen zin in heeft.</p></div></div>
+    <div class="panel groceries-panel">
+      <form id="meal-ideas-form" class="groceries-form"><label class="sr-only" for="meal-idea-name">Gerecht of voeding</label><input id="meal-idea-name" name="name" required maxlength="120" placeholder="Voeg een gerecht of voeding toe"><button class="button" type="submit"><span class="plus">+</span> Toevoegen</button></form>
+      ${sortedIdeas.length ? sortedIdeas.map(idea => `<div class="meal-idea"><strong class="meal-name">${escapeHtml(idea.name)}</strong>
+        ${state.members.length ? `<fieldset class="meal-wishes"><legend class="sr-only">Wie heeft er zin in ${escapeHtml(idea.name)}?</legend>${state.members.map(member => `<label><input type="checkbox" class="check" data-action="meal-wish" data-id="${escapeHtml(idea.id)}" data-member-id="${escapeHtml(member.id)}" ${idea.wishedBy.includes(member.id) ? 'checked' : ''}><span>${escapeHtml(member.name)}</span></label>`).join('')}</fieldset>` : '<p class="meal-empty-members">Voeg een gezinslid toe om wensen aan te duiden.</p>'}
+        <span class="meal-count ${idea.wishedBy.length > state.members.length / 2 ? 'majority' : ''}">${idea.wishedBy.length} ${idea.wishedBy.length === 1 ? 'persoon' : 'personen'}${idea.wishedBy.length > state.members.length / 2 ? ' · Meerderheid' : ''}</span>
+        <button type="button" class="text-button meal-delete" data-action="delete-meal-idea" data-id="${escapeHtml(idea.id)}" aria-label="${escapeHtml(idea.name)} verwijderen">Verwijderen</button></div>`).join('') : '<div class="empty"><strong>Nog geen kookinspiratie</strong>Voeg een gerecht of voeding toe.</div>'}
+    </div>`;
+}
+
 function renderBackup() {
   return `<div class="page-heading"><div><h1>Back-up</h1><p>Bewaar je gegevens veilig of zet een eerdere back-up terug.</p></div></div>
-    <div class="panel backup-panel"><h2>Back-up downloaden</h2><p>Download een JSON-bestand met gezinsleden, taken, planningen, afvinkjes en boodschappen. Bewaar dit bestand op een veilige plek: het bevat persoonlijke gegevens.</p><button class="button" data-action="export-backup">Back-up downloaden</button></div>
+    <div class="panel backup-panel"><h2>Back-up downloaden</h2><p>Download een JSON-bestand met gezinsleden, taken, planningen, afvinkjes, boodschappen en kookinspiratie. Bewaar dit bestand op een veilige plek: het bevat persoonlijke gegevens.</p><button class="button" data-action="export-backup">Back-up downloaden</button></div>
     <div class="panel backup-panel"><h2>Back-up terugzetten</h2><p>Een back-up terugzetten vervangt de huidige gegevens in deze browser. Download eventueel eerst een back-up van de huidige gegevens.</p><label for="backup-file" class="field-label">JSON-bestand kiezen</label><input id="backup-file" type="file" accept=".json,application/json"><button class="button secondary" data-action="import-backup">Back-up terugzetten</button></div>`;
 }
 
 function render() {
-  const view = ['overzicht', 'taken', 'gezin', 'backup', 'boodschappen'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'overzicht';
-  document.querySelector('#content').innerHTML = view === 'taken' ? renderTasks() : view === 'gezin' ? renderFamily() : view === 'backup' ? renderBackup() : view === 'boodschappen' ? renderGroceries() : renderDashboard();
+  const view = ['overzicht', 'taken', 'gezin', 'backup', 'boodschappen', 'kookinspiratie'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'overzicht';
+  document.querySelector('#content').innerHTML = view === 'taken' ? renderTasks() : view === 'gezin' ? renderFamily() : view === 'backup' ? renderBackup() : view === 'boodschappen' ? renderGroceries() : view === 'kookinspiratie' ? renderMealIdeas() : renderDashboard();
   document.querySelectorAll('.navigation a').forEach(link => link.classList.toggle('active', link.dataset.view === view));
-  document.querySelector('#breadcrumb-current').textContent = view === 'gezin' ? 'ONS GEZIN' : view === 'taken' ? 'ALLE TAKEN' : view === 'backup' ? 'BACK-UP' : view === 'boodschappen' ? 'BOODSCHAPPEN' : 'OVERZICHT';
+  document.querySelector('#breadcrumb-current').textContent = view === 'gezin' ? 'ONS GEZIN' : view === 'taken' ? 'ALLE TAKEN' : view === 'backup' ? 'BACK-UP' : view === 'boodschappen' ? 'BOODSCHAPPEN' : view === 'kookinspiratie' ? 'KOOKINSPIRATIE' : 'OVERZICHT';
   document.querySelector('#nav-count').textContent = state.tasks.length;
   document.querySelector('#today-label').textContent = formatDate(new Date(), { weekday: 'long', day: 'numeric', month: 'long' });
 }
@@ -420,7 +451,8 @@ function validateBackup(backup) {
     }
     groceryIds.add(item.id);
   }
-  return { ...data, groceries: data.groceries ?? [], tasks: data.tasks.map(task => {
+  if (data.mealIdeas !== undefined) validateMealIdeas(data.mealIdeas, data.members);
+  return { ...data, groceries: data.groceries ?? [], mealIdeas: data.mealIdeas === undefined ? [] : data.mealIdeas, tasks: data.tasks.map(task => {
     const normalized = normalizeTask(task);
     if (normalized.schedules) normalized.schedules = normalized.schedules.map(normalizeTask);
     return normalized;
@@ -565,8 +597,13 @@ function openMember(id) {
   form.elements.name.addEventListener('input', () => form.elements.name.setCustomValidity(''));
   form.querySelector('[data-action="delete-member"]')?.addEventListener('click', () => {
     if (!confirm(`${existing.name} verwijderen? Toegewezen taken blijven behouden, maar worden niet meer ingepland.`)) return;
-    state.members = state.members.filter(member => member.id !== existing.id);
-    state.tasks.forEach(task => {
+    const nextState = {
+      ...state,
+      members: state.members.filter(member => member.id !== existing.id),
+      tasks: structuredClone(state.tasks),
+      mealIdeas: state.mealIdeas.map(idea => ({ ...idea, wishedBy: idea.wishedBy.filter(id => id !== existing.id) }))
+    };
+    nextState.tasks.forEach(task => {
       for (const part of schedulesFor(task)) {
         if (part.memberId === existing.id) part.memberId = '';
         for (const assignments of [part.dailyAssignments, part.weeklyAssignments]) {
@@ -574,7 +611,7 @@ function openMember(id) {
         }
       }
     });
-    if (save()) { document.querySelector('#modal').close(); render(); showToast('Gezinslid verwijderd'); }
+    if (save(nextState)) { state = nextState; document.querySelector('#modal').close(); render(); showToast('Gezinslid verwijderd'); }
   });
   document.querySelector('#modal').showModal();
 }
@@ -604,6 +641,10 @@ document.addEventListener('click', event => {
     const nextState = { ...state, groceries: state.groceries.filter(item => item.id !== button.dataset.id) };
     if (save(nextState)) { state = nextState; render(); showToast('Boodschap verwijderd'); }
   }
+  if (action === 'delete-meal-idea') {
+    const nextState = { ...state, mealIdeas: state.mealIdeas.filter(idea => idea.id !== button.dataset.id) };
+    if (save(nextState)) { state = nextState; render(); showToast('Gerecht verwijderd'); }
+  }
   if (action === 'new-member') openMember();
   if (action === 'edit-member') openMember(button.dataset.id);
   if (action === 'close-modal') document.querySelector('#modal').close();
@@ -614,6 +655,16 @@ document.addEventListener('click', event => {
 
 document.addEventListener('change', event => {
   const target = event.target;
+  if (target.dataset.action === 'meal-wish') {
+    const nextState = { ...state, mealIdeas: state.mealIdeas.map(idea => idea.id === target.dataset.id ? {
+      ...idea, wishedBy: target.checked ? [...idea.wishedBy, target.dataset.memberId] : idea.wishedBy.filter(id => id !== target.dataset.memberId)
+    } : idea) };
+    if (save(nextState)) {
+      state = nextState;
+      render();
+      [...document.querySelectorAll('[data-action="meal-wish"]')].find(input => input.dataset.id === target.dataset.id && input.dataset.memberId === target.dataset.memberId)?.focus();
+    } else target.checked = !target.checked;
+  }
   if (target.dataset.action === 'grocery-done') {
     const nextState = { ...state, groceries: state.groceries.map(item => item.id === target.dataset.id ? { ...item, done: target.checked } : item) };
     if (save(nextState)) { state = nextState; render(); }
@@ -633,17 +684,20 @@ document.addEventListener('change', event => {
 });
 
 document.addEventListener('submit', event => {
-  if (event.target.id !== 'groceries-form') return;
+  if (!['groceries-form', 'meal-ideas-form'].includes(event.target.id)) return;
   event.preventDefault();
   const input = event.target.elements.name;
   const name = input.value.trim();
-  if (!name) { input.setCustomValidity('Vul een boodschap in.'); input.reportValidity(); return; }
-  const nextState = { ...state, groceries: [...state.groceries, { id: crypto.randomUUID(), name, done: false, urgent: false }] };
-  if (save(nextState)) { state = nextState; render(); document.querySelector('#grocery-name').focus(); }
+  const meal = event.target.id === 'meal-ideas-form';
+  if (!name) { input.setCustomValidity(meal ? 'Vul een gerecht of voeding in.' : 'Vul een boodschap in.'); input.reportValidity(); return; }
+  const nextState = meal
+    ? { ...state, mealIdeas: [...state.mealIdeas, { id: crypto.randomUUID(), name, wishedBy: [] }] }
+    : { ...state, groceries: [...state.groceries, { id: crypto.randomUUID(), name, done: false, urgent: false }] };
+  if (save(nextState)) { state = nextState; render(); document.querySelector(meal ? '#meal-idea-name' : '#grocery-name').focus(); }
 });
 
 document.addEventListener('input', event => {
-  if (event.target.id === 'grocery-name') event.target.setCustomValidity('');
+  if (event.target.id === 'grocery-name' || event.target.id === 'meal-idea-name') event.target.setCustomValidity('');
   if (event.target.id !== 'task-search') return;
   taskSearch = event.target.value;
   const position = event.target.selectionStart;

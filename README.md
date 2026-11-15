@@ -12,8 +12,8 @@ python3 -m http.server 8000
 
 Open daarna <http://localhost:8000>. Er zijn geen externe dependencies nodig.
 Bij het eerste gebruik bevat de app fictieve voorbeeldgegevens: Mama, Papa en
-Kind, zonder geboortedatums, en enkele huishoudelijke taken met een
-voorbeeldplanning. Je kunt deze gegevens aanpassen of verwijderen. Bestaande
+Kind, zonder geboortedatums, enkele huishoudelijke taken met een
+voorbeeldplanning en enkele gerechten voor kookinspiratie. Je kunt deze gegevens aanpassen of verwijderen. Bestaande
 gegevens in de browser worden niet vervangen door deze nieuwe startgegevens.
 
 Via **Bekijken** bij **Ons gezin** op het overzicht kun je gezinsleden
@@ -69,10 +69,20 @@ product markeer je het als dringend of verwijder je die markering. Ook bij
 afgevinkte producten blijft de markering bewaard. De lijst wordt net als de taken
 lokaal in deze browser bewaard en niet met andere apparaten gesynchroniseerd.
 
+## Kookinspiratie
+
+Via **Kookinspiratie** kun je gerechten of voeding toevoegen en verwijderen.
+Vink per gerecht aan welke gezinsleden er zin in hebben; je kunt die wensen
+ook weer uitvinken. De gerechten met de meeste wensen staan bovenaan. Per
+gerecht zie je het aantal geïnteresseerde gezinsleden en een markering als
+meer dan de helft van de gezinsleden er zin in heeft. Bij het verwijderen van een gezinslid verdwijnen diens
+wensen, maar de gerechten blijven staan. De lijst wordt lokaal in deze
+browser bewaard en niet gesynchroniseerd met andere apparaten.
+
 ## Back-up
 
 Via **Back-up** kun je handmatig een JSON-bestand downloaden met gezinsleden,
-taken, planningen, afvinkjes en boodschappen. Bewaar dit bestand veilig: het bevat persoonlijke
+taken, planningen, afvinkjes, boodschappen en kookinspiratie. Bewaar dit bestand veilig: het bevat persoonlijke
 gegevens. De instelling voor lichte of donkere modus staat niet in de back-up.
 
 Kies op dezelfde pagina een eerder gedownload bestand en klik op **Back-up
@@ -82,6 +92,7 @@ gegevens. Een back-up wordt niet automatisch gemaakt of bijgewerkt.
 Oudere back-ups zonder boodschappen kunnen ook worden teruggezet; daarbij
 begint de boodschappenlijst leeg. Boodschappen uit oudere back-ups zonder
 dringendheidsmarkering zijn niet dringend.
+Bij oudere back-ups zonder kookinspiratie begint die lijst leeg.
 
 ## Weergave
 

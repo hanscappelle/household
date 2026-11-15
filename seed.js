@@ -4,6 +4,13 @@ const SEED_MEMBERS = [
   { id: 'member-3', name: 'Kind', birthDate: null }
 ];
 
+const SEED_MEAL_IDEAS = [
+  { id: 'example-meal-pasta', name: 'Pasta met groenten', wishedBy: [] },
+  { id: 'example-meal-soup', name: 'Groentesoep', wishedBy: [] },
+  { id: 'example-meal-wraps', name: 'Wraps met bonen', wishedBy: [] },
+  { id: 'example-meal-pancakes', name: 'Pannenkoeken', wishedBy: [] }
+];
+
 const SEED_TASKS = [
   {
     id: 'example-cooking',

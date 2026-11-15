@@ -161,6 +161,15 @@ input:focus,select:focus{border-color:#85ad8d;box-shadow:0 0 0 3px #e9f2e9}
 .groceries-form{display:flex;gap:10px;margin-bottom:20px}
 .groceries-form input{flex:1;min-width:0}
 .groceries-panel .list-summary{margin-bottom:12px}
+.meal-idea{display:grid;grid-template-columns:minmax(80px,1fr) minmax(0,2fr) auto auto;align-items:center;gap:8px 12px;padding:8px 0;border-bottom:1px solid #f0f2ef}
+.meal-idea:last-child{border-bottom:0}
+.meal-name{font-size:13px;overflow-wrap:anywhere;min-width:0}
+.meal-wishes{display:flex;flex-wrap:wrap;gap:6px 12px;border:0;padding:0;margin:0;min-width:0}
+.meal-empty-members{font-size:11px;color:#718676}
+.meal-wishes label{display:flex;align-items:center;gap:6px;min-width:0;font-size:12px}
+.meal-wishes label span{overflow-wrap:anywhere}
+.meal-count{font-size:10px;font-weight:700;color:#718676;white-space:nowrap}
+.meal-count.majority{color:#416c4d;background:#e8f2e7;border-radius:5px;padding:4px 6px}
 .grocery-urgent{display:flex;align-items:center;gap:4px;flex-shrink:0;border:1px solid #dfe7de;border-radius:7px;background:#fff;color:#718676;padding:5px 7px;font-size:12px}
 .grocery-urgent[aria-pressed="true"]{background:#fff1e5;border-color:#e9c4a0;color:#9a4f20}
 .grocery-urgent-label{font-size:10px;font-weight:700}
@@ -209,6 +218,10 @@ dialog::backdrop{background:rgba(34,50,38,.42)}
 [data-theme="dark"] .button.danger{background:#53362f;color:#ffd2c5}
 [data-theme="dark"] .grocery-urgent{background:#293c2e;border-color:#506554;color:#d4e5d6}
 [data-theme="dark"] .grocery-urgent[aria-pressed="true"]{background:#503b2b;border-color:#a57952;color:#ffd7b1}
+[data-theme="dark"] .meal-idea{border-color:#3a4e3e}
+[data-theme="dark"] .meal-wishes legend,[data-theme="dark"] .meal-empty-members{color:#c0d9c3}
+[data-theme="dark"] .meal-count{color:#c0d9c3}
+[data-theme="dark"] .meal-count.majority{background:#354b39;color:#d0ebd2}
 [data-theme="dark"] .day.selected{background:#668f70;color:#fff}
 [data-theme="dark"] .day-number{color:#dce9dd}
 [data-theme="dark"] .day-task-count{color:#c0ddc4}
@@ -238,3 +251,4 @@ dialog::backdrop{background:rgba(34,50,38,.42)}
 @media(max-width:650px){.frequency-column{display:none}.status-column{width:100px}.list-panel{padding:0 10px}.list-toolbar select{min-width:0}}
 @media(max-width:650px){.navigation{flex-wrap:wrap}.navigation a{flex:1 1 30%}.groceries-panel{padding:15px}.groceries-form .button{padding:0 10px}}
 @media(max-width:400px){.grocery-urgent-label{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}}
+@media(max-width:600px){.meal-idea{grid-template-columns:minmax(0,1fr) auto auto}.meal-wishes,.meal-empty-members{grid-column:1/-1;grid-row:2}.meal-count{grid-column:2;grid-row:1}.meal-delete{grid-column:3;grid-row:1}}
