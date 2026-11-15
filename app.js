@@ -59,6 +59,8 @@ let createdPasswordResetUrl = '';
 let createdPasswordResetEmail = '';
 let accountEmail = '';
 let currentUserId = '';
+let demoMode = false;
+let themeBeforeDemo = 'light';
 let colorPalette = 'forest';
 let saving = false;
 let needsRecovery = false;
@@ -96,6 +98,7 @@ function initializeTheme() {
 }
 
 async function api(url, options = {}) {
+  if (demoMode) throw new Error('Deze accountfunctie is niet beschikbaar in de demomodus.');
   const response = await fetch(url, { credentials: 'same-origin', ...options });
   const result = await response.json();
   if (!response.ok) {
@@ -107,6 +110,7 @@ async function api(url, options = {}) {
 }
 
 async function save(nextState = state) {
+  if (demoMode) return true;
   const attempted = structuredClone(nextState);
   saving = true;
   document.querySelector('#app').inert = true;
@@ -491,7 +495,7 @@ function renderFamily() {
   const roles = { owner: 'Ouder', parent: 'Ouder', partner: 'Ouder', child: 'Kind' };
   return `<div class="page-heading"><div><h1>Ons gezin</h1><p>Iedereen draagt op zijn eigen manier bij.</p></div><button class="button" data-action="new-member"><span class="plus">+</span> Gezinslid toevoegen</button></div>
     <div class="members-grid">${state.members.map((member, index) => `<div class="panel member-card">${avatar(member, index)}<h3>${escapeHtml(member.name)}</h3><p>${escapeHtml(memberDetails(member))}${member.email ? `<br>${escapeHtml(member.email)}` : ''}<br>${state.tasks.filter(task => assignedMemberIds(task).includes(member.id)).length} toegewezen taken</p><button class="text-button" data-action="edit-member" data-id="${escapeHtml(member.id)}">Gegevens bewerken →</button></div>`).join('')}</div>
-    <section class="household-access">
+    ${demoMode ? '<div class="panel backup-panel"><h2>Gezinsaccounts</h2><p>Uitnodigingen en wachtwoordreset zijn beschikbaar nadat je een account hebt aangemaakt.</p></div>' : `<section class="household-access">
       <div class="section-heading"><div><h2>Samen in hetzelfde dashboard</h2><p>Nodig je partner of kinderen uit met hun eigen e-mailadres en wachtwoord.</p></div></div>
       <div class="panel backup-panel">
         <h2>Gezinsaccounts</h2>
@@ -513,7 +517,7 @@ function renderFamily() {
           <button type="button" class="button secondary" data-action="copy-password-reset">Link kopiëren</button><p>Deel deze link rechtstreeks met de gebruiker. De link is eenmalig geldig voor 1 uur; daarna kiest de gebruiker zelf een nieuw wachtwoord. Na de reset worden bestaande sessies beëindigd.</p>
         </div>
       </div>
-    </section>`;
+    </section>`}`;
 }
 
 function renderGroceries() {
@@ -543,7 +547,7 @@ function renderBackup() {
   return `<div class="page-heading"><div><h1>Instellingen</h1><p>Personaliseer de teksten en beheer de back-up van jullie gezinsgegevens.</p></div></div>
     <form id="palette-form" class="panel backup-panel palette-panel">
       <h2>Jouw kleurenpalet</h2>
-      <p>Deze keuze geldt alleen voor jouw login en verandert de weergave voor de rest van het gezin niet.</p>
+      <p>${demoMode ? 'Probeer een kleurenpalet uit voor deze tijdelijke demo.' : 'Deze keuze geldt alleen voor jouw login en verandert de weergave voor de rest van het gezin niet.'}</p>
       <div class="palette-options" role="radiogroup" aria-label="Kleurenpalet">${COLOR_PALETTES.map(palette => `<label class="palette-option ${colorPalette === palette.id ? 'selected' : ''}"><input type="radio" name="colorPalette" value="${palette.id}" ${colorPalette === palette.id ? 'checked' : ''}><span class="palette-preview" data-palette="${palette.id}" aria-hidden="true"><i></i><i></i><i></i></span><span class="palette-option-copy"><strong>${palette.label}</strong><small>${palette.description}</small></span></label>`).join('')}</div>
       <div id="palette-error" role="alert"></div>
       <button class="button" type="submit">Kleurenpalet opslaan</button>
@@ -561,13 +565,14 @@ function renderBackup() {
       </div>
       <div class="modal-actions"><button type="button" class="button secondary" data-action="reset-customization">Standaardteksten herstellen</button><button type="submit" class="button">Teksten opslaan</button></div>
     </form>
-    <div class="panel backup-panel"><h2>Back-up downloaden</h2><p>Download een JSON-bestand met gezinsleden, taken, planningen, afvinkjes, boodschappen, kookinspiratie en notities. Bewaar dit bestand op een veilige plek: het bevat persoonlijke gegevens.</p><button class="button" data-action="export-backup">Back-up downloaden</button></div>
-    <div class="panel backup-panel"><h2>Back-up terugzetten</h2><p>Een back-up terugzetten vervangt de huidige gegevens van je account. Download eventueel eerst een back-up van de huidige gegevens.</p><label for="backup-file" class="field-label">JSON-bestand kiezen</label><input id="backup-file" type="file" accept=".json,application/json"><button class="button secondary" data-action="import-backup">Back-up terugzetten</button></div>`;
+    ${demoMode ? '<div class="panel backup-panel"><h2>Back-up</h2><p>Back-ups downloaden en terugzetten zijn beschikbaar met een account, niet in de demo.</p></div>' : `<div class="panel backup-panel"><h2>Back-up downloaden</h2><p>Download een JSON-bestand met gezinsleden, taken, planningen, afvinkjes, boodschappen, kookinspiratie en notities. Bewaar dit bestand op een veilige plek: het bevat persoonlijke gegevens.</p><button class="button" data-action="export-backup">Back-up downloaden</button></div>
+    <div class="panel backup-panel"><h2>Back-up terugzetten</h2><p>Een back-up terugzetten vervangt de huidige gegevens van je account. Download eventueel eerst een back-up van de huidige gegevens.</p><label for="backup-file" class="field-label">JSON-bestand kiezen</label><input id="backup-file" type="file" accept=".json,application/json"><button class="button secondary" data-action="import-backup">Back-up terugzetten</button></div>`}`;
 }
 
 function renderHelp() {
   return `<div class="page-heading"><div><h1>Help</h1><p>Praktische uitleg over het gebruik van jullie huishoudapp.</p></div></div>
     <div class="help-content">
+      ${demoMode ? '<section class="panel help-panel"><h2>Demomodus</h2><p>Je gebruikt fictieve gegevens. Wijzigingen en je kleurenkeuze blijven alleen tijdens deze demo in dit tabblad. Bij afsluiten of herladen verdwijnen ze. Uitnodigingen, wachtwoordreset en back-ups zijn alleen beschikbaar met een account.</p></section>' : ''}
       <section class="panel help-panel"><h2>Aanmelden en samen gebruiken</h2>
         <p>Log in met je e-mailadres en wachtwoord. Een ouder kan via <a href="#gezin">Ons gezin</a> een partner of kind uitnodigen met een persoonlijke link. De genodigde kiest zelf een wachtwoord. Een geaccepteerde uitnodiging geeft toegang tot hetzelfde gezinsdashboard.</p>
         <p>Is een gezinslid het wachtwoord vergeten? Een ouder kan bij <a href="#gezin">Gezinsaccounts</a> een eenmalige resetlink maken en deze rechtstreeks met die gebruiker delen. De link verloopt na een uur; de gebruiker kiest zelf het nieuwe wachtwoord.</p>
@@ -1104,6 +1109,16 @@ document.addEventListener('submit', async event => {
     const paletteError = form.querySelector('#palette-error');
     paletteError.textContent = '';
     const selectedPalette = form.elements.colorPalette.value;
+    if (demoMode) {
+      if (!COLOR_PALETTES.some(palette => palette.id === selectedPalette)) {
+        paletteError.textContent = 'Kies een geldig kleurenpalet.';
+        return;
+      }
+      applyColorPalette(selectedPalette);
+      render();
+      showToast('Kleurenpalet toegepast voor deze demo');
+      return;
+    }
     form.inert = true;
     try {
       const result = await api('api/preferences', {
@@ -1219,6 +1234,10 @@ document.addEventListener('change', event => {
 window.addEventListener('hashchange', render);
 document.querySelector('#theme-toggle').addEventListener('click', () => {
   const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  if (demoMode) {
+    applyTheme(theme);
+    return;
+  }
   try {
     localStorage.setItem(THEME_KEY, theme);
     applyTheme(theme);
@@ -1228,9 +1247,38 @@ document.querySelector('#theme-toggle').addEventListener('click', () => {
   }
 });
 window.addEventListener('storage', event => {
-  if (event.key === THEME_KEY || event.key === null) applyTheme(event.newValue);
+  if (!demoMode && (event.key === THEME_KEY || event.key === null)) applyTheme(event.newValue);
 });
 initializeTheme();
+
+function startDemo() {
+  const demoData = {
+    members: SEED_MEMBERS,
+    tasks: SEED_TASKS.map((task, index) => ({ ...task, important: index === 0 })),
+    completed: {},
+    groceries: [
+      { id: 'demo-milk', name: 'Melk', done: false, urgent: true },
+      { id: 'demo-bread', name: 'Brood', done: false, urgent: false }
+    ],
+    mealIdeas: SEED_MEAL_IDEAS,
+    notes: [{ id: 'demo-note', title: 'Welkom bij de demo', description: 'Probeer gerust taken, boodschappen en notities uit.', author: 'Demogebruiker', authorUserId: 'demo', important: true, archived: false }]
+  };
+  state = validateBackup({ format: BACKUP_FORMAT, version: 1, data: structuredClone(demoData) });
+  demoMode = true;
+  themeBeforeDemo = document.documentElement.dataset.theme;
+  revision = null;
+  accountEmail = 'Demogebruiker';
+  currentUserId = 'demo';
+  householdInfo = { members: [], invitations: [], canInvite: false };
+  applyColorPalette('forest');
+  document.querySelector('#auth-screen').hidden = true;
+  document.querySelector('#app').hidden = false;
+  document.querySelector('#demo-banner').hidden = false;
+  document.querySelector('#logout').textContent = 'Demo afsluiten';
+  document.querySelector('#account-email').textContent = '';
+  history.replaceState(null, '', `${location.pathname}#overzicht`);
+  render();
+}
 
 async function openAccount() {
   const result = await api('api/state');
@@ -1258,6 +1306,7 @@ const passwordResetToken = new URLSearchParams(location.search).get('wachtwoord-
 const passwordResetForm = document.querySelector('#password-reset-form');
 const authEmail = authForm.elements.email;
 const authError = document.querySelector('#auth-error');
+document.querySelector('#start-demo').addEventListener('click', startDemo);
 authEmail.addEventListener('invalid', () => {
   authError.textContent = 'Vul een geldig e-mailadres in.';
 });
@@ -1371,7 +1420,20 @@ passwordResetForm.addEventListener('submit', async event => {
 document.querySelector('#logout').addEventListener('click', async () => {
   document.querySelector('#app').inert = true;
   try {
-    await api('api/logout', { method: 'POST' });
+    if (!demoMode) await api('api/logout', { method: 'POST' });
+    else {
+      demoMode = false;
+      applyTheme(themeBeforeDemo);
+      document.querySelector('#demo-banner').hidden = true;
+      document.querySelector('#logout').textContent = 'Uitloggen';
+      selectedDate = dateKey(new Date());
+      taskSearch = '';
+      frequencyFilter = 'all';
+      memberFilter = 'all';
+      statusFilter = 'all';
+      statusSort = 'none';
+      history.replaceState(null, '', location.pathname);
+    }
     state = null;
     revision = null;
     householdInfo = { members: [], invitations: [], canInvite: false };
@@ -1382,6 +1444,8 @@ document.querySelector('#logout').addEventListener('click', async () => {
     document.querySelector('#auth-screen').hidden = false;
     document.querySelector('#content').replaceChildren();
     document.querySelector('#account-email').textContent = '';
+    document.querySelector('#auth-title').textContent = CUSTOM_TEXT_DEFAULTS.websiteTitle;
+    document.title = `${CUSTOM_TEXT_DEFAULTS.websiteTitle} — samen voor een fijn thuis`;
     accountEmail = '';
     currentUserId = '';
     colorPalette = 'forest';

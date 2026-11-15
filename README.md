@@ -54,6 +54,16 @@ Kind, zonder geboortedatums, enkele huishoudelijke taken met een
 voorbeeldplanning en enkele gerechten voor kookinspiratie. Je kunt deze
 gegevens aanpassen of verwijderen.
 
+## Demo proberen
+
+Kies op het aanmeldscherm **Demo proberen** om zonder account met fictieve
+gezinsleden, taken, boodschappen, gerechten en een notitie te oefenen.
+Je kunt gegevens en kleuren aanpassen, maar alles bestaat alleen tijdelijk in
+het huidige tabblad: bij **Demo afsluiten** of herladen verdwijnen de
+wijzigingen. Demo-inhoud wordt niet naar de database of een nieuw account
+overgezet. Uitnodigingen, wachtwoordreset en back-ups zijn alleen beschikbaar
+met een echt account. Gebruik geen persoonlijke gegevens in de demo.
+
 ## Hostingsconfiguratie: alwaysdata
 
 1. Maak bij **Databases > MySQL** een MariaDB/MySQL-database en gebruiker
