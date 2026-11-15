@@ -4,7 +4,7 @@ const BACKUP_FORMAT = 'ons-huishouden-backup';
 const DAYS = ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'];
 const FREQUENCIES = { daily: 'Dagelijks', weekly: 'Wekelijks', monthly: 'Maandelijks', occasional: 'Sporadisch' };
 const initialState = () => ({
-  members: ['Papa', 'Mama', 'Stella', 'Tilde', 'Eljot'].map((name, index) => ({ id: `member-${index + 1}`, name, birthDate: null })),
+  members: structuredClone(SEED_MEMBERS),
   tasks: structuredClone(SEED_TASKS),
   completed: {},
   groceries: []

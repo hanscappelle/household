@@ -11,8 +11,10 @@ python3 -m http.server 8000
 ```
 
 Open daarna <http://localhost:8000>. Er zijn geen externe dependencies nodig.
-De eerste taken en gezinsleden komen uit de Excel-lijst in `data/`. Geboortedatums,
-toewijzingen en planning zijn niet ingevuld waar de lijst die niet bevat.
+Bij het eerste gebruik bevat de app fictieve voorbeeldgegevens: Mama, Papa en
+Kind, zonder geboortedatums, en enkele huishoudelijke taken met een
+voorbeeldplanning. Je kunt deze gegevens aanpassen of verwijderen. Bestaande
+gegevens in de browser worden niet vervangen door deze nieuwe startgegevens.
 
 Via **Bekijken** bij **Ons gezin** op het overzicht kun je gezinsleden
 beheren. Bij elk gezinslid kun je optioneel een geboortedatum invullen. De app toont
