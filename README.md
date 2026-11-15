@@ -42,6 +42,8 @@ geplande datum. Bestaande planningen worden automatisch overgenomen.
 In **Alle taken** geeft het label **Ingepland** of **Niet ingepland** aan of
 minstens één moment met een gezinslid is ingesteld. Een sporadische taak met
 een datum in het verleden blijft als ingepland aangeduid.
+Filter op planningsstatus via **Alle statussen** of klik op de kolomkop
+**Status** om de volgorde om te keren.
 
 Eerder samengevoegde taken behouden hun schema's en afvinkjes. Hun schema's
 kun je via **bewerken** afzonderlijk aanpassen; bij overlap heeft het eerste

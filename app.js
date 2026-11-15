@@ -50,6 +50,8 @@ let selectedDate = dateKey(new Date());
 let taskSearch = '';
 let frequencyFilter = 'all';
 let memberFilter = 'all';
+let statusFilter = 'all';
+let statusSort = 'none';
 let toastTimer;
 
 function applyTheme(theme) {
@@ -305,14 +307,19 @@ function renderDashboard() {
 function renderTasks() {
   const filtered = state.tasks.filter(task => task.title.toLocaleLowerCase('nl').includes(taskSearch.toLocaleLowerCase('nl')) &&
     (frequencyFilter === 'all' || schedulesFor(task).some(part => part.frequency === frequencyFilter)) &&
-    (memberFilter === 'all' || (memberFilter === 'unassigned' ? assignedMemberIds(task).length === 0 : assignedMemberIds(task).includes(memberFilter))));
+    (memberFilter === 'all' || (memberFilter === 'unassigned' ? assignedMemberIds(task).length === 0 : assignedMemberIds(task).includes(memberFilter))) &&
+    (statusFilter === 'all' || isScheduled(task) === (statusFilter === 'scheduled')));
+  if (statusSort !== 'none') {
+    filtered.sort((a, b) => (Number(isScheduled(a)) - Number(isScheduled(b))) * (statusSort === 'unscheduled-first' ? 1 : -1));
+  }
+  const sortLabel = statusSort === 'none' ? 'niet gesorteerd' : statusSort === 'scheduled-first' ? 'ingepland eerst' : 'niet ingepland eerst';
   return `<div class="page-heading"><div><h1>Alle taken</h1><p>Alles wat er thuis gebeurt, op één plek.</p></div><button class="button" data-action="new-task"><span class="plus">+</span> Taak toevoegen</button></div>
-    <div class="list-toolbar"><input class="search" id="task-search" type="search" placeholder="Zoek een taak..." aria-label="Zoek een taak" value="${escapeHtml(taskSearch)}"><select id="frequency-filter" aria-label="Filter op frequentie"><option value="all">Alle frequenties</option>${Object.entries(FREQUENCIES).map(([value, label]) => `<option value="${value}" ${frequencyFilter === value ? 'selected' : ''}>${label}</option>`).join('')}</select><select id="member-filter" aria-label="Filter op gezinslid"><option value="all">Iedereen</option><option value="unassigned" ${memberFilter === 'unassigned' ? 'selected' : ''}>Niet toegewezen</option>${state.members.map(member => `<option value="${escapeHtml(member.id)}" ${memberFilter === member.id ? 'selected' : ''}>${escapeHtml(member.name)}</option>`).join('')}</select></div>
-    <div class="list-summary">${filtered.length} ${filtered.length === 1 ? 'taak' : 'taken'}</div><div class="panel list-panel">${filtered.length ? filtered.map(task => {
+    <div class="list-toolbar"><input class="search" id="task-search" type="search" placeholder="Zoek een taak..." aria-label="Zoek een taak" value="${escapeHtml(taskSearch)}"><select id="frequency-filter" aria-label="Filter op frequentie"><option value="all">Alle frequenties</option>${Object.entries(FREQUENCIES).map(([value, label]) => `<option value="${value}" ${frequencyFilter === value ? 'selected' : ''}>${label}</option>`).join('')}</select><select id="member-filter" aria-label="Filter op gezinslid"><option value="all">Iedereen</option><option value="unassigned" ${memberFilter === 'unassigned' ? 'selected' : ''}>Niet toegewezen</option>${state.members.map(member => `<option value="${escapeHtml(member.id)}" ${memberFilter === member.id ? 'selected' : ''}>${escapeHtml(member.name)}</option>`).join('')}</select><select id="status-filter" aria-label="Filter op planningsstatus"><option value="all">Alle statussen</option><option value="scheduled" ${statusFilter === 'scheduled' ? 'selected' : ''}>Ingepland</option><option value="unscheduled" ${statusFilter === 'unscheduled' ? 'selected' : ''}>Niet ingepland</option></select></div>
+    <div class="list-summary">${filtered.length} ${filtered.length === 1 ? 'taak' : 'taken'}</div><div class="panel list-panel"><table class="task-table"><thead><tr><th scope="col">Taak</th><th scope="col" class="status-column" aria-sort="${statusSort === 'none' ? 'none' : statusSort === 'scheduled-first' ? 'ascending' : 'descending'}"><button type="button" class="status-sort" data-action="sort-status" aria-label="Sorteer op planningsstatus, ${sortLabel}">Status <span aria-hidden="true">${statusSort === 'none' ? '↕' : statusSort === 'scheduled-first' ? '↑' : '↓'}</span></button></th><th scope="col" class="frequency-column">Frequentie</th></tr></thead><tbody>${filtered.length ? filtered.map(task => {
       const scheduled = isScheduled(task);
       const status = scheduled ? 'Ingepland' : 'Niet ingepland';
-      return `<button type="button" class="task-row task-list-item" data-action="edit-task" data-id="${escapeHtml(task.id)}" aria-label="${escapeHtml(task.title)} — ${status} — bewerken"><span class="stat-icon" style="width:34px;height:34px;font-size:15px">✓</span><span class="task-info"><strong>${escapeHtml(task.title)}</strong><small>${!task.schedules && (task.frequency === 'monthly' || task.frequency === 'occasional') ? `${escapeHtml(memberFor(task)?.name || 'Niet toegewezen')} · ` : ''}${escapeHtml(taskSchedule(task))}${task.group ? ` · ${escapeHtml(task.group)}` : ''}</small><span class="schedule-status ${scheduled ? 'scheduled' : 'unscheduled'}">${status}</span></span><span class="frequency-tag">${frequencyLabel(task)}</span><span class="task-action" aria-hidden="true">···</span></button>`;
-    }).join('') : '<div class="empty" style="margin:20px 0">Geen taken gevonden.</div>'}</div>`;
+      return `<tr class="task-list-row" data-action="edit-task" data-id="${escapeHtml(task.id)}"><td><button type="button" class="task-list-item" aria-label="${escapeHtml(task.title)} — ${status} — bewerken"><span class="stat-icon" style="width:34px;height:34px;font-size:15px">✓</span><span class="task-info"><strong>${escapeHtml(task.title)}</strong><small>${!task.schedules && (task.frequency === 'monthly' || task.frequency === 'occasional') ? `${escapeHtml(memberFor(task)?.name || 'Niet toegewezen')} · ` : ''}${escapeHtml(taskSchedule(task))}${task.group ? ` · ${escapeHtml(task.group)}` : ''}</small></span></button></td><td class="status-column"><span class="schedule-status ${scheduled ? 'scheduled' : 'unscheduled'}">${status}</span></td><td class="frequency-column"><span class="frequency-tag">${frequencyLabel(task)}</span></td></tr>`;
+    }).join('') : '<tr><td colspan="3"><div class="empty" style="margin:20px 0">Geen taken gevonden.</div></td></tr>'}</tbody></table></div>`;
 }
 
 function renderFamily() {
@@ -432,6 +439,8 @@ async function importBackup() {
   taskSearch = '';
   frequencyFilter = 'all';
   memberFilter = 'all';
+  statusFilter = 'all';
+  statusSort = 'none';
   render();
   showToast('Back-up teruggezet');
 }
@@ -548,6 +557,11 @@ document.addEventListener('click', event => {
   const action = button.dataset.action;
   if (action === 'new-task') openTask();
   if (action === 'edit-task') openTask(button.dataset.id);
+  if (action === 'sort-status') {
+    statusSort = statusSort === 'scheduled-first' ? 'unscheduled-first' : 'scheduled-first';
+    render();
+    document.querySelector('[data-action="sort-status"]').focus();
+  }
   if (action === 'export-backup') exportBackup();
   if (action === 'import-backup') importBackup();
   if (action === 'new-member') openMember();
@@ -570,6 +584,7 @@ document.addEventListener('change', event => {
   }
   if (target.id === 'frequency-filter') { frequencyFilter = target.value; render(); }
   if (target.id === 'member-filter') { memberFilter = target.value; render(); }
+  if (target.id === 'status-filter') { statusFilter = target.value; render(); }
 });
 
 document.addEventListener('input', event => {
