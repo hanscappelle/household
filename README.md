@@ -228,10 +228,12 @@ en daarna herladen. Terugzetten van die back-up vervangt de servergegevens.
 ## Boodschappen
 
 Via **Boodschappen** kun je producten toevoegen, afvinken als ze gekocht zijn
-en verwijderen. Afgevinkte producten blijven staan totdat je ze verwijdert;
-je kunt ze ook opnieuw aanvinken als nodig. Met het vlaggetje naast een
-product markeer je het als dringend of verwijder je die markering. Ook bij
-afgevinkte producten blijft de markering bewaard. De lijst hoort bij je account.
+en verwijderen. Afgevinkte producten blijven staan totdat je ze verwijdert en
+staan onderaan de lijst; je kunt ze ook opnieuw aanvinken als nodig. Niet
+afgevinkte dringende boodschappen staan boven andere niet-afgevinkte producten.
+Met het vlaggetje naast een product markeer je het als dringend of verwijder je
+die markering. Ook bij afgevinkte producten blijft de markering bewaard. De
+lijst hoort bij je account.
 
 ## Kookinspiratie
 
