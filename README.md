@@ -20,6 +20,9 @@ een niet-schrikkeljaar vanaf 1 maart. Als alleen een eerder opgegeven
 geboortejaar bekend is, toont de app het verschil met het huidige jaar met
 een vermelding dat de verjaardag onbekend is. Een eerder opgegeven leeftijd
 blijft zichtbaar totdat je een geboortedatum invult.
+Verjaardagen verschijnen jaarlijks met een taartje in de weekagenda, vanaf de
+eerste verjaardag. Voor 29 februari verschijnt de verjaardag in een
+niet-schrikkeljaar op 1 maart. Verjaardagen tellen niet mee als taken.
 
 ## Plannen
 

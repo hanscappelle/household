@@ -184,6 +184,19 @@ function tasksOn(date) {
   return state.tasks.filter(task => occursOn(task, date));
 }
 
+function birthdaysOn(date) {
+  return state.members.filter(member => {
+    if (!member.birthDate || !validBackupDate(member.birthDate)) return false;
+    const birthDate = parseDate(member.birthDate);
+    if (date.getFullYear() <= birthDate.getFullYear()) return false;
+    const leapBirthday = birthDate.getMonth() === 1 && birthDate.getDate() === 29;
+    const leapYear = new Date(date.getFullYear(), 1, 29).getMonth() === 1;
+    const month = leapBirthday && !leapYear ? 2 : birthDate.getMonth();
+    const day = leapBirthday && !leapYear ? 1 : birthDate.getDate();
+    return date.getMonth() === month && date.getDate() === day;
+  });
+}
+
 function completionKey(task, date) {
   return `${task.id}|${dateKey(date)}`;
 }
@@ -252,6 +265,7 @@ function renderDashboard() {
   const weekTasks = weekDates.flatMap(day => tasksOn(day).map(task => ({ task, day })));
   const done = weekTasks.filter(item => isDone(item.task, item.day)).length;
   const todayTasks = tasksOn(date);
+  const birthdays = birthdaysOn(date);
   const week = isoWeek(date);
   const range = `${formatDate(start, { day: 'numeric', month: 'short' })} – ${formatDate(weekDates[6], { day: 'numeric', month: 'short', year: 'numeric' })}`;
   return `
@@ -269,9 +283,15 @@ function renderDashboard() {
     <div class="dashboard-grid">
       <section><div class="section-heading"><div><h2>De week in beeld</h2><p>Een klein beetje planning, een groot verschil.</p></div><button class="text-button" data-action="today">Vandaag</button></div>
         <div class="panel"><div class="calendar-head"><div><strong>Week ${week} <span style="color:#9eaca0;font-weight:400">· ${week % 2 ? 'oneven' : 'even'} week</span></strong><small>${escapeHtml(range)}</small></div><div class="calendar-controls"><button class="icon-button" data-action="previous-week" aria-label="Vorige week">‹</button><button class="icon-button" data-action="next-week" aria-label="Volgende week">›</button></div></div>
-          <div class="weekdays">${weekDates.map(day => `<button class="day ${dateKey(day) === selectedDate ? 'selected' : ''}" data-action="select-day" data-date="${dateKey(day)}" aria-label="${escapeHtml(formatDate(day, { weekday: 'long', day: 'numeric', month: 'long' }))}" aria-pressed="${dateKey(day) === selectedDate}"><span class="day-name">${DAYS[(day.getDay() + 6) % 7]}</span><span class="day-number">${day.getDate()}</span><span class="day-dot" style="${tasksOn(day).length ? '' : 'visibility:hidden'}"></span></button>`).join('')}</div>
+          <div class="weekdays">${weekDates.map(day => {
+            const dayBirthdays = birthdaysOn(day);
+            const label = `${formatDate(day, { weekday: 'long', day: 'numeric', month: 'long' })}${dayBirthdays.length ? ` · ${dayBirthdays.length} ${dayBirthdays.length === 1 ? 'verjaardag' : 'verjaardagen'}` : ''}`;
+            return `<button class="day ${dateKey(day) === selectedDate ? 'selected' : ''}" data-action="select-day" data-date="${dateKey(day)}" aria-label="${escapeHtml(label)}" aria-pressed="${dateKey(day) === selectedDate}"><span class="day-name">${DAYS[(day.getDay() + 6) % 7]}</span><span class="day-number">${day.getDate()}</span><span class="day-markers"><span class="day-dot" style="${tasksOn(day).length ? '' : 'visibility:hidden'}"></span>${dayBirthdays.length ? '<span class="birthday-marker" aria-hidden="true">🎂</span>' : ''}</span></button>`;
+          }).join('')}</div>
           <div class="day-detail"><div class="day-detail-head"><strong>${escapeHtml(formatDate(date, { weekday: 'long', day: 'numeric', month: 'long' }))}</strong><span>${todayTasks.length} ${todayTasks.length === 1 ? 'taak' : 'taken'}</span></div>
-            ${todayTasks.length ? todayTasks.map(task => `<div class="task-row ${isDone(task, date) ? 'done' : ''}"><input class="check" type="checkbox" data-action="complete" data-id="${escapeHtml(task.id)}" aria-label="${escapeHtml(task.title)} afronden" ${isDone(task, date) ? 'checked' : ''}><div class="task-info"><strong>${escapeHtml(task.title)}</strong><small>${escapeHtml(memberOn(task, date).name)} · ${frequencyLabel(task)}</small></div>${taskMenu(task)}</div>`).join('') : `<div class="empty"><span class="empty-icon">☼</span><strong>Een lekker lege planning</strong>Plan een taak in en hij verschijnt hier.</div>`}
+            ${birthdays.map(member => `<div class="birthday-row"><span class="birthday-icon" aria-hidden="true">🎂</span><div><strong>Verjaardag van ${escapeHtml(member.name)}</strong><small>${date.getFullYear() - parseDate(member.birthDate).getFullYear()} jaar</small></div></div>`).join('')}
+            ${todayTasks.map(task => `<div class="task-row ${isDone(task, date) ? 'done' : ''}"><input class="check" type="checkbox" data-action="complete" data-id="${escapeHtml(task.id)}" aria-label="${escapeHtml(task.title)} afronden" ${isDone(task, date) ? 'checked' : ''}><div class="task-info"><strong>${escapeHtml(task.title)}</strong><small>${escapeHtml(memberOn(task, date).name)} · ${frequencyLabel(task)}</small></div>${taskMenu(task)}</div>`).join('')}
+            ${!todayTasks.length && !birthdays.length ? `<div class="empty"><span class="empty-icon">☼</span><strong>Een lekker lege planning</strong>Plan een taak in en hij verschijnt hier.</div>` : ''}
           </div>
         </div>
       </section>

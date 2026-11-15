@@ -86,6 +86,12 @@ h1{font-size:36px;letter-spacing:-.7px;line-height:1.15}
 .day.selected .day-number{color:#fff}
 .day-dot{height:4px;width:4px;border-radius:50%;background:#a9c5aa}
 .day.selected .day-dot{background:#fff}
+.day-markers{height:13px;display:flex;align-items:center;justify-content:center;gap:3px}
+.birthday-marker{font-size:12px;line-height:1}
+.birthday-row{display:flex;align-items:center;gap:11px;padding:12px 0;border-bottom:1px solid #f0f2ef}
+.birthday-icon{width:34px;height:34px;display:grid;place-items:center;flex-shrink:0;background:#f9eee2;border-radius:10px;font-size:19px}
+.birthday-row strong{display:block;font-size:12px}
+.birthday-row small{display:block;color:#9a897e;font-size:10px;margin-top:4px}
 .day-detail{padding:17px 19px 19px;min-height:180px}
 .day-detail-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
 .day-detail-head strong{font-size:12px}
@@ -178,6 +184,9 @@ dialog::backdrop{background:rgba(34,50,38,.42)}
 [data-theme="dark"] .day.selected{background:#668f70;color:#fff}
 [data-theme="dark"] .day-number{color:#dce9dd}
 [data-theme="dark"] .weekdays,[data-theme="dark"] .task-row,[data-theme="dark"] .family-row{border-color:#3a4e3e}
+[data-theme="dark"] .birthday-row{border-color:#3a4e3e}
+[data-theme="dark"] .birthday-row small{color:#d8bdae}
+[data-theme="dark"] .birthday-icon{background:#504238}
 [data-theme="dark"] .task-list-item:hover{background:#293c2e}
 [data-theme="dark"] .schedule-status.scheduled{background:#354b39;color:#d0ebd2}
 [data-theme="dark"] .schedule-status.unscheduled{background:#4b402b;color:#f0d7a2}
