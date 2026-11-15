@@ -14,7 +14,8 @@ Open daarna <http://localhost:8000>. Er zijn geen externe dependencies nodig.
 De eerste taken en gezinsleden komen uit de Excel-lijst in `data/`. Geboortedatums,
 toewijzingen en planning zijn niet ingevuld waar de lijst die niet bevat.
 
-Bij elk gezinslid kun je optioneel een geboortedatum invullen. De app toont
+Via **Bekijken** bij **Ons gezin** op het overzicht kun je gezinsleden
+beheren. Bij elk gezinslid kun je optioneel een geboortedatum invullen. De app toont
 de leeftijd rekening houdend met de verjaardag; voor 29 februari is dat in
 een niet-schrikkeljaar vanaf 1 maart. Als alleen een eerder opgegeven
 geboortejaar bekend is, toont de app het verschil met het huidige jaar met
@@ -39,6 +40,10 @@ moment is één gezinslid verantwoordelijk:
 Een taak zonder gezinslid of een sporadische taak zonder datum staat wel in de
 takenlijst, maar niet op de kalender. Afvinken geldt voor de afzonderlijke
 geplande datum. Bestaande planningen worden automatisch overgenomen.
+In de weekplanning staat bij elke dag met taken het aantal geplande taken.
+Voor de geselecteerde dag toont de staafgrafiek **Verdeling per gezinslid**
+hoeveel taken ieder gezinslid heeft, inclusief afgevinkte taken. De langste
+staaf geeft het hoogste aantal van die dag weer. Verjaardagen tellen niet mee.
 In **Alle taken** geeft het label **Ingepland** of **Niet ingepland** aan of
 minstens één moment met een gezinslid is ingesteld. Een sporadische taak met
 een datum in het verleden blijft als ingepland aangeduid.
@@ -57,7 +62,9 @@ browsergegevens worden gewist. De app heeft geen login of gedeelde server.
 
 Via **Boodschappen** kun je producten toevoegen, afvinken als ze gekocht zijn
 en verwijderen. Afgevinkte producten blijven staan totdat je ze verwijdert;
-je kunt ze ook opnieuw aanvinken als nodig. De lijst wordt net als de taken
+je kunt ze ook opnieuw aanvinken als nodig. Met het vlaggetje naast een
+product markeer je het als dringend of verwijder je die markering. Ook bij
+afgevinkte producten blijft de markering bewaard. De lijst wordt net als de taken
 lokaal in deze browser bewaard en niet met andere apparaten gesynchroniseerd.
 
 ## Back-up
@@ -71,7 +78,8 @@ terugzetten**. Na bevestiging worden de huidige gegevens in deze browser
 vervangen, niet samengevoegd. Maak eventueel eerst een back-up van de huidige
 gegevens. Een back-up wordt niet automatisch gemaakt of bijgewerkt.
 Oudere back-ups zonder boodschappen kunnen ook worden teruggezet; daarbij
-begint de boodschappenlijst leeg.
+begint de boodschappenlijst leeg. Boodschappen uit oudere back-ups zonder
+dringendheidsmarkering zijn niet dringend.
 
 ## Weergave
 

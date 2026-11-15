@@ -271,6 +271,11 @@ function renderDashboard() {
   const done = weekTasks.filter(item => isDone(item.task, item.day)).length;
   const todayTasks = tasksOn(date);
   const birthdays = birthdaysOn(date);
+  const memberLoads = state.members.map(member => ({
+    member,
+    count: todayTasks.filter(task => memberOn(task, date)?.id === member.id).length
+  }));
+  const maxLoad = Math.max(0, ...memberLoads.map(item => item.count));
   const week = isoWeek(date);
   const range = `${formatDate(start, { day: 'numeric', month: 'short' })} – ${formatDate(weekDates[6], { day: 'numeric', month: 'short', year: 'numeric' })}`;
   return `
@@ -290,18 +295,20 @@ function renderDashboard() {
         <div class="panel"><div class="calendar-head"><div><strong>Week ${week} <span style="color:#9eaca0;font-weight:400">· ${week % 2 ? 'oneven' : 'even'} week</span></strong><small>${escapeHtml(range)}</small></div><div class="calendar-controls"><button class="icon-button" data-action="previous-week" aria-label="Vorige week">‹</button><button class="icon-button" data-action="next-week" aria-label="Volgende week">›</button></div></div>
           <div class="weekdays">${weekDates.map(day => {
             const dayBirthdays = birthdaysOn(day);
-            const label = `${formatDate(day, { weekday: 'long', day: 'numeric', month: 'long' })}${dayBirthdays.length ? ` · ${dayBirthdays.length} ${dayBirthdays.length === 1 ? 'verjaardag' : 'verjaardagen'}` : ''}`;
-            return `<button class="day ${dateKey(day) === selectedDate ? 'selected' : ''}" data-action="select-day" data-date="${dateKey(day)}" aria-label="${escapeHtml(label)}" aria-pressed="${dateKey(day) === selectedDate}"><span class="day-name">${DAYS[(day.getDay() + 6) % 7]}</span><span class="day-number">${day.getDate()}</span><span class="day-markers"><span class="day-dot" style="${tasksOn(day).length ? '' : 'visibility:hidden'}"></span>${dayBirthdays.length ? '<span class="birthday-marker" aria-hidden="true">🎂</span>' : ''}</span></button>`;
+            const count = tasksOn(day).length;
+            const label = `${formatDate(day, { weekday: 'long', day: 'numeric', month: 'long' })} · ${count} ${count === 1 ? 'taak' : 'taken'}${dayBirthdays.length ? ` · ${dayBirthdays.length} ${dayBirthdays.length === 1 ? 'verjaardag' : 'verjaardagen'}` : ''}`;
+            return `<button class="day ${dateKey(day) === selectedDate ? 'selected' : ''}" data-action="select-day" data-date="${dateKey(day)}" aria-label="${escapeHtml(label)}" aria-pressed="${dateKey(day) === selectedDate}"><span class="day-name">${DAYS[(day.getDay() + 6) % 7]}</span><span class="day-number">${day.getDate()}</span><span class="day-markers" aria-hidden="true">${count ? `<span class="day-dot"></span><span class="day-task-count">${count}</span>` : ''}${dayBirthdays.length ? '<span class="birthday-marker">🎂</span>' : ''}</span></button>`;
           }).join('')}</div>
           <div class="day-detail"><div class="day-detail-head"><strong>${escapeHtml(formatDate(date, { weekday: 'long', day: 'numeric', month: 'long' }))}</strong><span>${todayTasks.length} ${todayTasks.length === 1 ? 'taak' : 'taken'}</span></div>
             ${birthdays.map(member => `<div class="birthday-row"><span class="birthday-icon" aria-hidden="true">🎂</span><div><strong>Verjaardag van ${escapeHtml(member.name)}</strong><small>${date.getFullYear() - parseDate(member.birthDate).getFullYear()} jaar</small></div></div>`).join('')}
             ${todayTasks.map(task => `<div class="task-row ${isDone(task, date) ? 'done' : ''}"><input class="check" type="checkbox" data-action="complete" data-id="${escapeHtml(task.id)}" aria-label="${escapeHtml(task.title)} afronden" ${isDone(task, date) ? 'checked' : ''}><div class="task-info"><strong>${escapeHtml(task.title)}</strong><small>${escapeHtml(memberOn(task, date).name)} · ${frequencyLabel(task)}</small></div>${taskMenu(task)}</div>`).join('')}
             ${!todayTasks.length && !birthdays.length ? `<div class="empty"><span class="empty-icon">☼</span><strong>Een lekker lege planning</strong>Plan een taak in en hij verschijnt hier.</div>` : ''}
+            ${memberLoads.length ? `<div class="daily-load"><strong>Verdeling per gezinslid</strong><ul>${memberLoads.map(({ member, count }) => `<li><span class="load-name">${escapeHtml(member.name)}</span><span class="load-track" aria-hidden="true"><span class="load-bar" style="width:${maxLoad ? count / maxLoad * 100 : 0}%"></span></span><span class="load-count">${count} ${count === 1 ? 'taak' : 'taken'}</span></li>`).join('')}</ul></div>` : ''}
           </div>
         </div>
       </section>
       <section><div class="section-heading"><div><h2>Ons gezin</h2><p>Samen staan we sterker.</p></div><a class="text-button" href="#gezin">Bekijken →</a></div>
-        <div class="panel family-panel">${state.members.length ? state.members.map((member, index) => `<div class="family-row">${avatar(member, index)}<div><strong>${escapeHtml(member.name)}</strong><small>${escapeHtml(memberDetails(member))}</small></div><button class="task-action family-arrow" data-action="edit-member" data-id="${escapeHtml(member.id)}" aria-label="${escapeHtml(member.name)} bewerken">›</button></div>`).join('') : '<div class="empty">Voeg een gezinslid toe om te beginnen.</div>'}</div>
+        <div class="panel family-panel">${state.members.length ? state.members.map((member, index) => `<div class="family-row">${avatar(member, index)}<div><strong>${escapeHtml(member.name)}</strong><small>${escapeHtml(memberDetails(member))}</small></div></div>`).join('') : '<div class="empty">Voeg een gezinslid toe om te beginnen.</div>'}</div>
         <div class="tip"><span class="tip-icon">✧</span><div><strong>Goed om te weten</strong><p>De taken uit jullie lijst staan al klaar. Wijs ze toe en kies wanneer ze terugkomen.</p><a class="text-button" href="#taken" style="padding-left:0">Bekijk alle taken →</a></div></div>
       </section>
     </div>`;
@@ -336,7 +343,7 @@ function renderGroceries() {
     <div class="panel groceries-panel">
       <form id="groceries-form" class="groceries-form"><label class="sr-only" for="grocery-name">Boodschap</label><input id="grocery-name" name="name" required maxlength="120" placeholder="Voeg iets toe aan de lijst"><button class="button" type="submit"><span class="plus">+</span> Toevoegen</button></form>
       <p class="list-summary">${remaining} ${remaining === 1 ? 'boodschap' : 'boodschappen'} te halen</p>
-      ${state.groceries.length ? state.groceries.map(item => `<div class="task-row ${item.done ? 'done' : ''}"><input type="checkbox" class="check" data-action="grocery-done" data-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(item.name)} gekocht" ${item.done ? 'checked' : ''}><div class="task-info"><strong>${escapeHtml(item.name)}</strong></div><button type="button" class="text-button grocery-delete" data-action="delete-grocery" data-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(item.name)} verwijderen">Verwijderen</button></div>`).join('') : '<div class="empty"><strong>Je lijst is leeg</strong>Voeg toe wat jullie nodig hebben.</div>'}
+      ${state.groceries.length ? state.groceries.map(item => `<div class="task-row ${item.done ? 'done' : ''}"><input type="checkbox" class="check" data-action="grocery-done" data-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(item.name)} gekocht" ${item.done ? 'checked' : ''}><div class="task-info"><strong>${escapeHtml(item.name)}</strong></div><button type="button" class="grocery-urgent" data-action="toggle-grocery-urgent" data-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(item.name)} dringend" aria-pressed="${item.urgent === true}" title="${item.urgent ? 'Dringend: klik om te wijzigen' : 'Markeer als dringend'}"><span aria-hidden="true">${item.urgent ? '⚑' : '⚐'}</span><span class="grocery-urgent-label">${item.urgent ? 'Dringend' : 'Niet dringend'}</span></button><button type="button" class="text-button grocery-delete" data-action="delete-grocery" data-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(item.name)} verwijderen">Verwijderen</button></div>`).join('') : '<div class="empty"><strong>Je lijst is leeg</strong>Voeg toe wat jullie nodig hebben.</div>'}
     </div>`;
 }
 
@@ -408,7 +415,7 @@ function validateBackup(backup) {
   if (data.groceries !== undefined && !Array.isArray(data.groceries)) throw new Error('De boodschappenlijst is ongeldig.');
   const groceryIds = new Set();
   for (const item of data.groceries ?? []) {
-    if (!object(item) || !id(item.id) || groceryIds.has(item.id) || typeof item.name !== 'string' || !item.name.trim() || item.name.length > 120 || typeof item.done !== 'boolean') {
+    if (!object(item) || !id(item.id) || groceryIds.has(item.id) || typeof item.name !== 'string' || !item.name.trim() || item.name.length > 120 || typeof item.done !== 'boolean' || (item.urgent !== undefined && typeof item.urgent !== 'boolean')) {
       throw new Error('Een boodschap bevat ongeldige gegevens.');
     }
     groceryIds.add(item.id);
@@ -585,6 +592,14 @@ document.addEventListener('click', event => {
   }
   if (action === 'export-backup') exportBackup();
   if (action === 'import-backup') importBackup();
+  if (action === 'toggle-grocery-urgent') {
+    const nextState = { ...state, groceries: state.groceries.map(item => item.id === button.dataset.id ? { ...item, urgent: !item.urgent } : item) };
+    if (save(nextState)) {
+      state = nextState;
+      render();
+      [...document.querySelectorAll('[data-action="toggle-grocery-urgent"]')].find(item => item.dataset.id === button.dataset.id)?.focus();
+    }
+  }
   if (action === 'delete-grocery') {
     const nextState = { ...state, groceries: state.groceries.filter(item => item.id !== button.dataset.id) };
     if (save(nextState)) { state = nextState; render(); showToast('Boodschap verwijderd'); }
@@ -623,7 +638,7 @@ document.addEventListener('submit', event => {
   const input = event.target.elements.name;
   const name = input.value.trim();
   if (!name) { input.setCustomValidity('Vul een boodschap in.'); input.reportValidity(); return; }
-  const nextState = { ...state, groceries: [...state.groceries, { id: crypto.randomUUID(), name, done: false }] };
+  const nextState = { ...state, groceries: [...state.groceries, { id: crypto.randomUUID(), name, done: false, urgent: false }] };
   if (save(nextState)) { state = nextState; render(); document.querySelector('#grocery-name').focus(); }
 });
 
