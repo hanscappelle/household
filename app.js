@@ -2,6 +2,12 @@ const THEME_KEY = 'ons-huishouden-thema';
 const BACKUP_FORMAT = 'ons-huishouden-backup';
 const DAYS = ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'];
 const FREQUENCIES = { daily: 'Dagelijks', weekly: 'Wekelijks', monthly: 'Maandelijks', occasional: 'Sporadisch' };
+const COLOR_PALETTES = [
+  { id: 'forest', label: 'Bosgroen', description: 'De oorspronkelijke groene tinten' },
+  { id: 'ocean', label: 'Oceaanblauw', description: 'Frisse blauw- en zeetinten' },
+  { id: 'lavender', label: 'Lavendel', description: 'Zachte paarse tinten' },
+  { id: 'terracotta', label: 'Terracotta', description: 'Warme aardetinten' }
+];
 const CUSTOM_TEXT_DEFAULTS = {
   websiteTitle: 'Ons huishouden',
   brandSubtitle: 'SAMEN THUIS',
@@ -53,6 +59,7 @@ let createdPasswordResetUrl = '';
 let createdPasswordResetEmail = '';
 let accountEmail = '';
 let currentUserId = '';
+let colorPalette = 'forest';
 let saving = false;
 let needsRecovery = false;
 let selectedDate = dateKey(new Date());
@@ -71,6 +78,11 @@ function applyTheme(theme) {
   button.querySelector('[aria-hidden]').textContent = dark ? '☀' : '☾';
   button.querySelector('.theme-text').textContent = dark ? 'Licht' : 'Donker';
   document.querySelector('meta[name="theme-color"]').content = dark ? '#17231c' : '#f6f7f2';
+}
+
+function applyColorPalette(palette) {
+  colorPalette = palette;
+  document.documentElement.dataset.palette = palette;
 }
 
 function initializeTheme() {
@@ -480,6 +492,13 @@ function renderMealIdeas() {
 
 function renderBackup() {
   return `<div class="page-heading"><div><h1>Instellingen</h1><p>Personaliseer de teksten en beheer de back-up van jullie gezinsgegevens.</p></div></div>
+    <form id="palette-form" class="panel backup-panel palette-panel">
+      <h2>Jouw kleurenpalet</h2>
+      <p>Deze keuze geldt alleen voor jouw login en verandert de weergave voor de rest van het gezin niet.</p>
+      <div class="palette-options" role="radiogroup" aria-label="Kleurenpalet">${COLOR_PALETTES.map(palette => `<label class="palette-option ${colorPalette === palette.id ? 'selected' : ''}"><input type="radio" name="colorPalette" value="${palette.id}" ${colorPalette === palette.id ? 'checked' : ''}><span class="palette-preview" data-palette="${palette.id}" aria-hidden="true"><i></i><i></i><i></i></span><span class="palette-option-copy"><strong>${palette.label}</strong><small>${palette.description}</small></span></label>`).join('')}</div>
+      <div id="palette-error" role="alert"></div>
+      <button class="button" type="submit">Kleurenpalet opslaan</button>
+    </form>
     <form id="customization-form" class="panel backup-panel">
       <h2>Teksten personaliseren</h2>
       <p>Deze teksten zijn zichtbaar voor iedereen in jullie gezinsdashboard.</p>
@@ -520,6 +539,7 @@ function renderHelp() {
       </section>
       <section class="panel help-panel"><h2>Instellingen en gegevens bewaren</h2>
         <p>Bij <a href="#instellingen">Instellingen</a> pas je de websitetitel, de ondertekst van het logo en de welkomst- en zijpaneelteksten aan. Deze teksten zijn zichtbaar voor het hele gezin.</p>
+        <p>Je kiest daar ook een kleurenpalet. Die keuze wordt afzonderlijk per login bewaard en heeft geen invloed op de rest van het huishouden.</p>
         <p>Je kunt daar ook een JSON-back-up downloaden of terugzetten. Terugzetten vervangt de huidige gezinsgegevens; maak eventueel eerst een back-up. Bewaar het bestand veilig, want het bevat persoonlijke gegevens.</p>
       </section>
       <section class="panel help-panel"><h2>Wijzigingen op meerdere apparaten</h2>
@@ -995,6 +1015,29 @@ document.addEventListener('submit', async event => {
     }
     return;
   }
+  if (event.target.id === 'palette-form') {
+    event.preventDefault();
+    const form = event.target;
+    const paletteError = form.querySelector('#palette-error');
+    paletteError.textContent = '';
+    const selectedPalette = form.elements.colorPalette.value;
+    form.inert = true;
+    try {
+      const result = await api('api/preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ colorPalette: selectedPalette })
+      });
+      applyColorPalette(result.colorPalette);
+      render();
+      showToast('Kleurenpalet opgeslagen voor jouw login');
+    } catch (error) {
+      console.error('Kleurenpalet opslaan mislukt:', error);
+      paletteError.textContent = `Kleurenpalet opslaan is niet gelukt: ${error.message}`;
+      form.inert = false;
+    }
+    return;
+  }
   if (event.target.id === 'customization-form') {
     event.preventDefault();
     const form = event.target;
@@ -1077,6 +1120,13 @@ document.addEventListener('input', event => {
   search.setSelectionRange(position, position);
 });
 
+document.addEventListener('change', event => {
+  if (event.target.name !== 'colorPalette') return;
+  document.querySelectorAll('.palette-option').forEach(option => {
+    option.classList.toggle('selected', option.querySelector('input').checked);
+  });
+});
+
 window.addEventListener('hashchange', render);
 document.querySelector('#theme-toggle').addEventListener('click', () => {
   const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
@@ -1096,10 +1146,12 @@ initializeTheme();
 async function openAccount() {
   const result = await api('api/state');
   householdInfo = await api('api/household');
+  const preferences = await api('api/preferences');
   state = validateBackup({ format: BACKUP_FORMAT, version: 1, data: result.data });
   revision = result.revision;
   accountEmail = result.email;
   currentUserId = String(householdInfo.members.find(member => member.email.toLowerCase() === result.email.toLowerCase())?.id || '');
+  applyColorPalette(preferences.colorPalette);
   document.querySelector('#account-email').textContent = result.email;
   document.querySelector('#auth-screen').hidden = true;
   document.querySelector('#invite-screen').hidden = true;
@@ -1243,6 +1295,8 @@ document.querySelector('#logout').addEventListener('click', async () => {
     document.querySelector('#account-email').textContent = '';
     accountEmail = '';
     currentUserId = '';
+    colorPalette = 'forest';
+    document.documentElement.dataset.palette = colorPalette;
     document.querySelector('#auth-error').textContent = '';
   } catch (error) {
     console.error('Uitloggen mislukt:', error);

@@ -82,6 +82,7 @@ const cookieName = basePath ? 'household_session' : 'session';
 const cookieOptions = { httpOnly: true, secure: secureCookie, sameSite: 'strict', path: basePath || '/', maxAge: 7 * 24 * 60 * 60 * 1000 };
 const emailValid = email => typeof email === 'string' && email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 const passwordValid = password => typeof password === 'string' && password.length >= 12 && Buffer.byteLength(password, 'utf8') <= 1024;
+const colorPalettes = new Set(['forest', 'ocean', 'lavender', 'terracotta']);
 const notesValid = notes => Array.isArray(notes) && notes.length <= 1000 &&
   new Set(notes.map(note => note?.id)).size === notes.length &&
   notes.every(note => note && typeof note === 'object' && !Array.isArray(note) &&
@@ -173,6 +174,20 @@ router.post('/api/login', authLimit, async (req, res) => {
   if (!timingSafeEqual(calculated, expected) || !user) return res.status(401).json({ error: 'Ongeldig e-mailadres of wachtwoord.' });
   await createSession(res, user.id);
   res.json({ email });
+});
+
+router.get('/api/preferences', authenticate, async (req, res) => {
+  const [rows] = await pool.execute('SELECT color_palette FROM users WHERE id = ?', [req.user.id]);
+  res.json({ colorPalette: rows[0].color_palette });
+});
+
+router.put('/api/preferences', authenticate, async (req, res) => {
+  const colorPalette = req.body?.colorPalette;
+  if (!colorPalettes.has(colorPalette)) {
+    return res.status(400).json({ error: 'Kies een geldig kleurenpalet.' });
+  }
+  await pool.execute('UPDATE users SET color_palette = ? WHERE id = ?', [colorPalette, req.user.id]);
+  res.json({ colorPalette });
 });
 
 router.post('/api/password-resets', authenticate, authLimit, async (req, res) => {
@@ -451,8 +466,13 @@ async function start() {
     password_salt CHAR(32) NOT NULL,
     password_hash CHAR(128) NOT NULL,
     data LONGTEXT NOT NULL,
-    revision INT UNSIGNED NOT NULL
+    revision INT UNSIGNED NOT NULL,
+    color_palette VARCHAR(20) NOT NULL DEFAULT 'forest'
   ) ENGINE=InnoDB`);
+  const [userColumns] = await pool.execute("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'");
+  if (!userColumns.some(column => column.COLUMN_NAME === 'color_palette')) {
+    await pool.query("ALTER TABLE users ADD COLUMN color_palette VARCHAR(20) NOT NULL DEFAULT 'forest'");
+  }
   await pool.query(`CREATE TABLE IF NOT EXISTS sessions (
     token_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL PRIMARY KEY,
     user_id BIGINT UNSIGNED NOT NULL,

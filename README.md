@@ -264,10 +264,15 @@ welkomsttitel en -tekst en de kleine boodschap in het zijpaneel aanpassen. Deze 
 gedeeld met alle gezinsaccounts en opgenomen in de back-up. Met
 **Standaardteksten herstellen** zet je ze terug naar de oorspronkelijke tekst.
 
+Je kunt op deze pagina ook kiezen uit de kleurenpaletten Bosgroen,
+Oceaanblauw, Lavendel en Terracotta. Het gekozen palet wordt per login
+opgeslagen, geldt ook in de donkere modus en verandert de weergave voor andere
+gezinsaccounts niet. Bestaande accounts beginnen met Bosgroen.
+
 Je kunt hier ook handmatig een JSON-bestand downloaden met gezinsleden, taken,
 planningen, afvinkjes, boodschappen, kookinspiratie, notities en persoonlijke teksten.
-Bewaar dit bestand veilig: het bevat persoonlijke gegevens. De instelling
-voor lichte of donkere modus staat niet in de back-up.
+Bewaar dit bestand veilig: het bevat persoonlijke gegevens. Je voorkeur voor
+lichte of donkere modus en je persoonlijke kleurenpalet staan niet in de back-up.
 
 Kies op dezelfde pagina een eerder gedownload bestand en klik op **Back-up
 terugzetten**. Na bevestiging worden de huidige gegevens van je huishouden
@@ -289,6 +294,7 @@ instellingen, back-ups en het gebruik op meerdere apparaten.
 
 Met de knop **Donker** bovenaan schakel je donkere modus in. Met **Licht**
 schakel je terug. Je keuze wordt afzonderlijk in de lokale browser bewaard.
+Je persoonlijke kleurenpalet blijft daarbij actief in beide modi.
 
 ## Testen
 
