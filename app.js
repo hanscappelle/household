@@ -337,6 +337,67 @@ function renderLoadDistribution(title, loads) {
   return `<section class="daily-load"><strong>${escapeHtml(title)}</strong><ul>${loads.map(({ member, count }) => `<li><span class="load-name">${escapeHtml(member.name)}</span><span class="load-track" aria-hidden="true"><span class="load-bar" style="width:${maxLoad ? count / maxLoad * 100 : 0}%"></span></span><span class="load-count">${count} ${count === 1 ? 'taak' : 'taken'}</span></li>`).join('')}</ul></section>`;
 }
 
+function memberStatistics(member) {
+  if (!validBackupDate(member.createdAt)) return null;
+  const start = parseDate(member.createdAt);
+  const end = parseDate(dateKey(new Date()));
+  let scheduled = 0;
+  let completed = 0;
+  for (let date = start; date <= end; date = addDays(date, 1)) {
+    for (const task of state.tasks) {
+      if (occursOn(task, date) && memberOn(task, date)?.id === member.id) {
+        scheduled += 1;
+        if (isDone(task, date)) completed += 1;
+      }
+    }
+  }
+  const creator = demoMode ? member.id : householdInfo.members.find(item =>
+    item.email.toLowerCase() === member.email?.toLowerCase())?.id;
+  const collections = [
+    { key: 'tasks', label: 'Aangemaakte taken' },
+    { key: 'groceries', label: 'Aangemaakte boodschappen' },
+    { key: 'mealIdeas', label: 'Aangemaakte gerechten' },
+    { key: 'notes', label: 'Aangemaakte berichten' }
+  ];
+  const creations = collections.map(({ key, label }) => {
+    const inRange = (state[key] || []).filter(item =>
+      validBackupDate(item.createdAt) && item.createdAt >= member.createdAt && item.createdAt <= dateKey(end) &&
+      (demoMode ? typeof item.createdByMemberId === 'string' : item.createdByUserId != null));
+    const count = inRange.filter(item => creator != null && (demoMode
+      ? item.createdByMemberId === creator
+      : String(item.createdByUserId) === String(creator))).length;
+    return { label, count, percentage: inRange.length ? Math.round(count / inRange.length * 100) : 0 };
+  });
+  return { scheduled, completed, creations };
+}
+
+function localCreationMetadata() {
+  const metadata = { createdAt: dateKey(new Date()) };
+  if (demoMode) {
+    const member = currentMember();
+    if (member) metadata.createdByMemberId = member.id;
+  } else {
+    metadata.createdByUserId = currentUserId;
+  }
+  return metadata;
+}
+
+function createdDateLabel(member) {
+  return validBackupDate(member.createdAt)
+    ? formatDate(parseDate(member.createdAt), { day: 'numeric', month: 'long', year: 'numeric' })
+    : 'datum niet bekend';
+}
+
+function renderMemberStatistics(member) {
+  const statistics = memberStatistics(member);
+  return `<div class="page-heading"><div><h1>Statistieken: ${escapeHtml(member.name)}</h1><p>${statistics ? `Vanaf ${createdDateLabel(member)} tot en met vandaag.` : 'De aanmaakdatum van dit gezinslid is nog niet bekend.'}</p></div><a class="button secondary" href="#gezin">← Terug naar ons gezin</a></div>
+    ${statistics ? `<div class="stats member-statistics">
+      <div class="stat"><span class="stat-icon">◷</span><div><strong>${statistics.scheduled}</strong><small>Ingeplande taken</small></div></div>
+      <div class="stat"><span class="stat-icon">✓</span><div><strong>${statistics.completed}</strong><small>Uitgevoerde taken</small></div></div>
+      ${statistics.creations.map(({ label, count, percentage }) => `<div class="stat"><span class="stat-icon">＋</span><div><strong>${count}</strong><small>${escapeHtml(label)} · ${percentage}% van gezin</small></div></div>`).join('')}
+    </div><p class="member-statistics-note">Taken zijn geteld op basis van de huidige planning en opgeslagen afvinkjes. De percentages zijn het aandeel van alle geregistreerde aanmaakacties in die categorie sinds de aanmaakdatum. Oudere items zonder makerregistratie tellen niet mee. Voor makerstatistieken moet het account via het e-mailadres aan een gezinslid zijn gekoppeld.</p>` : '<div class="panel member-statistics-empty">Er zijn nog geen statistieken te berekenen. Vul de aanmaakdatum in via <a href="#gezin">Ons gezin</a> → <strong>Gegevens bewerken</strong>.</div>'}`;
+}
+
 function renderDashboard() {
   const date = parseDate(selectedDate);
   const start = monday(date);
@@ -497,7 +558,7 @@ function renderTasks() {
 function renderFamily() {
   const roles = { owner: 'Ouder', parent: 'Ouder', partner: 'Ouder', child: 'Kind' };
   return `<div class="page-heading"><div><h1>Ons gezin</h1><p>Iedereen draagt op zijn eigen manier bij.</p></div><button class="button" data-action="new-member"><span class="plus">+</span> Gezinslid toevoegen</button></div>
-    <div class="members-grid">${state.members.map((member, index) => `<div class="panel member-card">${avatar(member, index)}<h3>${escapeHtml(member.name)}</h3><p>${escapeHtml(memberDetails(member))}${member.email ? `<br>${escapeHtml(member.email)}` : ''}<br>${state.tasks.filter(task => assignedMemberIds(task).includes(member.id)).length} toegewezen taken</p>${isChild() ? '' : `<button class="text-button" data-action="edit-member" data-id="${escapeHtml(member.id)}">Gegevens bewerken →</button>`}</div>`).join('')}</div>
+    <div class="members-grid">${state.members.map((member, index) => `<div class="panel member-card">${avatar(member, index)}<h3>${escapeHtml(member.name)}</h3><p>${escapeHtml(memberDetails(member))}${member.email ? `<br>${escapeHtml(member.email)}` : ''}<br>${state.tasks.filter(task => assignedMemberIds(task).includes(member.id)).length} toegewezen taken</p><p class="member-created"><strong>Aangemaakt:</strong> ${escapeHtml(createdDateLabel(member))}</p><a class="text-button member-stats-link" href="#statistieken/${encodeURIComponent(member.id)}">Statistieken bekijken →</a>${isChild() ? '' : `<button class="text-button" data-action="edit-member" data-id="${escapeHtml(member.id)}">Gegevens bewerken →</button>`}</div>`).join('')}</div>
     ${demoMode ? '<div class="panel backup-panel"><h2>Gezinsaccounts</h2><p>Uitnodigingen en wachtwoordreset zijn beschikbaar nadat je een account hebt aangemaakt.</p></div>' : `<section class="household-access">
       <div class="section-heading"><div><h2>Samen in hetzelfde dashboard</h2><p>Nodig je partner of kinderen uit met hun eigen e-mailadres en wachtwoord.</p></div></div>
       <div class="panel backup-panel">
@@ -612,13 +673,22 @@ function render() {
   const member = currentMember();
   accountName.textContent = demoMode ? '' : member?.name || 'Gezinslid';
   accountName.title = !demoMode && !member ? 'Vul je inlogadres in bij je gegevens onder Ons gezin.' : '';
-  const requestedView = location.hash.slice(1);
+  const [requestedView, encodedMemberId] = location.hash.slice(1).split('/');
   if (requestedView === 'backup') {
     location.hash = 'instellingen';
     return;
   }
-  const view = ['overzicht', 'taken', 'gezin', 'instellingen', 'help', 'boodschappen', 'kookinspiratie', 'notitiearchief'].includes(requestedView) ? requestedView : 'overzicht';
-  document.querySelector('#content').innerHTML = view === 'taken' ? renderTasks() : view === 'gezin' ? renderFamily() : view === 'instellingen' ? renderBackup() : view === 'help' ? renderHelp() : view === 'boodschappen' ? renderGroceries() : view === 'kookinspiratie' ? renderMealIdeas() : view === 'notitiearchief' ? renderNoteArchive() : renderDashboard();
+  let statisticsMember;
+  if (requestedView === 'statistieken' && encodedMemberId) {
+    try {
+      const memberId = decodeURIComponent(encodedMemberId);
+      statisticsMember = state.members.find(item => item.id === memberId);
+    } catch (error) {
+      if (!(error instanceof URIError)) throw error;
+    }
+  }
+  const view = statisticsMember ? 'statistieken' : ['overzicht', 'taken', 'gezin', 'instellingen', 'help', 'boodschappen', 'kookinspiratie', 'notitiearchief'].includes(requestedView) ? requestedView : 'overzicht';
+  document.querySelector('#content').innerHTML = view === 'taken' ? renderTasks() : view === 'gezin' ? renderFamily() : view === 'statistieken' ? renderMemberStatistics(statisticsMember) : view === 'instellingen' ? renderBackup() : view === 'help' ? renderHelp() : view === 'boodschappen' ? renderGroceries() : view === 'kookinspiratie' ? renderMealIdeas() : view === 'notitiearchief' ? renderNoteArchive() : renderDashboard();
   document.querySelector('#brand-title').textContent = state.customization.websiteTitle;
   document.querySelector('#brand-subtitle').textContent = state.customization.brandSubtitle;
   document.querySelector('.brand').setAttribute('aria-label', `${state.customization.websiteTitle}, naar overzicht`);
@@ -626,8 +696,8 @@ function render() {
   document.title = `${state.customization.websiteTitle} — samen voor een fijn thuis`;
   document.querySelector('#sidebar-custom-title').textContent = state.customization.sidebarTitle;
   document.querySelector('#sidebar-custom-text').textContent = state.customization.sidebarText;
-  document.querySelectorAll('.navigation a').forEach(link => link.classList.toggle('active', link.dataset.view === view));
-  document.querySelector('#breadcrumb-current').textContent = view === 'gezin' ? 'ONS GEZIN' : view === 'taken' ? 'ALLE TAKEN' : view === 'instellingen' ? 'INSTELLINGEN' : view === 'help' ? 'HELP' : view === 'boodschappen' ? 'BOODSCHAPPEN' : view === 'kookinspiratie' ? 'KOOKINSPIRATIE' : view === 'notitiearchief' ? 'NOTITIEARCHIEF' : 'OVERZICHT';
+  document.querySelectorAll('.navigation a').forEach(link => link.classList.toggle('active', link.dataset.view === (view === 'statistieken' ? 'gezin' : view)));
+  document.querySelector('#breadcrumb-current').textContent = view === 'gezin' ? 'ONS GEZIN' : view === 'statistieken' ? 'ONS GEZIN / STATISTIEKEN' : view === 'taken' ? 'ALLE TAKEN' : view === 'instellingen' ? 'INSTELLINGEN' : view === 'help' ? 'HELP' : view === 'boodschappen' ? 'BOODSCHAPPEN' : view === 'kookinspiratie' ? 'KOOKINSPIRATIE' : view === 'notitiearchief' ? 'NOTITIEARCHIEF' : 'OVERZICHT';
   document.querySelector('#nav-count').textContent = state.tasks.length;
   document.querySelector('#today-label').textContent = formatDate(new Date(), { weekday: 'long', day: 'numeric', month: 'long' });
 }
@@ -654,7 +724,8 @@ function validateBackup(backup) {
   for (const member of data.members) {
     if (!object(member) || !id(member.id) || memberIds.has(member.id) || typeof member.name !== 'string' || !member.name.trim() ||
       (member.email != null && (typeof member.email !== 'string' || member.email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(member.email))) ||
-      (member.birthDate != null && (!validBackupDate(member.birthDate) || member.birthDate > dateKey(new Date()))) ||
+    (member.createdAt != null && (!validBackupDate(member.createdAt) || member.createdAt > dateKey(new Date()))) ||
+    (member.birthDate != null && (!validBackupDate(member.birthDate) || member.birthDate > dateKey(new Date()))) ||
       (member.birthYear != null && (!Number.isInteger(member.birthYear) || member.birthYear < 1900 || member.birthYear > new Date().getFullYear())) ||
       (member.age != null && (!Number.isInteger(member.age) || member.age < 0 || member.age > 130))) throw new Error('Een gezinslid bevat ongeldige gegevens.');
     memberIds.add(member.id);
@@ -824,7 +895,8 @@ function openTask(id) {
     if (title === null) return;
     if (!title) { form.elements.title.setCustomValidity('Vul een naam in.'); form.elements.title.reportValidity(); return; }
     readSchedule(activeSchedule, data);
-    const updated = { ...task, id: existing?.id || crypto.randomUUID(), title, important: data.has('important') };
+    const updated = { ...task, id: existing?.id || crypto.randomUUID(), title, important: data.has('important'),
+      ...(!existing ? localCreationMetadata() : {}) };
     if (existing) state.tasks[state.tasks.indexOf(existing)] = updated;
     else state.tasks.push(updated);
     if (await save()) { document.querySelector('#modal').close(); render(); showToast('Taak opgeslagen'); }
@@ -842,7 +914,7 @@ function openTask(id) {
 function openMember(id) {
   const existing = state.members.find(member => member.id === id);
   document.querySelector('#modal-content').innerHTML = `<form id="member-form" class="modal-inner"><div class="modal-head"><div><h2 id="modal-title">${existing ? 'Gezinslid bewerken' : 'Gezinslid toevoegen'}</h2><p>Iedereen hoort erbij.</p></div><button type="button" class="close" data-action="close-modal" aria-label="Sluiten">×</button></div>
-    <div class="form-grid"><div class="field"><label for="member-name">Naam</label><input id="member-name" name="name" required maxlength="80" value="${escapeHtml(existing?.name || '')}"></div><div class="field"><label for="birth-date">Geboortedatum</label><input id="birth-date" name="birthDate" type="date" min="1900-01-01" max="${dateKey(new Date())}" value="${escapeHtml(existing?.birthDate || '')}">${!existing?.birthDate && existing?.birthYear != null ? `<span class="field-help">Eerder opgegeven geboortejaar: ${escapeHtml(existing.birthYear)}. Vul de volledige geboortedatum in voor de juiste leeftijd.</span>` : !existing?.birthDate && existing?.age != null ? `<span class="field-help">Eerder opgegeven leeftijd: ${escapeHtml(existing.age)} jaar. Vul de geboortedatum in om dit te vervangen.</span>` : ''}</div><div class="field full"><label for="member-email">E-mailadres (optioneel)</label><input id="member-email" name="email" type="email" autocomplete="email" maxlength="254" value="${escapeHtml(existing?.email || '')}" placeholder="naam@voorbeeld.nl"><span class="field-help">Het e-mailadres waarmee dit gezinslid inlogt, indien diegene een eigen account heeft.</span></div></div>
+    <div class="form-grid"><div class="field"><label for="member-name">Naam</label><input id="member-name" name="name" required maxlength="80" value="${escapeHtml(existing?.name || '')}"></div><div class="field"><label for="birth-date">Geboortedatum</label><input id="birth-date" name="birthDate" type="date" min="1900-01-01" max="${dateKey(new Date())}" value="${escapeHtml(existing?.birthDate || '')}">${!existing?.birthDate && existing?.birthYear != null ? `<span class="field-help">Eerder opgegeven geboortejaar: ${escapeHtml(existing.birthYear)}. Vul de volledige geboortedatum in voor de juiste leeftijd.</span>` : !existing?.birthDate && existing?.age != null ? `<span class="field-help">Eerder opgegeven leeftijd: ${escapeHtml(existing.age)} jaar. Vul de geboortedatum in om dit te vervangen.</span>` : ''}</div>${existing ? `<div class="field"><label for="member-created-at">Aangemaakt op</label><input id="member-created-at" name="createdAt" type="date" max="${dateKey(new Date())}" value="${escapeHtml(existing.createdAt || '')}"><span class="field-help">Bij oudere gezinsleden kan de datum ontbreken. Vul hier de juiste datum in als je die weet.</span></div>` : ''}<div class="field full"><label for="member-email">E-mailadres (optioneel)</label><input id="member-email" name="email" type="email" autocomplete="email" maxlength="254" value="${escapeHtml(existing?.email || '')}" placeholder="naam@voorbeeld.nl"><span class="field-help">Het e-mailadres waarmee dit gezinslid inlogt, indien diegene een eigen account heeft.</span></div></div>
     <div class="modal-actions">${existing ? '<button type="button" class="button danger" data-action="delete-member">Verwijderen</button>' : ''}<button type="button" class="button secondary" data-action="close-modal">Annuleren</button><button type="submit" class="button">Opslaan</button></div></form>`;
   const form = document.querySelector('#member-form');
   form.addEventListener('submit', async event => {
@@ -858,7 +930,8 @@ function openMember(id) {
       return;
     }
     form.elements.email.setCustomValidity('');
-    const member = { ...existing, id: existing?.id || crypto.randomUUID(), name, birthDate, email: email || null };
+    const member = { ...existing, id: existing?.id || crypto.randomUUID(), name, birthDate, email: email || null, createdAt: existing ? form.elements.createdAt.value : dateKey(new Date()) };
+    if (!member.createdAt) delete member.createdAt;
     if (birthDate !== null) { delete member.birthYear; delete member.age; }
     if (existing) state.members[state.members.indexOf(existing)] = member;
     else state.members.push(member);
@@ -1100,6 +1173,7 @@ document.addEventListener('submit', async event => {
       id: crypto.randomUUID(),
       title,
       description,
+      ...localCreationMetadata(),
       important: form.elements.important.checked,
       author: currentAuthorName(),
       authorUserId: currentUserId,
@@ -1221,8 +1295,8 @@ document.addEventListener('submit', async event => {
   const meal = event.target.id === 'meal-ideas-form';
   if (!name) { input.setCustomValidity(meal ? 'Vul een gerecht of voeding in.' : 'Vul een boodschap in.'); input.reportValidity(); return; }
   const nextState = meal
-    ? { ...state, mealIdeas: [...state.mealIdeas, { id: crypto.randomUUID(), name, wishedBy: [] }] }
-    : { ...state, groceries: [...state.groceries, { id: crypto.randomUUID(), name, done: false, urgent: false }] };
+    ? { ...state, mealIdeas: [...state.mealIdeas, { id: crypto.randomUUID(), name, wishedBy: [], ...localCreationMetadata() }] }
+    : { ...state, groceries: [...state.groceries, { id: crypto.randomUUID(), name, done: false, urgent: false, ...localCreationMetadata() }] };
   if (await save(nextState)) { state = nextState; render(); document.querySelector(meal ? '#meal-idea-name' : '#grocery-name').focus(); }
 });
 
@@ -1268,7 +1342,7 @@ initializeTheme();
 
 function startDemo() {
   const demoData = {
-    members: SEED_MEMBERS,
+    members: SEED_MEMBERS.map(member => ({ ...member, createdAt: dateKey(new Date()) })),
     tasks: SEED_TASKS.map((task, index) => ({ ...task, important: index === 0 })),
     completed: {},
     groceries: [

@@ -202,6 +202,13 @@ input:focus,select:focus{border-color:#85ad8d;box-shadow:0 0 0 3px #e9f2e9}
 .member-card{padding:22px}.member-card .avatar{width:48px;height:48px;font-size:20px;margin-bottom:14px}
 .member-card h3{font-size:14px}.member-card p{color:#9aa79d;font-size:11px;margin-top:6px}
 .member-card button{margin-top:14px;padding-left:0}
+.member-card .member-created{margin-top:10px}
+.member-created strong{color:#718676;font-weight:700}
+.member-stats-link{display:inline-block;margin-top:14px}
+.member-statistics{grid-template-columns:repeat(auto-fill,minmax(210px,1fr));max-width:1100px;margin-top:0}
+.member-statistics-note{color:#87928a;font-size:12px;margin-top:12px}
+.member-statistics-empty{max-width:680px;padding:20px;color:#718676;font-size:13px;line-height:1.6}
+.member-statistics-empty a{color:#507a60;font-weight:700;text-decoration:underline}
 .backup-panel{padding:22px;margin-bottom:16px;max-width:680px}
 .backup-panel h2{font-size:21px}
 .backup-panel p{color:#7a8a7d;font-size:12px;line-height:1.6;margin:10px 0 16px}

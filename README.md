@@ -60,6 +60,18 @@ koppeling staat daar **Gezinslid**.
 Op het overzicht staat de taakverdeling per gezinslid voor de gekozen dag en
 voor de hele bijbehorende week (maandag tot en met zondag). Een terugkerende
 taak telt voor elke dag waarop die is ingepland.
+Onder **Ons gezin** staat ook de aanmaakdatum van elk gezinslid. Via
+**Statistieken bekijken** zie je hoeveel taakmomenten er vanaf die datum tot
+en met vandaag volgens de huidige planning aan die persoon waren toegewezen,
+en hoeveel daarvan zijn afgevinkt. Bij oudere profielen waarvan de
+aanmaakdatum niet werd opgeslagen, kun je de datum aanvullen via
+**Gegevens bewerken**; zonder datum zijn de statistieken niet te berekenen.
+De statistieken tonen daarnaast per gezinslid het aantal aangemaakte taken,
+boodschappen, gerechten en berichten en het aandeel daarvan binnen de
+geregistreerde aanmaakacties in die categorie sinds die datum. Items die al
+bestonden voordat de makerregistratie beschikbaar was, tellen niet mee.
+Voor makerstatistieken moet het account via het e-mailadres aan een gezinslid
+zijn gekoppeld.
 
 ## Demo proberen
 

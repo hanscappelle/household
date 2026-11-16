@@ -182,6 +182,16 @@ test(`accounts en opslag op ${basePath || '/'}`, { skip: !configured, timeout: 3
     method: 'PUT', cookie: childAccount.cookie, body: { data: childChanges, revision: childState.json.revision }
   });
   assert.equal(childSaved.status, 200);
+  const stateAfterChildSave = (await request('/api/state', { cookie: childAccount.cookie })).json.data;
+  const childUserId = childFamily.json.members.find(member => member.email === emails[3]).id;
+  for (const item of [
+    ...stateAfterChildSave.groceries.filter(item => item.id === 'child-grocery'),
+    ...stateAfterChildSave.mealIdeas.filter(item => item.id === 'child-meal'),
+    ...stateAfterChildSave.notes.filter(item => item.id === 'child-note')
+  ]) {
+    assert.match(item.createdAt, /^\d{4}-\d{2}-\d{2}$/);
+    assert.equal(String(item.createdByUserId), String(childUserId));
+  }
   assert.equal((await request('/api/state', {
     method: 'PUT', cookie: first.cookie, body: { data: childState.json.data, revision: childSaved.json.revision }
   })).status, 200);

@@ -55,13 +55,14 @@ function childChangesAllowed(previous, submitted, defaultCustomization) {
   if (!allowedList(previous.groceries || [], submitted.groceries, ['done'],
     item => validName(item) && typeof item.done === 'boolean' && (item.urgent === undefined || typeof item.urgent === 'boolean'),
     item => item.done === false && item.urgent === false &&
-      Object.keys(item).every(key => ['id', 'name', 'done', 'urgent'].includes(key)))) return false;
+      Object.keys(item).every(key => ['id', 'name', 'done', 'urgent', 'createdAt', 'createdByUserId', 'createdByMemberId'].includes(key)))) return false;
 
   const memberIds = new Set(submitted.members.map(member => member.id));
   if (!allowedList(previous.mealIdeas || [], submitted.mealIdeas, ['wishedBy'],
     item => validName(item) && Array.isArray(item.wishedBy) && new Set(item.wishedBy).size === item.wishedBy.length &&
       item.wishedBy.every(id => memberIds.has(id)),
-    item => item.wishedBy.length === 0 && Object.keys(item).every(key => ['id', 'name', 'wishedBy'].includes(key)))) return false;
+    item => item.wishedBy.length === 0 &&
+      Object.keys(item).every(key => ['id', 'name', 'wishedBy', 'createdAt', 'createdByUserId', 'createdByMemberId'].includes(key)))) return false;
 
   const oldNotes = (previous.notes || []).map(note => ({ ...note, important: note.important === true }));
   const newNotes = (submitted.notes || previous.notes || []).map(note => ({ ...note, important: note.important === true }));

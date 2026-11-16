@@ -27,9 +27,9 @@ test('kind mag toevoegen en bestaande checkboxen aan- en uitvinken', () => {
   const data = clientState();
   data.completed['t1|2026-11-16'] = true;
   data.groceries[0].done = true;
-  data.groceries.push({ id: 'g2', name: 'Brood', done: false, urgent: false });
+  data.groceries.push({ id: 'g2', name: 'Brood', done: false, urgent: false, createdAt: '2026-11-16', createdByUserId: 5 });
   data.mealIdeas[0].wishedBy.push('m1');
-  data.mealIdeas.push({ id: 'i2', name: 'Soep', wishedBy: [] });
+  data.mealIdeas.push({ id: 'i2', name: 'Soep', wishedBy: [], createdAt: '2026-11-16', createdByUserId: 5 });
   data.notes.push({ id: 'n2', title: 'Hallo', description: 'Bericht', author: 'Kind', archived: false, important: true });
   assert.equal(childChangesAllowed(original, data, defaults), true);
 

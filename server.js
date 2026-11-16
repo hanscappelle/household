@@ -7,6 +7,7 @@ const { randomBytes, scrypt: scryptCallback, timingSafeEqual, createHash } = req
 const { promisify } = require('node:util');
 const path = require('node:path');
 const { SEED_MEMBERS, SEED_TASKS, SEED_MEAL_IDEAS } = require('./seed');
+const { registerCreatedItems } = require('./creation-metadata');
 const { childChangesAllowed } = require('./child-permissions');
 
 const scrypt = promisify(scryptCallback);
@@ -108,7 +109,8 @@ const defaultCustomization = {
   sidebarText: 'Een beetje overzicht maakt ruimte voor de leuke dingen.'
 };
 const initialState = () => ({
-  members: SEED_MEMBERS, tasks: SEED_TASKS, completed: {}, groceries: [], notes: [], mealIdeas: SEED_MEAL_IDEAS,
+  members: SEED_MEMBERS.map(member => ({ ...member, createdAt: new Date().toISOString().slice(0, 10) })),
+  tasks: SEED_TASKS, completed: {}, groceries: [], notes: [], mealIdeas: SEED_MEAL_IDEAS,
   customization: { ...defaultCustomization }
 });
 
@@ -441,7 +443,11 @@ router.put('/api/state', authenticate, async (req, res) => {
       editedAt: changed ? (editorIsAuthor ? '' : new Date().toISOString()) : previous.editedAt || ''
     };
   });
+  const createdAt = new Date().toISOString().slice(0, 10);
   let nextData = { ...data, notes };
+  for (const collection of ['tasks', 'groceries', 'mealIdeas', 'notes']) {
+    nextData[collection] = registerCreatedItems(currentData[collection], nextData[collection], req.user.id, createdAt);
+  }
   if (data.customization !== undefined) {
     if (!data.customization || typeof data.customization !== 'object' || Array.isArray(data.customization) ||
         Object.entries(customizationLimits).some(([key, limit]) =>
