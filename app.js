@@ -719,10 +719,16 @@ function validateBackup(backup) {
 
 function exportBackup() {
   const backup = { format: BACKUP_FORMAT, version: 1, data: state };
-  const url = URL.createObjectURL(new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }));
+  const contents = JSON.stringify(backup, null, 2);
+  const filename = `huishouden-backup-${dateKey(new Date())}.json`;
+  if (window.HouseholdAndroid?.saveBackup) {
+    window.HouseholdAndroid.saveBackup(filename, contents);
+    return;
+  }
+  const url = URL.createObjectURL(new Blob([contents], { type: 'application/json' }));
   const link = document.createElement('a');
   link.href = url;
-  link.download = `huishouden-backup-${dateKey(new Date())}.json`;
+  link.download = filename;
   document.body.append(link);
   link.click();
   link.remove();

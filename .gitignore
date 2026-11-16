@@ -3,3 +3,7 @@
 .env
 .DS_Store
 /secrets/
+/android/.gradle/
+/android/**/build/
+/android/local.properties
+/android/.idea/
