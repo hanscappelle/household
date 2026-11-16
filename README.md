@@ -338,7 +338,7 @@ verwijdert deze weer. Zonder databaseconfiguratie wordt de test overgeslagen.
 
 ## Android-app
 
-De Android-app opent het dashboard op
+De Android-app heeft een groen launchericoon met een huisje en opent het dashboard op
 <https://betyre.alwaysdata.net/household/> in een ingebouwde WebView. De app
 gebruikt dezelfde webversie en vereist geen aparte API. Aanmelden en sessies
 werken binnen de WebView; links naar andere websites openen in de browser.
@@ -349,6 +349,9 @@ Android-apparaat of emulator. Je kunt vanuit die map ook
 `./gradlew :app:assembleDebug` uitvoeren. Voor een Gradle-build is JDK 17 of
 nieuwer vereist. De app vraagt internettoegang en laat alleen HTTPS-verkeer
 toe.
+
+De nieuwste Android-debugversie is beschikbaar als
+[APK-download](release/household-debug.apk) in de map `release`.
 
 ## Niet doen
 - Samenvoegen van taken vanuit UI, onnodig complex en weinig meerwaarde.
