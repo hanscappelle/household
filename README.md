@@ -227,6 +227,7 @@ Een taak zonder gezinslid of een sporadische taak zonder datum staat wel in de
 takenlijst, maar niet op de kalender. Afvinken geldt voor de afzonderlijke
 geplande datum. Bestaande planningen worden automatisch overgenomen.
 In de weekplanning staat bij elke dag met taken het aantal geplande taken.
+De taken van de geselecteerde dag staan gegroepeerd per verantwoordelijke.
 Op het overzicht toont de derde tegel het aantal ingeplande belangrijke taken
 deze week.
 Voor de geselecteerde dag toont de staafgrafiek **Verdeling per gezinslid**

@@ -124,6 +124,8 @@ h1{font-size:36px;letter-spacing:-.7px;line-height:1.15}
 .day-detail-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
 .day-detail-head strong{font-size:12px}
 .day-detail-head span{font-size:10px;color:#a7b3a9}
+.day-task-group h3{margin:16px 0 0;font-size:11px;color:#718676;overflow-wrap:anywhere}
+[data-theme="dark"] .day-task-group h3{color:#c0d9c3}
 .empty{background:#f8faf6;border:1px dashed #e6ede3;border-radius:9px;text-align:center;padding:25px 15px;color:#9aa99b;font-size:11px;line-height:1.6}
 .empty .empty-icon{display:block;color:#b1cbb1;font-size:22px;margin-bottom:5px}
 .empty strong{display:block;color:#708776;font-size:12px}

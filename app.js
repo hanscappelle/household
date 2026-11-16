@@ -350,9 +350,9 @@ function renderDashboard() {
   const birthdays = birthdaysOn(date);
   const memberLoads = state.members.map(member => ({
     member,
-    count: todayTasks.filter(task => memberOn(task, date)?.id === member.id).length
+    tasks: todayTasks.filter(task => memberOn(task, date)?.id === member.id)
   }));
-  const maxLoad = Math.max(0, ...memberLoads.map(item => item.count));
+  const maxLoad = Math.max(0, ...memberLoads.map(item => item.tasks.length));
   const week = isoWeek(date);
   const range = `${formatDate(start, { day: 'numeric', month: 'short' })} – ${formatDate(weekDates[6], { day: 'numeric', month: 'short', year: 'numeric' })}`;
   return `
@@ -378,9 +378,9 @@ function renderDashboard() {
           }).join('')}</div>
           <div class="day-detail"><div class="day-detail-head"><strong>${escapeHtml(formatDate(date, { weekday: 'long', day: 'numeric', month: 'long' }))}</strong><span>${todayTasks.length} ${todayTasks.length === 1 ? 'taak' : 'taken'}</span></div>
             ${birthdays.map(member => `<div class="birthday-row"><span class="birthday-icon" aria-hidden="true">🎂</span><div><strong>Verjaardag van ${escapeHtml(member.name)}</strong><small>${date.getFullYear() - parseDate(member.birthDate).getFullYear()} jaar</small></div></div>`).join('')}
-            ${todayTasks.map(task => `<div class="task-row ${isDone(task, date) ? 'done' : ''}"><input class="check" type="checkbox" data-action="complete" data-id="${escapeHtml(task.id)}" aria-label="${escapeHtml(task.title)} afronden" ${isDone(task, date) ? 'checked' : ''}><div class="task-info"><strong>${escapeHtml(task.title)}${task.important ? '<span class="important-icon" title="Belangrijke taak" aria-label="Belangrijke taak"><svg viewBox="0 0 16 16" focusable="false"><circle cx="8" cy="8" r="7"/><path class="important-icon-mark" d="M8 3.8v5.1M8 11.5v.1"/></svg></span>' : ''}</strong><small>${escapeHtml(memberOn(task, date).name)} · ${frequencyLabel(task)}</small></div>${taskMenu(task)}</div>`).join('')}
+            ${memberLoads.filter(group => group.tasks.length).map(({ member, tasks }) => `<section class="day-task-group"><h3>${escapeHtml(member.name)}</h3>${tasks.map(task => `<div class="task-row ${isDone(task, date) ? 'done' : ''}"><input class="check" type="checkbox" data-action="complete" data-id="${escapeHtml(task.id)}" aria-label="${escapeHtml(task.title)} afronden" ${isDone(task, date) ? 'checked' : ''}><div class="task-info"><strong>${escapeHtml(task.title)}${task.important ? '<span class="important-icon" title="Belangrijke taak" aria-label="Belangrijke taak"><svg viewBox="0 0 16 16" focusable="false"><circle cx="8" cy="8" r="7"/><path class="important-icon-mark" d="M8 3.8v5.1M8 11.5v.1"/></svg></span>' : ''}</strong><small>${frequencyLabel(task)}</small></div>${taskMenu(task)}</div>`).join('')}</section>`).join('')}
             ${!todayTasks.length && !birthdays.length ? `<div class="empty"><span class="empty-icon">☼</span><strong>Een lekker lege planning</strong>Plan een taak in en hij verschijnt hier.</div>` : ''}
-            ${memberLoads.length ? `<div class="daily-load"><strong>Verdeling per gezinslid</strong><ul>${memberLoads.map(({ member, count }) => `<li><span class="load-name">${escapeHtml(member.name)}</span><span class="load-track" aria-hidden="true"><span class="load-bar" style="width:${maxLoad ? count / maxLoad * 100 : 0}%"></span></span><span class="load-count">${count} ${count === 1 ? 'taak' : 'taken'}</span></li>`).join('')}</ul></div>` : ''}
+            ${memberLoads.length ? `<div class="daily-load"><strong>Verdeling per gezinslid</strong><ul>${memberLoads.map(({ member, tasks }) => `<li><span class="load-name">${escapeHtml(member.name)}</span><span class="load-track" aria-hidden="true"><span class="load-bar" style="width:${maxLoad ? tasks.length / maxLoad * 100 : 0}%"></span></span><span class="load-count">${tasks.length} ${tasks.length === 1 ? 'taak' : 'taken'}</span></li>`).join('')}</ul></div>` : ''}
           </div>
         </div>
       </section>
@@ -579,7 +579,7 @@ function renderHelp() {
         <p>De uitnodigingslink is zeven dagen geldig. Deel hem alleen met de bedoelde persoon. Kindaccounts kunnen het dashboard gebruiken, maar geen gezinsleden uitnodigen of uitnodigingen intrekken.</p>
       </section>
       <section class="panel help-panel"><h2>Overzicht en taken</h2>
-        <p>Op <a href="#overzicht">Overzicht</a> zie je de weekplanning, taken en verjaardagen. Kies een dag in de agenda of gebruik de pijlen om naar een andere week te gaan. Vink een taak af wanneer die klaar is.</p>
+        <p>Op <a href="#overzicht">Overzicht</a> zie je de weekplanning, taken en verjaardagen. Kies een dag in de agenda of gebruik de pijlen om naar een andere week te gaan. De taken van de gekozen dag staan gegroepeerd per verantwoordelijke. Vink een taak af wanneer die klaar is.</p>
         <p>Naast de weekplanning zie je de gezinsleden; daaronder staan gedeelde notities als post-its. Kies <strong>Notitie toevoegen</strong> om in een venster een titel en beschrijving in te vullen. De auteur wordt automatisch ingevuld. Zet eventueel <strong>Markeer als belangrijk</strong> aan; dit staat standaard uit. Belangrijke notities krijgen een uitroepteken en staan bovenaan.</p>
         <p>Open het driepuntjesmenu op een post-it om die te bewerken of te archiveren. Bij bewerken door een ander gezinslid worden diens naam en bewerktijd vermeld. Gearchiveerde notities verdwijnen van het overzicht. Via <a href="#notitiearchief">Notitiearchief</a> kun je ze herstellen of definitief verwijderen.</p>
         <p>Op <a href="#taken">Alle taken</a> kun je een taak openen om de planning te wijzigen. Kies per dag, week, maand of eenmalige datum wie de taak uitvoert. Markeer in het taakformulier belangrijke taken; die herken je aan het label <strong>Belangrijk</strong>. Gebruik de zoekbalk en filters om taken terug te vinden.</p>
