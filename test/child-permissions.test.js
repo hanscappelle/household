@@ -83,3 +83,9 @@ test('oude gegevens en nieuwe gezinsprofielen blijven bruikbaar', () => {
   data.members.push({ id: 'm3', name: 'Nieuw', birthDate: null, email: null });
   assert.equal(childChangesAllowed(old, data, defaults), true);
 });
+
+test('oude sporadische taken worden jaarlijkse taken', () => {
+  const task = normalizeTask({ id: 't1', title: 'Ramen wassen', frequency: 'occasional', date: '2024-06-15' });
+  assert.equal(task.frequency, 'yearly');
+  assert.equal(task.date, '2024-06-15');
+});

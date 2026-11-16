@@ -53,6 +53,13 @@ Bij een nieuw account bevat de app fictieve voorbeeldgegevens: Mama, Papa en
 Kind, zonder geboortedatums, enkele huishoudelijke taken met een
 voorbeeldplanning en enkele gerechten voor kookinspiratie. Je kunt deze
 gegevens aanpassen of verwijderen.
+Vul bij je eigen gezinslid onder **Ons gezin** hetzelfde e-mailadres in als
+waarmee je inlogt. De naam van dat gezinslid verschijnt dan bovenaan; zonder
+koppeling staat daar **Gezinslid**.
+
+Op het overzicht staat de taakverdeling per gezinslid voor de gekozen dag en
+voor de hele bijbehorende week (maandag tot en met zondag). Een terugkerende
+taak telt voor elke dag waarop die is ingepland.
 
 ## Demo proberen
 
@@ -225,13 +232,14 @@ moment is één gezinslid verantwoordelijk:
   oneven ISO-weken. Laat een week leeg om die over te slaan.
 - Maandelijks: kies een gezinslid en een dag van de maand. Ontbreekt die dag
   in een maand, dan wordt die maand overgeslagen.
-- Sporadisch: kies een gezinslid en eventueel een datum.
+- Jaarlijks: kies een gezinslid en eventueel een dag en maand. Het gekozen
+  jaartal wordt genegeerd; op 29 februari valt de taak alleen in schrikkeljaren.
 
 Vink in het taakformulier **Markeer als belangrijk** aan om een taak extra
 opvallend te labelen. Het uitroepteken bij de taak geeft dit aan op het overzicht en in
 **Alle taken**. Oudere back-ups zonder deze instelling blijven geldig; die
 taken zijn standaard niet als belangrijk gemarkeerd.
-Een taak zonder gezinslid of een sporadische taak zonder datum staat wel in de
+Een taak zonder gezinslid of een jaarlijkse taak zonder datum staat wel in de
 takenlijst, maar niet op de kalender. Afvinken geldt voor de afzonderlijke
 geplande datum. Bestaande planningen worden automatisch overgenomen.
 In de weekplanning staat bij elke dag met taken het aantal geplande taken.
@@ -242,8 +250,8 @@ Voor de geselecteerde dag toont de staafgrafiek **Verdeling per gezinslid**
 hoeveel taken ieder gezinslid heeft, inclusief afgevinkte taken. De langste
 staaf geeft het hoogste aantal van die dag weer. Verjaardagen tellen niet mee.
 In **Alle taken** geeft het label **Ingepland** of **Niet ingepland** aan of
-minstens één moment met een gezinslid is ingesteld. Een sporadische taak met
-een datum in het verleden blijft als ingepland aangeduid.
+minstens één moment met een gezinslid is ingesteld. Een jaarlijkse taak met
+een ingevulde dag en maand blijft als ingepland aangeduid.
 Filter op planningsstatus via **Alle statussen** of klik op de kolomkop
 **Status** om de volgorde om te keren.
 Met het kruisje in het zoekveld maak je de zoektekst leeg zonder de andere
@@ -343,6 +351,7 @@ De Android-app heeft een groen launchericoon met een huisje en opent het dashboa
 gebruikt dezelfde webversie en vereist geen aparte API. Aanmelden en sessies
 werken binnen de WebView; links naar andere websites openen in de browser.
 Back-ups downloaden en terugzetten gebruiken de bestandskiezer van Android.
+Veeg bovenaan de pagina omlaag om de huidige pagina te vernieuwen.
 
 Open de map `android` in Android Studio en bouw of start de app op een
 Android-apparaat of emulator. Je kunt vanuit die map ook

@@ -1,7 +1,7 @@
 const THEME_KEY = 'ons-huishouden-thema';
 const BACKUP_FORMAT = 'ons-huishouden-backup';
 const DAYS = ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'];
-const FREQUENCIES = { daily: 'Dagelijks', weekly: 'Wekelijks', monthly: 'Maandelijks', occasional: 'Sporadisch' };
+const FREQUENCIES = { daily: 'Dagelijks', weekly: 'Wekelijks', monthly: 'Maandelijks', yearly: 'Jaarlijks' };
 const COLOR_PALETTES = [
   { id: 'forest', label: 'Bosgroen', description: 'De oorspronkelijke groene tinten' },
   { id: 'ocean', label: 'Oceaanblauw', description: 'Frisse blauw- en zeetinten' },
@@ -217,7 +217,7 @@ function occursOn(task, date) {
   if (task.frequency === 'daily') return true;
   if (task.frequency === 'weekly') return task.weekday === weekday;
   if (task.frequency === 'monthly') return task.monthDay === date.getDate();
-  return task.frequency === 'occasional' && task.date === dateKey(date);
+  return task.frequency === 'yearly' && task.date?.slice(5) === dateKey(date).slice(5);
 }
 
 function isScheduled(task) {
@@ -231,7 +231,7 @@ function isScheduled(task) {
     }
     if (!memberFor(schedule)) return false;
     if (schedule.frequency === 'monthly') return Number.isInteger(schedule.monthDay) && schedule.monthDay >= 1 && schedule.monthDay <= 31;
-    if (schedule.frequency === 'occasional' && /^\d{4}-\d{2}-\d{2}$/.test(schedule.date)) {
+    if (schedule.frequency === 'yearly' && /^\d{4}-\d{2}-\d{2}$/.test(schedule.date)) {
       const date = parseDate(schedule.date);
       return !Number.isNaN(date.getTime()) && dateKey(date) === schedule.date;
     }
@@ -296,9 +296,12 @@ function memberDetails(member) {
   return 'Geboortedatum nog niet ingevuld';
 }
 
+function currentMember() {
+  return state.members.find(item => item.email?.toLowerCase() === accountEmail.toLowerCase());
+}
+
 function currentAuthorName() {
-  const member = state.members.find(item => item.email?.toLowerCase() === accountEmail.toLowerCase());
-  return member?.name || accountEmail;
+  return currentMember()?.name || accountEmail;
 }
 
 function taskMenu(task) {
@@ -309,7 +312,7 @@ function taskMenu(task) {
 }
 
 function taskSchedule(task) {
-  if (task.schedules) return task.schedules.map(part => `${FREQUENCIES[part.frequency]}: ${part.frequency === 'monthly' || part.frequency === 'occasional' ? `${memberFor(part)?.name || 'Niet toegewezen'} · ` : ''}${taskSchedule(part)}`).join(' | ');
+  if (task.schedules) return task.schedules.map(part => `${FREQUENCIES[part.frequency]}: ${part.frequency === 'monthly' || part.frequency === 'yearly' ? `${memberFor(part)?.name || 'Niet toegewezen'} · ` : ''}${taskSchedule(part)}`).join(' | ');
   if (task.frequency === 'daily') {
     const days = DAYS.map((day, index) => {
       const member = state.members.find(item => item.id === task.dailyAssignments[index + 1]);
@@ -326,7 +329,12 @@ function taskSchedule(task) {
   }
   if (!memberFor(task)) return 'Nog niet toegewezen';
   if (task.frequency === 'monthly') return `Dag ${task.monthDay} van de maand`;
-  return task.date ? formatDate(parseDate(task.date), { day: 'numeric', month: 'long', year: 'numeric' }) : 'Nog geen datum gekozen';
+  return task.date ? formatDate(parseDate(task.date), { day: 'numeric', month: 'long' }) : 'Nog geen datum gekozen';
+}
+
+function renderLoadDistribution(title, loads) {
+  const maxLoad = Math.max(0, ...loads.map(item => item.count));
+  return `<section class="daily-load"><strong>${escapeHtml(title)}</strong><ul>${loads.map(({ member, count }) => `<li><span class="load-name">${escapeHtml(member.name)}</span><span class="load-track" aria-hidden="true"><span class="load-bar" style="width:${maxLoad ? count / maxLoad * 100 : 0}%"></span></span><span class="load-count">${count} ${count === 1 ? 'taak' : 'taken'}</span></li>`).join('')}</ul></section>`;
 }
 
 function renderDashboard() {
@@ -342,7 +350,11 @@ function renderDashboard() {
     member,
     tasks: todayTasks.filter(task => memberOn(task, date)?.id === member.id)
   }));
-  const maxLoad = Math.max(0, ...memberLoads.map(item => item.tasks.length));
+  const dailyLoads = memberLoads.map(({ member, tasks }) => ({ member, count: tasks.length }));
+  const weeklyLoads = state.members.map(member => ({
+    member,
+    count: weekTasks.filter(({ task, day }) => memberOn(task, day)?.id === member.id).length
+  }));
   const week = isoWeek(date);
   const range = `${formatDate(start, { day: 'numeric', month: 'short' })} – ${formatDate(weekDates[6], { day: 'numeric', month: 'short', year: 'numeric' })}`;
   return `
@@ -370,7 +382,7 @@ function renderDashboard() {
             ${birthdays.map(member => `<div class="birthday-row"><span class="birthday-icon" aria-hidden="true">🎂</span><div><strong>Verjaardag van ${escapeHtml(member.name)}</strong><small>${date.getFullYear() - parseDate(member.birthDate).getFullYear()} jaar</small></div></div>`).join('')}
             ${memberLoads.filter(group => group.tasks.length).map(({ member, tasks }) => `<section class="day-task-group"><h3>${escapeHtml(member.name)}</h3>${tasks.map(task => `<div class="task-row ${isDone(task, date) ? 'done' : ''}"><input class="check" type="checkbox" data-action="complete" data-id="${escapeHtml(task.id)}" aria-label="${escapeHtml(task.title)} afronden" ${isDone(task, date) ? 'checked' : ''}><div class="task-info"><strong>${escapeHtml(task.title)}${task.important ? '<span class="important-icon" title="Belangrijke taak" aria-label="Belangrijke taak"><svg viewBox="0 0 16 16" focusable="false"><circle cx="8" cy="8" r="7"/><path class="important-icon-mark" d="M8 3.8v5.1M8 11.5v.1"/></svg></span>' : ''}</strong><small>${frequencyLabel(task)}</small></div>${taskMenu(task)}</div>`).join('')}</section>`).join('')}
             ${!todayTasks.length && !birthdays.length ? `<div class="empty"><span class="empty-icon">☼</span><strong>Een lekker lege planning</strong>Plan een taak in en hij verschijnt hier.</div>` : ''}
-            ${memberLoads.length ? `<div class="daily-load"><strong>Verdeling per gezinslid</strong><ul>${memberLoads.map(({ member, tasks }) => `<li><span class="load-name">${escapeHtml(member.name)}</span><span class="load-track" aria-hidden="true"><span class="load-bar" style="width:${maxLoad ? tasks.length / maxLoad * 100 : 0}%"></span></span><span class="load-count">${tasks.length} ${tasks.length === 1 ? 'taak' : 'taken'}</span></li>`).join('')}</ul></div>` : ''}
+            ${memberLoads.length ? `<div class="load-distributions">${renderLoadDistribution('Verdeling per gezinslid · dag', dailyLoads)}${renderLoadDistribution('Verdeling per gezinslid · week', weeklyLoads)}</div>` : ''}
           </div>
         </div>
       </section>
@@ -478,7 +490,7 @@ function renderTasks() {
       const scheduled = isScheduled(task);
       const status = scheduled ? 'Ingepland' : 'Niet ingepland';
       const taskTag = isChild() ? 'div' : 'button';
-      return `<tr class="${isChild() ? '' : 'task-list-row'}" ${isChild() ? '' : `data-action="edit-task" data-id="${escapeHtml(task.id)}"`}><td><${taskTag} ${isChild() ? '' : `type="button" aria-label="${escapeHtml(task.title)}${task.important ? ' — belangrijk' : ''} — ${status} — bewerken"`} class="task-list-item"><span class="stat-icon" style="width:34px;height:34px;font-size:15px">✓</span><span class="task-info"><strong>${escapeHtml(task.title)}${task.important ? '<span class="important-icon" title="Belangrijke taak" aria-hidden="true"><svg viewBox="0 0 16 16" focusable="false"><circle cx="8" cy="8" r="7"/><path class="important-icon-mark" d="M8 3.8v5.1M8 11.5v.1"/></svg></span>' : ''}</strong><small>${!task.schedules && (task.frequency === 'monthly' || task.frequency === 'occasional') ? `${escapeHtml(memberFor(task)?.name || 'Niet toegewezen')} · ` : ''}${escapeHtml(taskSchedule(task))}${task.group ? ` · ${escapeHtml(task.group)}` : ''}</small></span></${taskTag}></td><td class="status-column"><span class="schedule-status ${scheduled ? 'scheduled' : 'unscheduled'}">${status}</span></td><td class="frequency-column"><span class="frequency-tag">${frequencyLabel(task)}</span></td></tr>`;
+      return `<tr class="${isChild() ? '' : 'task-list-row'}" ${isChild() ? '' : `data-action="edit-task" data-id="${escapeHtml(task.id)}"`}><td><${taskTag} ${isChild() ? '' : `type="button" aria-label="${escapeHtml(task.title)}${task.important ? ' — belangrijk' : ''} — ${status} — bewerken"`} class="task-list-item"><span class="stat-icon" style="width:34px;height:34px;font-size:15px">✓</span><span class="task-info"><strong>${escapeHtml(task.title)}${task.important ? '<span class="important-icon" title="Belangrijke taak" aria-hidden="true"><svg viewBox="0 0 16 16" focusable="false"><circle cx="8" cy="8" r="7"/><path class="important-icon-mark" d="M8 3.8v5.1M8 11.5v.1"/></svg></span>' : ''}</strong><small>${!task.schedules && (task.frequency === 'monthly' || task.frequency === 'yearly') ? `${escapeHtml(memberFor(task)?.name || 'Niet toegewezen')} · ` : ''}${escapeHtml(taskSchedule(task))}${task.group ? ` · ${escapeHtml(task.group)}` : ''}</small></span></${taskTag}></td><td class="status-column"><span class="schedule-status ${scheduled ? 'scheduled' : 'unscheduled'}">${status}</span></td><td class="frequency-column"><span class="frequency-tag">${frequencyLabel(task)}</span></td></tr>`;
     }).join('') : '<tr><td colspan="3"><div class="empty" style="margin:20px 0">Geen taken gevonden.</div></td></tr>'}</tbody></table></div>`;
 }
 
@@ -596,6 +608,10 @@ function renderHelp() {
 
 function render() {
   if (!state) return;
+  const accountName = document.querySelector('#account-name');
+  const member = currentMember();
+  accountName.textContent = demoMode ? '' : member?.name || 'Gezinslid';
+  accountName.title = !demoMode && !member ? 'Vul je inlogadres in bij je gegevens onder Ons gezin.' : '';
   const requestedView = location.hash.slice(1);
   if (requestedView === 'backup') {
     location.hash = 'instellingen';
@@ -645,7 +661,7 @@ function validateBackup(backup) {
   }
   const validAssignment = value => value === '' || id(value);
   const validSchedule = schedule => {
-    if (!object(schedule) || !Object.hasOwn(FREQUENCIES, schedule.frequency) || !optionalString(schedule.memberId) ||
+    if (!object(schedule) || (!Object.hasOwn(FREQUENCIES, schedule.frequency) && schedule.frequency !== 'occasional') || !optionalString(schedule.memberId) ||
       (schedule.memberId && !validAssignment(schedule.memberId)) ||
       (schedule.days != null && (!Array.isArray(schedule.days) || !schedule.days.every(day => Number.isInteger(day) && day >= 1 && day <= 7))) ||
       (schedule.week != null && !['all', 'even', 'odd'].includes(schedule.week)) ||
@@ -758,7 +774,7 @@ function scheduleFields(task) {
   if (task.frequency === 'weekly') return `<div class="field full"><label for="weekday">Dag van de week</label><select id="weekday" name="weekday">${DAYS.map((day, index) => `<option value="${index + 1}" ${task.weekday === index + 1 ? 'selected' : ''}>${day}</option>`).join('')}</select><span class="field-help">Kies per soort week één gezinslid. Laat een week leeg om die over te slaan.</span></div><div class="field"><label for="week-even">Even weken</label>${memberSelect('week-even', task.weeklyAssignments.even)}</div><div class="field"><label for="week-odd">Oneven weken</label>${memberSelect('week-odd', task.weeklyAssignments.odd)}</div>`;
   const memberField = `<div class="field full"><label for="memberId">Gezinslid</label>${memberSelect('memberId', task.memberId)}</div>`;
   if (task.frequency === 'monthly') return `${memberField}<div class="field full"><label for="monthDay">Dag van de maand</label><input id="monthDay" name="monthDay" type="number" min="1" max="31" value="${task.monthDay}" required><span class="field-help">Bestaat deze dag niet in een maand, dan wordt de taak die maand overgeslagen.</span></div>`;
-  return `${memberField}<div class="field full"><label for="date">Datum (optioneel)</label><input id="date" name="date" type="date" value="${escapeHtml(task.date)}"><span class="field-help">Zonder datum blijft de taak in de takenlijst staan.</span></div>`;
+  return `${memberField}<div class="field full"><label for="date">Dag en maand (optioneel)</label><input id="date" name="date" type="date" value="${escapeHtml(task.date)}"><span class="field-help">De taak wordt jaarlijks op deze dag en maand ingepland; het gekozen jaar wordt genegeerd. Zonder datum blijft de taak in de takenlijst staan.</span></div>`;
 }
 
 function readSchedule(task, data) {
@@ -770,7 +786,7 @@ function readSchedule(task, data) {
   } else {
     task.memberId = String(data.get('memberId') || '');
     if (task.frequency === 'monthly') task.monthDay = Number(data.get('monthDay')) || 1;
-    if (task.frequency === 'occasional') task.date = String(data.get('date') || '');
+    if (task.frequency === 'yearly') task.date = String(data.get('date') || '');
   }
 }
 
@@ -1275,7 +1291,7 @@ function startDemo() {
   document.querySelector('#app').hidden = false;
   document.querySelector('#demo-banner').hidden = false;
   document.querySelector('#logout').textContent = 'Demo afsluiten';
-  document.querySelector('#account-email').textContent = '';
+  document.querySelector('#account-name').textContent = '';
   history.replaceState(null, '', `${location.pathname}#overzicht`);
   render();
 }
@@ -1290,7 +1306,6 @@ async function openAccount() {
   currentRole = result.role;
   currentUserId = String(householdInfo.members.find(member => member.email.toLowerCase() === result.email.toLowerCase())?.id || '');
   applyColorPalette(preferences.colorPalette);
-  document.querySelector('#account-email').textContent = result.email;
   document.querySelector('#auth-screen').hidden = true;
   document.querySelector('#invite-screen').hidden = true;
   document.querySelector('#app').hidden = false;
@@ -1306,6 +1321,17 @@ const inviteForm = document.querySelector('#invite-form');
 const passwordResetToken = new URLSearchParams(location.search).get('wachtwoord-reset');
 const passwordResetForm = document.querySelector('#password-reset-form');
 const authEmail = authForm.elements.email;
+const authPassword = authForm.elements.password;
+const authPasswordToggle = document.querySelector('#auth-password-toggle');
+function setAuthPasswordVisible(visible) {
+  authPassword.type = visible ? 'text' : 'password';
+  const label = visible ? 'Wachtwoord verbergen' : 'Wachtwoord weergeven';
+  authPasswordToggle.setAttribute('aria-label', label);
+  authPasswordToggle.setAttribute('aria-pressed', String(visible));
+  authPasswordToggle.title = label;
+}
+authPasswordToggle.addEventListener('click', () => setAuthPasswordVisible(authPassword.type === 'password'));
+authForm.addEventListener('reset', () => setAuthPasswordVisible(false));
 const authError = document.querySelector('#auth-error');
 document.querySelector('#start-demo').addEventListener('click', startDemo);
 authEmail.addEventListener('invalid', () => {
@@ -1443,8 +1469,10 @@ document.querySelector('#logout').addEventListener('click', async () => {
     createdPasswordResetEmail = '';
     document.querySelector('#app').hidden = true;
     document.querySelector('#auth-screen').hidden = false;
+    setAuthPasswordVisible(false);
     document.querySelector('#content').replaceChildren();
-    document.querySelector('#account-email').textContent = '';
+    document.querySelector('#account-name').textContent = '';
+    document.querySelector('#account-name').title = '';
     document.querySelector('#auth-title').textContent = CUSTOM_TEXT_DEFAULTS.websiteTitle;
     document.title = `${CUSTOM_TEXT_DEFAULTS.websiteTitle} — samen voor een fijn thuis`;
     accountEmail = '';

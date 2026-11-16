@@ -61,13 +61,14 @@ const SEED_TASKS = [
   {
     id: 'example-windows',
     title: 'Ramen wassen',
-    frequency: 'occasional'
+    frequency: 'yearly'
   }
 ];
 
 function normalizeTask(task) {
   return {
     ...task,
+    frequency: task.frequency === 'occasional' ? 'yearly' : task.frequency,
     important: task.important === true,
     memberId: task.memberId ?? '',
     weekday: task.weekday ?? 1,

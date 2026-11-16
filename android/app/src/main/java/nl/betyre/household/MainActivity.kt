@@ -31,10 +31,12 @@ import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import java.io.IOException
 
 class MainActivity : Activity() {
     private lateinit var webView: WebView
+    private lateinit var swipeRefresh: SwipeRefreshLayout
     private lateinit var progressBar: ProgressBar
     private lateinit var errorView: View
     private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
@@ -68,6 +70,12 @@ class MainActivity : Activity() {
             download(url, userAgent, contentDisposition, mimeType)
         }
 
+        swipeRefresh = SwipeRefreshLayout(this).apply {
+            setColorSchemeColors(Color.rgb(52, 110, 67))
+            setOnChildScrollUpCallback { _, _ -> webView.canScrollVertically(-1) }
+            setOnRefreshListener { webView.reload() }
+            addView(webView)
+        }
         progressBar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
             max = 100
             isIndeterminate = false
@@ -75,7 +83,7 @@ class MainActivity : Activity() {
         errorView = createErrorView()
         val root = FrameLayout(this).apply {
             setBackgroundColor(Color.rgb(246, 247, 242))
-            addView(webView, FrameLayout.LayoutParams(
+            addView(swipeRefresh, FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
             ))
@@ -266,6 +274,11 @@ class MainActivity : Activity() {
     }
 
     private inner class HouseholdWebViewClient : WebViewClient() {
+        override fun onPageFinished(view: WebView, url: String) {
+            super.onPageFinished(view, url)
+            swipeRefresh.isRefreshing = false
+        }
+
         override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
             val uri = request.url
             if (isHouseholdUrl(uri)) return false
@@ -353,6 +366,7 @@ class MainActivity : Activity() {
         uri.scheme == "https" && uri.host == HOME_HOST && (uri.port == -1 || uri.port == 443)
 
     private fun showError() {
+        swipeRefresh.isRefreshing = false
         progressBar.visibility = View.GONE
         errorView.visibility = View.VISIBLE
     }
