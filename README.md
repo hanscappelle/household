@@ -254,10 +254,9 @@ taken zijn standaard niet als belangrijk gemarkeerd.
 Een taak zonder gezinslid of een jaarlijkse taak zonder datum staat wel in de
 takenlijst, maar niet op de kalender. Afvinken geldt voor de afzonderlijke
 geplande datum. Bestaande planningen worden automatisch overgenomen.
-In de weekplanning staat bij elke dag met taken het aantal geplande taken.
+De tegels boven de weekplanning tonen het aantal geplande taken vandaag,
+afgeronde taken vandaag en ingeplande belangrijke taken in de weergegeven week.
 De taken van de geselecteerde dag staan gegroepeerd per verantwoordelijke.
-Op het overzicht toont de derde tegel het aantal ingeplande belangrijke taken
-deze week.
 Voor de geselecteerde dag toont de staafgrafiek **Verdeling per gezinslid**
 hoeveel taken ieder gezinslid heeft, inclusief afgevinkte taken. De langste
 staaf geeft het hoogste aantal van die dag weer. Verjaardagen tellen niet mee.

@@ -400,12 +400,14 @@ function renderMemberStatistics(member) {
 
 function renderDashboard() {
   const date = parseDate(selectedDate);
+  const today = parseDate(dateKey(new Date()));
   const start = monday(date);
   const weekDates = Array.from({ length: 7 }, (_, index) => addDays(start, index));
   const weekTasks = weekDates.flatMap(day => tasksOn(day).map(task => ({ task, day })));
-  const done = weekTasks.filter(item => isDone(item.task, item.day)).length;
   const importantTasks = weekTasks.filter(item => item.task.important).length;
   const todayTasks = tasksOn(date);
+  const plannedTasksToday = tasksOn(today);
+  const doneToday = plannedTasksToday.filter(task => isDone(task, today)).length;
   const birthdays = birthdaysOn(date);
   const memberLoads = state.members.map(member => ({
     member,
@@ -426,8 +428,8 @@ function renderDashboard() {
       <div class="hero-art" aria-hidden="true"><svg viewBox="0 0 260 210" fill="none" stroke="currentColor" stroke-width="2"><circle cx="142" cy="104" r="77"/><path d="M75 132l67-57 67 57M90 119v65h104v-65M129 184v-40h27v40M65 184h154"/><path d="M48 183c-3-25-10-37-23-44 20 2 29 14 29 35m-6 10c4-26 14-38 27-43-10 14-15 28-15 43M217 184c1-21 7-35 21-43-6 16-9 27-9 43"/><path d="M95 60l3-10 4 10 10 3-10 4-4 10-3-10-10-4zM200 71l2-7 3 7 7 3-7 3-3 7-2-7-7-3z"/></svg></div>
     </section>
     <div class="stats">
-      <div class="stat"><span class="stat-icon">◷</span><div><strong>${weekTasks.length}</strong><small>Gepland deze week</small></div></div>
-      <div class="stat"><span class="stat-icon">✓</span><div><strong>${done}</strong><small>Afgerond deze week</small></div></div>
+      <div class="stat"><span class="stat-icon">◷</span><div><strong>${plannedTasksToday.length}</strong><small>Geplande taken vandaag</small></div></div>
+      <div class="stat"><span class="stat-icon">✓</span><div><strong>${doneToday}</strong><small>Afgerond vandaag</small></div></div>
       <div class="stat"><span class="stat-icon">!</span><div><strong>${importantTasks}</strong><small>Belangrijke taken deze week</small></div></div>
     </div>
     <div class="dashboard-grid">
