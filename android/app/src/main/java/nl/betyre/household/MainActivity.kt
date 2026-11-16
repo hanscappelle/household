@@ -276,6 +276,10 @@ class MainActivity : Activity() {
     private inner class HouseholdWebViewClient : WebViewClient() {
         override fun onPageFinished(view: WebView, url: String) {
             super.onPageFinished(view, url)
+            view.evaluateJavascript(
+                "document.querySelectorAll('dialog').forEach(dialog => dialog.style.maxHeight = '90%')",
+                null
+            )
             swipeRefresh.isRefreshing = false
         }
 
