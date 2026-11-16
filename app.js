@@ -34,23 +34,6 @@ function validateMealIdeas(ideas, members) {
   }
 }
 
-function normalizeTask(task) {
-  return {
-    ...task,
-    important: task.important === true,
-    memberId: task.memberId ?? '',
-    weekday: task.weekday ?? 1,
-    monthDay: task.monthDay ?? 1,
-    date: task.date ?? '',
-    group: task.group ?? '',
-    dailyAssignments: task.dailyAssignments ?? Object.fromEntries((task.days || []).map(day => [day, task.memberId || ''])),
-    weeklyAssignments: task.weeklyAssignments ?? {
-      even: task.week === 'odd' ? '' : task.memberId || '',
-      odd: task.week === 'even' ? '' : task.memberId || ''
-    }
-  };
-}
-
 let state = null;
 let revision = null;
 let householdInfo = { members: [], invitations: [], canInvite: false };
@@ -59,6 +42,8 @@ let createdPasswordResetUrl = '';
 let createdPasswordResetEmail = '';
 let accountEmail = '';
 let currentUserId = '';
+let currentRole = '';
+const isChild = () => currentRole === 'child';
 let demoMode = false;
 let themeBeforeDemo = 'light';
 let colorPalette = 'forest';
@@ -129,6 +114,10 @@ async function save(nextState = state) {
     needsRecovery = true;
     document.querySelector('#modal').close();
     document.querySelector('#recovery-message').textContent = `De wijziging is niet bevestigd: ${error.message}`;
+    document.querySelector('#recovery-export').hidden = isChild();
+    document.querySelector('#recovery-advice').textContent = isChild()
+      ? 'Herlaad om de gegevens op de server te bekijken. Je laatste wijziging is mogelijk niet opgeslagen.'
+      : 'Download eventueel eerst een back-up van je laatste wijziging. Herlaad daarna om de gegevens op de server te bekijken. Je kunt de back-up desgewenst terugzetten.';
     document.querySelector('#recovery').hidden = false;
     return false;
   } finally {
@@ -313,6 +302,7 @@ function currentAuthorName() {
 }
 
 function taskMenu(task) {
+  if (isChild()) return '';
   const id = escapeHtml(task.id);
   const title = escapeHtml(task.title);
   return `<button type="button" class="task-action" data-action="edit-task" data-id="${id}" aria-label="${title} bewerken">···</button>`;
@@ -356,7 +346,7 @@ function renderDashboard() {
   const week = isoWeek(date);
   const range = `${formatDate(start, { day: 'numeric', month: 'short' })} – ${formatDate(weekDates[6], { day: 'numeric', month: 'short', year: 'numeric' })}`;
   return `
-    <div class="page-heading"><div><h1>${escapeHtml(state.customization.welcomeTitle)} <span style="color:#9cbd9f">✳</span></h1><p>${escapeHtml(state.customization.welcomeText)}</p></div><button class="button" data-action="new-task"><span class="plus">+</span> Taak toevoegen</button></div>
+    <div class="page-heading"><div><h1>${escapeHtml(state.customization.welcomeTitle)} <span style="color:#9cbd9f">✳</span></h1><p>${escapeHtml(state.customization.welcomeText)}</p></div>${isChild() ? '' : '<button class="button" data-action="new-task"><span class="plus">+</span> Taak toevoegen</button>'}</div>
     <section class="hero">
       <div class="hero-copy"><div class="eyebrow">SAMEN VOOR EEN FIJN THUIS</div><h2>Een opgeruimd huis,<br><em>een beetje meer rust.</em></h2><p>Alle taken en plannen voor jullie gezin, overzichtelijk op één plek.</p></div>
       <span class="hero-badge">♡ &nbsp; SAMEN DOEN</span>
@@ -408,13 +398,13 @@ function renderNoteCards(notes, type) {
     const actions = type === 'active'
       ? `<button type="button" data-action="edit-note" data-id="${noteId}">Bewerken</button><button type="button" data-action="archive-note" data-id="${noteId}">Archiveren</button>`
       : `<button type="button" data-action="restore-note" data-id="${noteId}">Herstellen</button><button type="button" data-action="delete-note" data-id="${noteId}">Definitief verwijderen</button>`;
-    return `<article class="note-card ${note.important ? 'important-note' : ''}"><div class="note-card-heading"><h3>${note.important ? '<span class="note-important-mark" aria-label="Belangrijke notitie" title="Belangrijke notitie">!</span>' : ''}${escapeHtml(note.title)}</h3><div class="note-menu-wrap"><button type="button" class="note-menu-trigger" data-action="toggle-note-menu" aria-label="Acties voor ${escapeHtml(note.title)}" aria-expanded="false">⋯</button><div class="note-actions-menu" hidden>${actions}</div></div></div><p>${escapeHtml(note.description).replace(/\n/g, '<br>')}</p><small>Door ${escapeHtml(note.author)}${note.editedBy ? ` · Bewerkt door ${escapeHtml(note.editedBy)}${note.editedAt ? ` op ${escapeHtml(new Date(note.editedAt).toLocaleString('nl-BE'))}` : ''}` : ''}</small></article>`;
+    return `<article class="note-card ${note.important ? 'important-note' : ''}"><div class="note-card-heading"><h3>${note.important ? '<span class="note-important-mark" aria-label="Belangrijke notitie" title="Belangrijke notitie">!</span>' : ''}${escapeHtml(note.title)}</h3>${isChild() ? '' : `<div class="note-menu-wrap"><button type="button" class="note-menu-trigger" data-action="toggle-note-menu" aria-label="Acties voor ${escapeHtml(note.title)}" aria-expanded="false">⋯</button><div class="note-actions-menu" hidden>${actions}</div></div>`}</div><p>${escapeHtml(note.description).replace(/\n/g, '<br>')}</p><small>Door ${escapeHtml(note.author)}${note.editedBy ? ` · Bewerkt door ${escapeHtml(note.editedBy)}${note.editedAt ? ` op ${escapeHtml(new Date(note.editedAt).toLocaleString('nl-BE'))}` : ''}` : ''}</small></article>`;
   }).join('');
 }
 
 function renderNoteArchive() {
   const archived = state.notes.filter(note => note.archived);
-  return `<div class="page-heading"><div><h1>Notitiearchief</h1><p>Herstel een gearchiveerde notitie of verwijder die definitief.</p></div><a class="button secondary" href="#overzicht">Terug naar overzicht</a></div>
+  return `<div class="page-heading"><div><h1>Notitiearchief</h1><p>${isChild() ? 'Bekijk gearchiveerde notities.' : 'Herstel een gearchiveerde notitie of verwijder die definitief.'}</p></div><a class="button secondary" href="#overzicht">Terug naar overzicht</a></div>
     <div class="panel notes-panel"><div class="note-list">${renderNoteCards(archived, 'archived')}</div></div>`;
 }
 
@@ -482,19 +472,20 @@ function renderTasks() {
     filtered.sort((a, b) => (Number(isScheduled(a)) - Number(isScheduled(b))) * (statusSort === 'unscheduled-first' ? 1 : -1));
   }
   const sortLabel = statusSort === 'none' ? 'niet gesorteerd' : statusSort === 'scheduled-first' ? 'ingepland eerst' : 'niet ingepland eerst';
-  return `<div class="page-heading"><div><h1>Alle taken</h1><p>Alles wat er thuis gebeurt, op één plek.</p></div><button class="button" data-action="new-task"><span class="plus">+</span> Taak toevoegen</button></div>
+  return `<div class="page-heading"><div><h1>Alle taken</h1><p>Alles wat er thuis gebeurt, op één plek.</p></div>${isChild() ? '' : '<button class="button" data-action="new-task"><span class="plus">+</span> Taak toevoegen</button>'}</div>
     <div class="list-toolbar"><div class="search"><input id="task-search" type="search" placeholder="Zoek een taak..." aria-label="Zoek een taak" value="${escapeHtml(taskSearch)}">${taskSearch ? '<button type="button" class="search-clear" data-action="clear-task-search" aria-label="Zoekveld leegmaken">×</button>' : ''}</div><select id="frequency-filter" aria-label="Filter op frequentie"><option value="all">Alle frequenties</option>${Object.entries(FREQUENCIES).map(([value, label]) => `<option value="${value}" ${frequencyFilter === value ? 'selected' : ''}>${label}</option>`).join('')}</select><select id="member-filter" aria-label="Filter op gezinslid"><option value="all">Iedereen</option><option value="unassigned" ${memberFilter === 'unassigned' ? 'selected' : ''}>Niet toegewezen</option>${state.members.map(member => `<option value="${escapeHtml(member.id)}" ${memberFilter === member.id ? 'selected' : ''}>${escapeHtml(member.name)}</option>`).join('')}</select><select id="status-filter" aria-label="Filter op planningsstatus"><option value="all">Alle statussen</option><option value="scheduled" ${statusFilter === 'scheduled' ? 'selected' : ''}>Ingepland</option><option value="unscheduled" ${statusFilter === 'unscheduled' ? 'selected' : ''}>Niet ingepland</option></select></div>
     <div class="list-summary">${filtered.length} ${filtered.length === 1 ? 'taak' : 'taken'}</div><div class="panel list-panel"><table class="task-table"><thead><tr><th scope="col">Taak</th><th scope="col" class="status-column" aria-sort="${statusSort === 'none' ? 'none' : statusSort === 'scheduled-first' ? 'ascending' : 'descending'}"><button type="button" class="status-sort" data-action="sort-status" aria-label="Sorteer op planningsstatus, ${sortLabel}">Status <span aria-hidden="true">${statusSort === 'none' ? '↕' : statusSort === 'scheduled-first' ? '↑' : '↓'}</span></button></th><th scope="col" class="frequency-column">Frequentie</th></tr></thead><tbody>${filtered.length ? filtered.map(task => {
       const scheduled = isScheduled(task);
       const status = scheduled ? 'Ingepland' : 'Niet ingepland';
-      return `<tr class="task-list-row" data-action="edit-task" data-id="${escapeHtml(task.id)}"><td><button type="button" class="task-list-item" aria-label="${escapeHtml(task.title)}${task.important ? ' — belangrijk' : ''} — ${status} — bewerken"><span class="stat-icon" style="width:34px;height:34px;font-size:15px">✓</span><span class="task-info"><strong>${escapeHtml(task.title)}${task.important ? '<span class="important-icon" title="Belangrijke taak" aria-hidden="true"><svg viewBox="0 0 16 16" focusable="false"><circle cx="8" cy="8" r="7"/><path class="important-icon-mark" d="M8 3.8v5.1M8 11.5v.1"/></svg></span>' : ''}</strong><small>${!task.schedules && (task.frequency === 'monthly' || task.frequency === 'occasional') ? `${escapeHtml(memberFor(task)?.name || 'Niet toegewezen')} · ` : ''}${escapeHtml(taskSchedule(task))}${task.group ? ` · ${escapeHtml(task.group)}` : ''}</small></span></button></td><td class="status-column"><span class="schedule-status ${scheduled ? 'scheduled' : 'unscheduled'}">${status}</span></td><td class="frequency-column"><span class="frequency-tag">${frequencyLabel(task)}</span></td></tr>`;
+      const taskTag = isChild() ? 'div' : 'button';
+      return `<tr class="${isChild() ? '' : 'task-list-row'}" ${isChild() ? '' : `data-action="edit-task" data-id="${escapeHtml(task.id)}"`}><td><${taskTag} ${isChild() ? '' : `type="button" aria-label="${escapeHtml(task.title)}${task.important ? ' — belangrijk' : ''} — ${status} — bewerken"`} class="task-list-item"><span class="stat-icon" style="width:34px;height:34px;font-size:15px">✓</span><span class="task-info"><strong>${escapeHtml(task.title)}${task.important ? '<span class="important-icon" title="Belangrijke taak" aria-hidden="true"><svg viewBox="0 0 16 16" focusable="false"><circle cx="8" cy="8" r="7"/><path class="important-icon-mark" d="M8 3.8v5.1M8 11.5v.1"/></svg></span>' : ''}</strong><small>${!task.schedules && (task.frequency === 'monthly' || task.frequency === 'occasional') ? `${escapeHtml(memberFor(task)?.name || 'Niet toegewezen')} · ` : ''}${escapeHtml(taskSchedule(task))}${task.group ? ` · ${escapeHtml(task.group)}` : ''}</small></span></${taskTag}></td><td class="status-column"><span class="schedule-status ${scheduled ? 'scheduled' : 'unscheduled'}">${status}</span></td><td class="frequency-column"><span class="frequency-tag">${frequencyLabel(task)}</span></td></tr>`;
     }).join('') : '<tr><td colspan="3"><div class="empty" style="margin:20px 0">Geen taken gevonden.</div></td></tr>'}</tbody></table></div>`;
 }
 
 function renderFamily() {
   const roles = { owner: 'Ouder', parent: 'Ouder', partner: 'Ouder', child: 'Kind' };
   return `<div class="page-heading"><div><h1>Ons gezin</h1><p>Iedereen draagt op zijn eigen manier bij.</p></div><button class="button" data-action="new-member"><span class="plus">+</span> Gezinslid toevoegen</button></div>
-    <div class="members-grid">${state.members.map((member, index) => `<div class="panel member-card">${avatar(member, index)}<h3>${escapeHtml(member.name)}</h3><p>${escapeHtml(memberDetails(member))}${member.email ? `<br>${escapeHtml(member.email)}` : ''}<br>${state.tasks.filter(task => assignedMemberIds(task).includes(member.id)).length} toegewezen taken</p><button class="text-button" data-action="edit-member" data-id="${escapeHtml(member.id)}">Gegevens bewerken →</button></div>`).join('')}</div>
+    <div class="members-grid">${state.members.map((member, index) => `<div class="panel member-card">${avatar(member, index)}<h3>${escapeHtml(member.name)}</h3><p>${escapeHtml(memberDetails(member))}${member.email ? `<br>${escapeHtml(member.email)}` : ''}<br>${state.tasks.filter(task => assignedMemberIds(task).includes(member.id)).length} toegewezen taken</p>${isChild() ? '' : `<button class="text-button" data-action="edit-member" data-id="${escapeHtml(member.id)}">Gegevens bewerken →</button>`}</div>`).join('')}</div>
     ${demoMode ? '<div class="panel backup-panel"><h2>Gezinsaccounts</h2><p>Uitnodigingen en wachtwoordreset zijn beschikbaar nadat je een account hebt aangemaakt.</p></div>' : `<section class="household-access">
       <div class="section-heading"><div><h2>Samen in hetzelfde dashboard</h2><p>Nodig je partner of kinderen uit met hun eigen e-mailadres en wachtwoord.</p></div></div>
       <div class="panel backup-panel">
@@ -527,7 +518,7 @@ function renderGroceries() {
     <div class="panel groceries-panel">
       <form id="groceries-form" class="groceries-form"><label class="sr-only" for="grocery-name">Boodschap</label><input id="grocery-name" name="name" required maxlength="120" placeholder="Voeg iets toe aan de lijst"><button class="button" type="submit"><span class="plus">+</span> Toevoegen</button></form>
       <p class="list-summary">${remaining} ${remaining === 1 ? 'boodschap' : 'boodschappen'} te halen</p>
-      ${sortedGroceries.length ? sortedGroceries.map(item => `<div class="task-row ${item.done ? 'done' : ''}"><input type="checkbox" class="check" data-action="grocery-done" data-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(item.name)} gekocht" ${item.done ? 'checked' : ''}><div class="task-info"><strong>${escapeHtml(item.name)}</strong></div><button type="button" class="grocery-urgent" data-action="toggle-grocery-urgent" data-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(item.name)} dringend" aria-pressed="${item.urgent === true}" title="${item.urgent ? 'Dringend: klik om te wijzigen' : 'Markeer als dringend'}"><span aria-hidden="true">${item.urgent ? '⚑' : '⚐'}</span><span class="grocery-urgent-label">${item.urgent ? 'Dringend' : 'Niet dringend'}</span></button><button type="button" class="text-button grocery-delete" data-action="delete-grocery" data-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(item.name)} verwijderen">Verwijderen</button></div>`).join('') : '<div class="empty"><strong>Je lijst is leeg</strong>Voeg toe wat jullie nodig hebben.</div>'}
+      ${sortedGroceries.length ? sortedGroceries.map(item => `<div class="task-row ${item.done ? 'done' : ''}"><input type="checkbox" class="check" data-action="grocery-done" data-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(item.name)} gekocht" ${item.done ? 'checked' : ''}><div class="task-info"><strong>${escapeHtml(item.name)}</strong></div>${isChild() ? (item.urgent ? '<span class="grocery-urgent-label">Dringend</span>' : '') : `<button type="button" class="grocery-urgent" data-action="toggle-grocery-urgent" data-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(item.name)} dringend" aria-pressed="${item.urgent === true}" title="${item.urgent ? 'Dringend: klik om te wijzigen' : 'Markeer als dringend'}"><span aria-hidden="true">${item.urgent ? '⚑' : '⚐'}</span><span class="grocery-urgent-label">${item.urgent ? 'Dringend' : 'Niet dringend'}</span></button><button type="button" class="text-button grocery-delete" data-action="delete-grocery" data-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(item.name)} verwijderen">Verwijderen</button>`}</div>`).join('') : '<div class="empty"><strong>Je lijst is leeg</strong>Voeg toe wat jullie nodig hebben.</div>'}
     </div>`;
 }
 
@@ -539,12 +530,12 @@ function renderMealIdeas() {
       ${sortedIdeas.length ? `<div class="meal-ideas-list">${sortedIdeas.map(idea => `<div class="meal-idea"><div class="meal-title">${mealAvatar(idea)}<div class="meal-heading"><strong class="meal-name">${escapeHtml(idea.name)}</strong><a class="recipe-search" href="https://www.google.com/search?${new URLSearchParams({ q: `recept ${idea.name}` })}" target="_blank" rel="noopener noreferrer">Recept zoeken ↗</a></div></div>
         ${state.members.length ? `<fieldset class="meal-wishes"><legend class="sr-only">Wie heeft er zin in ${escapeHtml(idea.name)}?</legend>${state.members.map(member => `<label><input type="checkbox" class="check" data-action="meal-wish" data-id="${escapeHtml(idea.id)}" data-member-id="${escapeHtml(member.id)}" ${idea.wishedBy.includes(member.id) ? 'checked' : ''}><span>${escapeHtml(member.name)}</span></label>`).join('')}</fieldset>` : '<p class="meal-empty-members">Voeg een gezinslid toe om wensen aan te duiden.</p>'}
         <span class="meal-count ${idea.wishedBy.length > state.members.length / 2 ? 'majority' : ''}">${idea.wishedBy.length} ${idea.wishedBy.length === 1 ? 'persoon' : 'personen'}${idea.wishedBy.length > state.members.length / 2 ? ' · Meerderheid' : ''}</span>
-        <button type="button" class="text-button meal-delete" data-action="delete-meal-idea" data-id="${escapeHtml(idea.id)}" aria-label="${escapeHtml(idea.name)} verwijderen">Verwijderen</button></div>`).join('')}</div>` : '<div class="empty"><strong>Nog geen kookinspiratie</strong>Voeg een gerecht of voeding toe.</div>'}
+        ${isChild() ? '' : `<button type="button" class="text-button meal-delete" data-action="delete-meal-idea" data-id="${escapeHtml(idea.id)}" aria-label="${escapeHtml(idea.name)} verwijderen">Verwijderen</button>`}</div>`).join('')}</div>` : '<div class="empty"><strong>Nog geen kookinspiratie</strong>Voeg een gerecht of voeding toe.</div>'}
     </div>`;
 }
 
 function renderBackup() {
-  return `<div class="page-heading"><div><h1>Instellingen</h1><p>Personaliseer de teksten en beheer de back-up van jullie gezinsgegevens.</p></div></div>
+  return `<div class="page-heading"><div><h1>Instellingen</h1><p>${isChild() ? 'Kies jouw kleurenpalet.' : 'Personaliseer de teksten en beheer de back-up van jullie gezinsgegevens.'}</p></div></div>
     <form id="palette-form" class="panel backup-panel palette-panel">
       <h2>Jouw kleurenpalet</h2>
       <p>${demoMode ? 'Probeer een kleurenpalet uit voor deze tijdelijke demo.' : 'Deze keuze geldt alleen voor jouw login en verandert de weergave voor de rest van het gezin niet.'}</p>
@@ -552,7 +543,7 @@ function renderBackup() {
       <div id="palette-error" role="alert"></div>
       <button class="button" type="submit">Kleurenpalet opslaan</button>
     </form>
-    <form id="customization-form" class="panel backup-panel">
+    ${isChild() ? '' : `<form id="customization-form" class="panel backup-panel">
       <h2>Teksten personaliseren</h2>
       <p>Deze teksten zijn zichtbaar voor iedereen in jullie gezinsdashboard.</p>
       <div class="form-grid">
@@ -566,7 +557,7 @@ function renderBackup() {
       <div class="modal-actions"><button type="button" class="button secondary" data-action="reset-customization">Standaardteksten herstellen</button><button type="submit" class="button">Teksten opslaan</button></div>
     </form>
     ${demoMode ? '<div class="panel backup-panel"><h2>Back-up</h2><p>Back-ups downloaden en terugzetten zijn beschikbaar met een account, niet in de demo.</p></div>' : `<div class="panel backup-panel"><h2>Back-up downloaden</h2><p>Download een JSON-bestand met gezinsleden, taken, planningen, afvinkjes, boodschappen, kookinspiratie en notities. Bewaar dit bestand op een veilige plek: het bevat persoonlijke gegevens.</p><button class="button" data-action="export-backup">Back-up downloaden</button></div>
-    <div class="panel backup-panel"><h2>Back-up terugzetten</h2><p>Een back-up terugzetten vervangt de huidige gegevens van je account. Download eventueel eerst een back-up van de huidige gegevens.</p><label for="backup-file" class="field-label">JSON-bestand kiezen</label><input id="backup-file" type="file" accept=".json,application/json"><button class="button secondary" data-action="import-backup">Back-up terugzetten</button></div>`}`;
+    <div class="panel backup-panel"><h2>Back-up terugzetten</h2><p>Een back-up terugzetten vervangt de huidige gegevens van je account. Download eventueel eerst een back-up van de huidige gegevens.</p><label for="backup-file" class="field-label">JSON-bestand kiezen</label><input id="backup-file" type="file" accept=".json,application/json"><button class="button secondary" data-action="import-backup">Back-up terugzetten</button></div>`}`}`;
 }
 
 function renderHelp() {
@@ -576,7 +567,7 @@ function renderHelp() {
       <section class="panel help-panel"><h2>Aanmelden en samen gebruiken</h2>
         <p>Log in met je e-mailadres en wachtwoord. Een ouder kan via <a href="#gezin">Ons gezin</a> een partner of kind uitnodigen met een persoonlijke link. De genodigde kiest zelf een wachtwoord. Een geaccepteerde uitnodiging geeft toegang tot hetzelfde gezinsdashboard.</p>
         <p>Is een gezinslid het wachtwoord vergeten? Een ouder kan bij <a href="#gezin">Gezinsaccounts</a> een eenmalige resetlink maken en deze rechtstreeks met die gebruiker delen. De link verloopt na een uur; de gebruiker kiest zelf het nieuwe wachtwoord.</p>
-        <p>De uitnodigingslink is zeven dagen geldig. Deel hem alleen met de bedoelde persoon. Kindaccounts kunnen het dashboard gebruiken, maar geen gezinsleden uitnodigen of uitnodigingen intrekken.</p>
+        <p>De uitnodigingslink is zeven dagen geldig. Deel hem alleen met de bedoelde persoon. Kindaccounts kunnen geen bestaande gezinsleden bewerken of verwijderen, gezinsleden uitnodigen of uitnodigingen intrekken. Ze kunnen taken alleen afvinken, boodschappen en gerechten toevoegen en afvinken, en notities plaatsen. Bestaande boodschappen, gerechten en notities verwijderen of wijzigen is voorbehouden aan ouders.</p>
       </section>
       <section class="panel help-panel"><h2>Overzicht en taken</h2>
         <p>Op <a href="#overzicht">Overzicht</a> zie je de weekplanning, taken en verjaardagen. Kies een dag in de agenda of gebruik de pijlen om naar een andere week te gaan. De taken van de gekozen dag staan gegroepeerd per verantwoordelijke. Vink een taak af wanneer die klaar is.</p>
@@ -593,7 +584,7 @@ function renderHelp() {
         <p>Op <a href="#kookinspiratie">Kookinspiratie</a> bewaar je gerechten en vink je per gezinslid aan wie er zin in heeft. De lijst sorteert gerechten met de meeste wensen bovenaan. Gebruik **Recept zoeken** bij een gerecht om online recepten ervoor te vinden.</p>
       </section>
       <section class="panel help-panel"><h2>Instellingen en gegevens bewaren</h2>
-        <p>Bij <a href="#instellingen">Instellingen</a> pas je de websitetitel, de ondertekst van het logo en de welkomst- en zijpaneelteksten aan. Deze teksten zijn zichtbaar voor het hele gezin.</p>
+        <p>Ouders kunnen bij <a href="#instellingen">Instellingen</a> de websitetitel, de ondertekst van het logo en de welkomst- en zijpaneelteksten aanpassen en back-ups beheren. Kindaccounts zien alleen de kleurinstellingen. De teksten zijn zichtbaar voor het hele gezin.</p>
         <p>Kies bij Instellingen een van de kleurenpaletten <strong>Bosgroen</strong>, <strong>Oceaanblauw</strong>, <strong>Lavendel</strong> of <strong>Terracotta</strong>. Het kleurenpalet wordt per login bewaard, geldt ook in donkere modus en verandert niets voor andere gezinsleden. De keuze wordt niet opgenomen in een back-up.</p>
         <p>Je kunt daar ook een JSON-back-up downloaden of terugzetten. Terugzetten vervangt de huidige gezinsgegevens; maak eventueel eerst een back-up. Bewaar het bestand veilig, want het bevat persoonlijke gegevens.</p>
       </section>
@@ -900,6 +891,7 @@ document.addEventListener('click', async event => {
     return;
   }
   const action = button.dataset.action;
+  if (isChild() && ['new-task', 'edit-task', 'edit-member', 'export-backup', 'import-backup', 'reset-customization', 'toggle-grocery-urgent', 'delete-grocery', 'delete-meal-idea', 'edit-note', 'archive-note', 'restore-note', 'delete-note'].includes(action)) return;
   if (action === 'toggle-note-menu') {
     const shouldOpen = button.getAttribute('aria-expanded') !== 'true';
     closeNoteMenus();
@@ -1144,6 +1136,7 @@ document.addEventListener('submit', async event => {
   }
   if (event.target.id === 'customization-form') {
     event.preventDefault();
+    if (isChild()) return;
     const form = event.target;
     const customization = {};
     for (const key of Object.keys(CUSTOM_TEXT_LIMITS)) {
@@ -1275,6 +1268,7 @@ function startDemo() {
   revision = null;
   accountEmail = 'Demogebruiker';
   currentUserId = 'demo';
+  currentRole = 'owner';
   householdInfo = { members: [], invitations: [], canInvite: false };
   applyColorPalette('forest');
   document.querySelector('#auth-screen').hidden = true;
@@ -1293,6 +1287,7 @@ async function openAccount() {
   state = validateBackup({ format: BACKUP_FORMAT, version: 1, data: result.data });
   revision = result.revision;
   accountEmail = result.email;
+  currentRole = result.role;
   currentUserId = String(householdInfo.members.find(member => member.email.toLowerCase() === result.email.toLowerCase())?.id || '');
   applyColorPalette(preferences.colorPalette);
   document.querySelector('#account-email').textContent = result.email;
@@ -1454,6 +1449,7 @@ document.querySelector('#logout').addEventListener('click', async () => {
     document.title = `${CUSTOM_TEXT_DEFAULTS.websiteTitle} — samen voor een fijn thuis`;
     accountEmail = '';
     currentUserId = '';
+    currentRole = '';
     colorPalette = 'forest';
     document.documentElement.dataset.palette = colorPalette;
     document.querySelector('#auth-error').textContent = '';

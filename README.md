@@ -184,8 +184,16 @@ rol (ouder of kind). Vul het e-mailadres voor de login in en deel de link
 persoonlijk; de app verstuurt zelf geen e-mail. De ontvanger stelt via die link
 een eigen wachtwoord in en krijgt een aparte login. Uitnodigingen zijn zeven
 dagen geldig en kunnen worden ingetrokken zolang ze niet zijn geaccepteerd.
-Alle accounts in het huishouden zien en wijzigen dezelfde gezinsgegevens;
-alleen ouders kunnen uitnodigingen maken of intrekken. Een genodigde heeft een
+Alle accounts in het huishouden zien dezelfde gezinsgegevens. Alleen ouders
+kunnen uitnodigingen maken of intrekken. Kindaccounts kunnen geplande taken
+aan- en afvinken, maar geen taken toevoegen, wijzigen, verwijderen of
+inplannen. Ze kunnen boodschappen en gerechten toevoegen en de bijbehorende
+checkboxes gebruiken, maar geen bestaande items wijzigen of verwijderen.
+Kinderen kunnen notities plaatsen, maar niet bewerken, archiveren, herstellen
+of verwijderen. Bij instellingen kunnen zij alleen hun kleurenpalet aanpassen;
+de persoonlijke teksten en back-ups zijn voor ouders. Kinderen kunnen geen
+bestaande gezinsleden bewerken of verwijderen, maar wel een gezinslid toevoegen.
+Een genodigde heeft een
 nieuw account nodig: een bestaand account kan niet aan een uitnodiging worden
 gekoppeld. Bij acceptatie wordt het e-mailadres van het gekozen profiel
 bijgewerkt naar het e-mailadres waarmee het account inlogt.
@@ -250,8 +258,10 @@ de app op een ander apparaat, log dan in met hetzelfde account. Gegevens
 worden niet automatisch live bijgewerkt in een al geopend tabblad: herlaad
 dat voordat je verder werkt. Bij gelijktijdige wijzigingen wordt een conflict
 gemeld in plaats van gegevens ongemerkt te overschrijven. Bij een mislukte of
-niet bevestigde opslag kun je de lokale wijziging eerst als back-up downloaden
-en daarna herladen. Terugzetten van die back-up vervangt de servergegevens.
+niet bevestigde opslag kan een ouder de lokale wijziging eerst als back-up
+downloaden en daarna herladen. Kindaccounts kunnen herladen; de laatste
+niet-bevestigde wijziging kan dan verloren gaan. Terugzetten van een back-up
+vervangt de servergegevens.
 
 ## Boodschappen
 

@@ -131,7 +131,7 @@ test(`accounts en opslag op ${basePath || '/'}`, { skip: !configured, timeout: 3
   });
   assert.equal(invited.status, 201);
   assert.equal((await request('/api/preferences', { cookie: invited.cookie })).json.colorPalette, 'forest');
-  const invitedState = await request('/api/state', { cookie: invited.cookie });
+  let invitedState = await request('/api/state', { cookie: invited.cookie });
   assert.deepEqual(invitedState.json.data.groceries, changed.groceries);
   assert.equal(invitedState.json.data.members.find(member => member.id === 'member-3').email, emails[2]);
   assert.equal((await request('/api/invitations', {
@@ -152,6 +152,40 @@ test(`accounts en opslag op ${basePath || '/'}`, { skip: !configured, timeout: 3
   assert.equal(childAccount.status, 201);
   const childFamily = await request('/api/household', { cookie: childAccount.cookie });
   assert.equal(childFamily.json.canInvite, false);
+  const childState = await request('/api/state', { cookie: childAccount.cookie });
+  assert.equal(childState.json.role, 'child');
+  assert.equal((await request('/api/preferences', {
+    method: 'PUT', cookie: childAccount.cookie, body: { colorPalette: 'ocean' }
+  })).status, 200);
+  for (const change of [
+    data => { data.tasks[0].title = 'Anders'; },
+    data => { data.members[0].name = 'Anders'; },
+    data => { data.groceries = []; },
+    data => { data.mealIdeas = []; },
+    data => { data.notes = []; },
+    data => { data.customization.websiteTitle = 'Anders'; }
+  ]) {
+    const data = structuredClone(childState.json.data);
+    change(data);
+    assert.equal((await request('/api/state', {
+      method: 'PUT', cookie: childAccount.cookie, body: { data, revision: childState.json.revision }
+    })).status, 403);
+  }
+  const childChanges = structuredClone(childState.json.data);
+  childChanges.completed[`${childChanges.tasks[0].id}|2026-11-16`] = true;
+  childChanges.groceries[0].done = true;
+  childChanges.groceries.push({ id: 'child-grocery', name: 'Brood', done: false, urgent: false });
+  childChanges.mealIdeas[0].wishedBy.push(childChanges.members[0].id);
+  childChanges.mealIdeas.push({ id: 'child-meal', name: 'Soep', wishedBy: [] });
+  childChanges.notes.push({ id: 'child-note', title: 'Hallo', description: 'Bericht', author: 'Kind', archived: false });
+  const childSaved = await request('/api/state', {
+    method: 'PUT', cookie: childAccount.cookie, body: { data: childChanges, revision: childState.json.revision }
+  });
+  assert.equal(childSaved.status, 200);
+  assert.equal((await request('/api/state', {
+    method: 'PUT', cookie: first.cookie, body: { data: childState.json.data, revision: childSaved.json.revision }
+  })).status, 200);
+  invitedState = await request('/api/state', { cookie: invited.cookie });
   assert.equal((await request('/api/password-resets', {
     method: 'POST', cookie: childAccount.cookie, body: { email: emails[0] }
   })).status, 403);

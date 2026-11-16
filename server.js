@@ -7,6 +7,7 @@ const { randomBytes, scrypt: scryptCallback, timingSafeEqual, createHash } = req
 const { promisify } = require('node:util');
 const path = require('node:path');
 const { SEED_MEMBERS, SEED_TASKS, SEED_MEAL_IDEAS } = require('./seed');
+const { childChangesAllowed } = require('./child-permissions');
 
 const scrypt = promisify(scryptCallback);
 const app = express();
@@ -399,7 +400,7 @@ router.post('/api/logout', authenticate, async (req, res) => {
 
 router.get('/api/state', authenticate, async (req, res) => {
   const [rows] = await pool.execute('SELECT data, revision FROM households WHERE id = ?', [req.user.household_id]);
-  res.json({ email: req.user.email, data: JSON.parse(rows[0].data), revision: rows[0].revision });
+  res.json({ email: req.user.email, role: req.user.household_role, data: JSON.parse(rows[0].data), revision: rows[0].revision });
 });
 
 router.put('/api/state', authenticate, async (req, res) => {
@@ -414,6 +415,9 @@ router.put('/api/state', authenticate, async (req, res) => {
   const [currentRows] = await pool.execute('SELECT data FROM households WHERE id = ? AND revision = ?', [req.user.household_id, revision]);
   if (!currentRows.length) return res.status(409).json({ error: 'De gegevens zijn ondertussen op een ander apparaat gewijzigd.' });
   const currentData = JSON.parse(currentRows[0].data);
+  if (req.user.household_role === 'child' && !childChangesAllowed(currentData, data, defaultCustomization)) {
+    return res.status(403).json({ error: 'Je hebt geen toestemming voor deze wijziging.' });
+  }
   const previousNotes = currentData.notes || [];
   const submittedNotes = data.notes || previousNotes;
   const author = currentData.members.find(member =>

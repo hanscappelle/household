@@ -65,6 +65,23 @@ const SEED_TASKS = [
   }
 ];
 
+function normalizeTask(task) {
+  return {
+    ...task,
+    important: task.important === true,
+    memberId: task.memberId ?? '',
+    weekday: task.weekday ?? 1,
+    monthDay: task.monthDay ?? 1,
+    date: task.date ?? '',
+    group: task.group ?? '',
+    dailyAssignments: task.dailyAssignments ?? Object.fromEntries((task.days || []).map(day => [day, task.memberId || ''])),
+    weeklyAssignments: task.weeklyAssignments ?? {
+      even: task.week === 'odd' ? '' : task.memberId || '',
+      odd: task.week === 'even' ? '' : task.memberId || ''
+    }
+  };
+}
+
 if (typeof module !== 'undefined') {
-  module.exports = { SEED_MEMBERS, SEED_TASKS, SEED_MEAL_IDEAS };
+  module.exports = { SEED_MEMBERS, SEED_TASKS, SEED_MEAL_IDEAS, normalizeTask };
 }
