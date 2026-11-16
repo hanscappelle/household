@@ -58,8 +58,11 @@ waarmee je inlogt. De naam van dat gezinslid verschijnt dan bovenaan; zonder
 koppeling staat daar **Gezinslid**.
 
 Op het overzicht staat de taakverdeling per gezinslid voor de gekozen dag en
-voor de hele bijbehorende week (maandag tot en met zondag). Een terugkerende
-taak telt voor elke dag waarop die is ingepland.
+voor de hele bijbehorende week (maandag tot en met zondag). Standaard wijs je
+een taak aan één gezinslid toe. Zet in het taakvenster **Taak door meerdere
+gezinsleden laten uitvoeren** aan om meerdere personen te selecteren; de taak
+verschijnt dan bij ieder van hen. Een terugkerende taak telt voor elke dag
+waarop die is ingepland.
 Onder **Ons gezin** staat ook de aanmaakdatum van elk gezinslid. Via
 **Statistieken bekijken** zie je hoeveel taakmomenten er vanaf die datum tot
 en met vandaag volgens de huidige planning aan die persoon waren toegewezen,

@@ -269,11 +269,20 @@ dialog::backdrop{background:rgba(34,50,38,.42)}
 .modal-head h2{font-size:25px}.modal-head p{font-size:11px;color:#9aa79d;margin-top:5px}
 .close{border:0;background:#f4f7f3;border-radius:7px;width:30px;height:30px;color:#809184;font-size:20px}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:15px}
+.task-options-row{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:15px;align-items:center}
+.task-flag-options{display:grid;gap:8px}
+.task-flag-options .important-checkbox{line-height:1.4}
 .field{display:grid;gap:7px}.field.full{grid-column:1/-1}
 .field label,.field-label{font-size:11px;font-weight:700;color:#6e8072}
 .field input,.field select{width:100%}
 .field-help{font-size:10px;color:#9aa79d;line-height:1.5}
 .assignment-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.member-assignment-list{display:grid;gap:6px}
+.member-assignment-list label{display:flex;align-items:center;gap:8px;padding:7px 9px;border:1px solid #e8eee7;border-radius:7px;background:#fff;cursor:pointer}
+.member-assignment-list label span{font-size:11px;font-weight:500;color:#536b59}
+.field .member-assignment-list input{width:16px;height:16px;margin:0;accent-color:#6e9978}
+[data-theme="dark"] .member-assignment-list label{background:var(--dark-control);border-color:var(--dark-border)}
+[data-theme="dark"] .member-assignment-list label span{color:#d5e1d6}
 .day-options{display:flex;flex-wrap:wrap;gap:6px}
 .day-options label{position:relative}
 .day-options input{position:absolute;opacity:0;width:1px}

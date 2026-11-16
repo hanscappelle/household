@@ -66,20 +66,33 @@ const SEED_TASKS = [
 ];
 
 function normalizeTask(task) {
+  const hasMultipleAssignments = value => Array.isArray(value) && value.length > 1;
+  const normalizeAssignments = assignments => Object.fromEntries(
+    Object.entries(assignments).map(([key, ids]) => [key, Array.isArray(ids) ? ids : ids ? [ids] : []])
+  );
+  const memberIds = task.memberIds ?? (task.memberId ? [task.memberId] : []);
+  const dailyAssignments = normalizeAssignments(task.dailyAssignments ?? Object.fromEntries((task.days || []).map(day => [day, task.memberId || ''])));
+  const weeklyAssignments = normalizeAssignments(task.weeklyAssignments ?? {
+    even: task.week === 'odd' ? '' : task.memberId || '',
+    odd: task.week === 'even' ? '' : task.memberId || ''
+  });
+  const legacyMultipleAssignments = hasMultipleAssignments(memberIds) ||
+    Object.values(dailyAssignments).some(hasMultipleAssignments) ||
+    Object.values(weeklyAssignments).some(hasMultipleAssignments) ||
+    (task.schedules || []).some(part => normalizeTask(part).allowMultipleMembers);
   return {
     ...task,
     frequency: task.frequency === 'occasional' ? 'yearly' : task.frequency,
     important: task.important === true,
-    memberId: task.memberId ?? '',
+    allowMultipleMembers: task.allowMultipleMembers === true || legacyMultipleAssignments,
+    memberId: memberIds[0] ?? '',
+    memberIds,
     weekday: task.weekday ?? 1,
     monthDay: task.monthDay ?? 1,
     date: task.date ?? '',
     group: task.group ?? '',
-    dailyAssignments: task.dailyAssignments ?? Object.fromEntries((task.days || []).map(day => [day, task.memberId || ''])),
-    weeklyAssignments: task.weeklyAssignments ?? {
-      even: task.week === 'odd' ? '' : task.memberId || '',
-      odd: task.week === 'even' ? '' : task.memberId || ''
-    }
+    dailyAssignments,
+    weeklyAssignments
   };
 }
 

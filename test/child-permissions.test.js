@@ -43,7 +43,7 @@ test('kind mag toevoegen en bestaande checkboxen aan- en uitvinken', () => {
 test('kind kan geen beschermde gegevens wijzigen of verwijderen', async t => {
   const cases = {
     'taak wijzigen': data => { data.tasks[0].title = 'Anders'; },
-    'taak inplannen': data => { data.tasks[0].dailyAssignments[2] = 'm1'; },
+    'taak inplannen': data => { data.tasks[0].dailyAssignments[2] = ['m1', 'm2']; },
     'taak toevoegen': data => { data.tasks.push({ ...data.tasks[0], id: 't2' }); },
     'taak verwijderen': data => { data.tasks = []; },
     'onbekend afvinkje': data => { data.completed['t2|2026-11-16'] = true; },
@@ -84,8 +84,43 @@ test('oude gegevens en nieuwe gezinsprofielen blijven bruikbaar', () => {
   assert.equal(childChangesAllowed(old, data, defaults), true);
 });
 
+test('kind kan taken met meerdere toegewezen gezinsleden ongewijzigd afvinken', () => {
+  const previous = clientState();
+  previous.tasks[0].dailyAssignments[1] = ['m1', 'm2'];
+  const submitted = structuredClone(previous);
+  submitted.completed['t1|2026-11-16'] = true;
+  assert.equal(childChangesAllowed(previous, submitted, defaults), true);
+});
+
 test('oude sporadische taken worden jaarlijkse taken', () => {
   const task = normalizeTask({ id: 't1', title: 'Ramen wassen', frequency: 'occasional', date: '2024-06-15' });
   assert.equal(task.frequency, 'yearly');
   assert.equal(task.date, '2024-06-15');
+});
+
+test('oude enkele toewijzingen en nieuwe meervoudige toewijzingen worden genormaliseerd', () => {
+  const legacy = normalizeTask({
+    frequency: 'daily',
+    dailyAssignments: { 1: 'm1' },
+    weeklyAssignments: { even: 'm2', odd: '' },
+    memberId: 'm1'
+  });
+  assert.deepEqual(legacy.dailyAssignments[1], ['m1']);
+  assert.deepEqual(legacy.weeklyAssignments, { even: ['m2'], odd: [] });
+  assert.deepEqual(legacy.memberIds, ['m1']);
+  assert.equal(legacy.allowMultipleMembers, false);
+
+  const multiple = normalizeTask({
+    frequency: 'daily',
+    dailyAssignments: { 1: ['m1', 'm2'] },
+    weeklyAssignments: { even: ['m1', 'm2'], odd: [] },
+    memberIds: ['m1', 'm2']
+  });
+  assert.deepEqual(multiple.dailyAssignments[1], ['m1', 'm2']);
+  assert.deepEqual(multiple.weeklyAssignments.even, ['m1', 'm2']);
+  assert.deepEqual(multiple.memberIds, ['m1', 'm2']);
+  assert.equal(multiple.allowMultipleMembers, true);
+
+  const defaultTask = normalizeTask({ frequency: 'daily' });
+  assert.equal(defaultTask.allowMultipleMembers, false);
 });
