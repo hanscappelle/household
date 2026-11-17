@@ -241,7 +241,9 @@ function schedulesFor(task) {
 }
 
 function frequencyLabel(task) {
-  if (task.flexibleSchedule) return `${FREQUENCIES[task.frequency]} · Vrij in te plannen`;
+  if (task.flexibleSchedule) {
+    return `${FREQUENCIES[task.frequency]} · Vrij in te plannen${task.freeToTake ? ' · Voor iedereen' : ''}`;
+  }
   return task.schedules ? 'Gecombineerd' : FREQUENCIES[task.frequency];
 }
 
@@ -275,7 +277,7 @@ function occursOn(task, date) {
   if (task.flexibleSchedule) {
     return Boolean(globalThis.flexibleTaskOccurrenceDate(
       task, dateKey(date), task.flexibleSince || task.createdAt || dateKey(date), state.completed
-    )) && membersOn(task, date).length > 0;
+    )) && (task.freeToTake || membersOn(task, date).length > 0);
   }
   if (task.freeToTake) {
     return schedulesFor(task).some(schedule => {
@@ -296,7 +298,7 @@ function occursOn(task, date) {
 
 function isScheduled(task) {
   if (task.flexibleSchedule) {
-    return Object.hasOwn(FREQUENCIES, task.frequency) && assignedMemberIds(task).length > 0;
+    return Object.hasOwn(FREQUENCIES, task.frequency) && (task.freeToTake || assignedMemberIds(task).length > 0);
   }
   if (task.freeToTake) {
     return schedulesFor(task).some(schedule => {
@@ -328,7 +330,8 @@ function isScheduled(task) {
 function tasksOn(date) {
   const selectedDateKey = dateKey(date);
   return state.tasks.filter(task => task.flexibleSchedule
-    ? Boolean(globalThis.flexibleTaskOccurrenceDate(task, selectedDateKey, task.flexibleSince || task.createdAt || selectedDateKey, state.completed)) && membersOn(task, date).length > 0
+    ? Boolean(globalThis.flexibleTaskOccurrenceDate(task, selectedDateKey, task.flexibleSince || task.createdAt || selectedDateKey, state.completed)) &&
+      (task.freeToTake || membersOn(task, date).length > 0)
     : task.freeToTake
       ? Boolean(globalThis.freeTaskOccurrenceDate(task, selectedDateKey, task.freeSince || task.createdAt || selectedDateKey, state.completed))
       : occursOn(task, date));
@@ -427,11 +430,12 @@ function taskMenu(task) {
 }
 
 function taskSchedule(task) {
-  if (task.freeToTake) return 'Vrij op te nemen';
   if (task.flexibleSchedule) {
+    if (task.freeToTake) return 'Vrij in te plannen · Voor iedereen';
     const members = membersForAssignment(task.memberIds || (task.memberId ? [task.memberId] : []));
     return `Vrij in te plannen${members.length ? ` · ${members.map(member => member.name).join(', ')}` : ''}`;
   }
+  if (task.freeToTake) return 'Voor iedereen';
   if (task.schedules) return task.schedules.map(part => `${FREQUENCIES[part.frequency]}: ${part.frequency === 'monthly' || part.frequency === 'yearly' ? `${membersForAssignment(part.memberIds || (part.memberId ? [part.memberId] : [])).map(member => member.name).join(', ') || 'Niet toegewezen'} · ` : ''}${taskSchedule(part)}`).join(' | ');
   if (task.frequency === 'daily') {
     const days = DAYS.map((day, index) => {
@@ -465,7 +469,9 @@ function speakButton(action, id, text, title, speechText, visibleLabel = '') {
 
 function taskSpeechText(task, done, date) {
   let scheduledFor = '';
-  if (date && task.freeToTake) scheduledFor = 'Deze taak is vrij op te nemen.';
+  if (date && task.freeToTake && task.flexibleSchedule) {
+    scheduledFor = 'Deze taak is voor iedereen en blijft deze periode in de planning staan tot ze is afgerond.';
+  } else if (date && task.freeToTake) scheduledFor = 'Deze taak is voor iedereen.';
   else if (date) {
     const members = membersOn(task, date).map(member => member.name);
     scheduledFor = members.length
@@ -704,7 +710,7 @@ function renderDashboard() {
           <div class="day-detail"><div class="day-detail-head"><strong>${escapeHtml(formatDate(date, { weekday: 'long', day: 'numeric', month: 'long' }))}</strong><span>${todayTasks.length} ${todayTasks.length === 1 ? 'taak' : 'taken'}</span></div>
             ${birthdays.map(member => `<div class="birthday-row"><span class="birthday-icon" aria-hidden="true">🎂</span><div><strong>Verjaardag van ${escapeHtml(member.name)}</strong><small>${date.getFullYear() - parseDate(member.birthDate).getFullYear()} jaar</small></div></div>`).join('')}
             ${memberLoads.filter(group => group.tasks.length).map(({ member, index, tasks }) => `<section class="day-task-group"><div class="day-task-member"><h3 class="day-task-member-heading"><span aria-hidden="true">${avatar(member, index)}</span><span>${escapeHtml(member.name)}</span></h3>${speakButton('speak-member', member.id, member.name, 'Naam voorlezen')}</div>${renderTaskRows(tasks, date, member.id)}</section>`).join('')}
-            ${freeTasks.length ? `<section class="day-task-group"><h3>Vrij op te nemen taken</h3>${renderTaskRows(freeTasks, date)}</section>` : ''}
+            ${freeTasks.length ? `<section class="day-task-group"><h3>Voor iedereen</h3>${renderTaskRows(freeTasks, date)}</section>` : ''}
             ${!todayTasks.length && !birthdays.length ? `<div class="empty"><span class="empty-icon">☼</span><strong>Een lekker lege planning</strong>Plan een taak in en hij verschijnt hier.</div>` : ''}
           </div>
         </div>
@@ -712,7 +718,7 @@ function renderDashboard() {
       <section><div class="section-heading"><div><h2>Ons gezin</h2><p>Samen staan we sterker.</p></div><a class="text-button" href="#gezin">Bekijken →</a></div>
         <div class="panel family-panel">${state.members.length ? state.members.map((member, index) => `<div class="family-row">${avatar(member, index)}<div><strong>${escapeHtml(member.name)}</strong><small>${escapeHtml(memberDetails(member))}${member.email ? ` · ${escapeHtml(member.email)}` : ''}</small></div></div>`).join('') : '<div class="empty">Voeg een gezinslid toe om te beginnen.</div>'}</div>
         ${memberLoads.length ? `<div class="load-distributions">${renderLoadDistribution('Verdeling per gezinslid · dag', dailyLoads)}${renderLoadDistribution('Verdeling per gezinslid · week', weeklyLoads)}</div>` : ''}
-        <div class="tip"><span class="tip-icon">✧</span><div><strong>Goed om te weten</strong><p>De taken uit jullie lijst staan al klaar. Wijs ze toe, plan ze vrij in of maak ze vrij op te nemen.</p><a class="text-button" href="#taken" style="padding-left:0">Bekijk alle taken →</a></div></div>
+        <div class="tip"><span class="tip-icon">✧</span><div><strong>Goed om te weten</strong><p>De taken uit jullie lijst staan al klaar. Wijs ze toe, plan ze vrij in of kies voor iedereen.</p><a class="text-button" href="#taken" style="padding-left:0">Bekijk alle taken →</a></div></div>
       </section>
       <section class="dashboard-notes"><div class="section-heading"><div><h2>Notities</h2><p>Deel een mededeling met het gezin.</p></div><div class="note-section-actions"><a class="text-button" href="#notitiearchief">Archief beheren →</a><button type="button" class="button" data-action="new-note"><span class="plus">+</span> Notitie toevoegen</button></div></div>
         <div class="panel notes-panel">
@@ -909,7 +915,7 @@ function renderHelp() {
         <p>Op <a href="#overzicht">Overzicht</a> zie je de weekplanning, taken en verjaardagen. Kies een dag in de agenda of gebruik de pijlen om naar een andere week te gaan. De taken van de gekozen dag staan gegroepeerd per verantwoordelijke. Vink een taak af wanneer die klaar is.</p>
         <p>Naast de weekplanning zie je de gezinsleden; daaronder staan gedeelde notities als post-its. Kies <strong>Notitie toevoegen</strong> om in een venster een titel en beschrijving in te vullen. De auteur wordt automatisch ingevuld. Zet eventueel <strong>Markeer als belangrijk</strong> aan; dit staat standaard uit. Belangrijke notities krijgen een uitroepteken en staan bovenaan.</p>
         <p>Open het driepuntjesmenu op een post-it om die te bewerken of te archiveren. Bij bewerken door een ander gezinslid worden diens naam en bewerktijd vermeld. Gearchiveerde notities verdwijnen van het overzicht. Via <a href="#notitiearchief">Notitiearchief</a> kun je ze herstellen of definitief verwijderen.</p>
-        <p>Op <a href="#taken">Alle taken</a> kun je een taak openen om de planning te wijzigen. Kies per dag, week, maand of eenmalige datum wie de taak uitvoert. Standaard wijs je de taak aan één gezinslid toe; zet <strong>Gedeelde taak</strong> aan om meerdere personen te selecteren. Zet <strong>Vrij in te plannen</strong> aan om een taak aan een gezinslid te koppelen zonder vaste dag: de taak blijft bij die persoon in de planning staan tot ze voor die periode is afgerond. Zet <strong>Vrij op te nemen taak</strong> aan om de taak zonder toewijzing onder die aparte titel in de planning te tonen. Een terugkerende vrij op te nemen taak schuift dagelijks door zolang die openstaat; er verschijnt pas een nieuw exemplaar op de volgende reguliere frequentiedag nadat de open taak is afgevinkt. Markeer in het taakformulier belangrijke taken; die herken je aan het label <strong>Belangrijk</strong>. Gebruik de zoekbalk en filters om taken terug te vinden.</p>
+        <p>Op <a href="#taken">Alle taken</a> kun je een taak openen om de planning te wijzigen. Kies per dag, week, maand of eenmalige datum wie de taak uitvoert. Standaard wijs je de taak aan één gezinslid toe; zet <strong>Gedeelde taak</strong> aan om meerdere personen te selecteren. Zet <strong>Vrij in te plannen</strong> aan om een taak zonder vaste dag te plannen; de taak blijft deze periode in de planning staan tot ze is afgerond. Je kunt dit combineren met <strong>Voor iedereen</strong>. De taak verschijnt dan onderaan de planning, zonder verantwoordelijke. Na afronden verschijnt ze weer in de volgende periode. Zonder die combinatie verschijnt de taak op de reguliere frequentiedag en schuift ze dagelijks door zolang die openstaat. Markeer in het taakformulier belangrijke taken; die herken je aan het label <strong>Belangrijk</strong>. Gebruik de zoekbalk en filters om taken terug te vinden.</p>
         <p>Vink je een taak na de geplande dag af, dan krijgt die het label <strong>Te laat uitgevoerd</strong>. Bij elk gezinslid kun je via <strong>Statistieken bekijken</strong> zien hoeveel taken die persoon te laat ingepland had; dit wordt niet gekoppeld aan het account dat de taak heeft afgevinkt.</p>
       </section>
       <section class="panel help-panel"><h2>Gezinsleden</h2>
@@ -1143,7 +1149,11 @@ function scheduleFields(task, allowMultipleMembers = false, freeToTake = false, 
     ? 'Selecteer iedereen die de taak uitvoert; elk gezinslid vinkt de taak apart af'
     : 'Kies wie de taak uitvoert';
   if (freeToTake) {
-    if (task.frequency === 'daily') return '<div class="field full"><span class="field-help">Deze taak verschijnt dagelijks bij de vrij op te nemen taken en schuift door tot iemand hem afvinkt.</span></div>';
+    if (flexibleSchedule) {
+      const period = task.frequency === 'daily' ? 'dag' : task.frequency === 'weekly' ? 'week' : task.frequency === 'monthly' ? 'maand' : 'jaar';
+      return `<div class="field full"><span class="field-help">Deze taak is voor iedereen. Ze staat onderaan de planning en blijft deze ${period} staan tot ze is afgerond.</span></div>`;
+    }
+    if (task.frequency === 'daily') return '<div class="field full"><span class="field-help">Deze taak verschijnt dagelijks onderaan de planning en schuift door tot iemand hem afvinkt.</span></div>';
     if (task.frequency === 'weekly') return `<div class="field full"><label for="weekday">Dag van de week</label><select id="weekday" name="weekday">${DAYS.map((day, index) => `<option value="${index + 1}" ${task.weekday === index + 1 ? 'selected' : ''}>${day}</option>`).join('')}</select><span class="field-help">De taak verschijnt wekelijks op deze dag en schuift daarna dagelijks door tot iemand hem afvinkt.</span></div>`;
     if (task.frequency === 'monthly') return `<div class="field full"><label for="monthDay">Dag van de maand</label><input id="monthDay" name="monthDay" type="number" min="1" max="31" value="${task.monthDay}" required><span class="field-help">Bestaat deze dag niet in een maand, dan wordt de taak die maand overgeslagen. Een open taak schuift dagelijks door tot iemand hem afvinkt.</span></div>`;
     return `<div class="field full"><label for="date">Dag en maand</label><input id="date" name="date" type="date" value="${escapeHtml(task.date)}"><span class="field-help">De taak verschijnt jaarlijks op deze dag en maand; het gekozen jaar wordt genegeerd. Een open taak schuift dagelijks door tot iemand hem afvinkt.</span></div>`;
@@ -1206,7 +1216,7 @@ function openTask(id) {
   let activeSchedule = task.schedules ? task.schedules[0] : task;
   document.querySelector('#modal-content').innerHTML = `<form id="task-form" class="modal-inner"><div class="modal-head"><div><h2 id="modal-title">${existing ? 'Taak bewerken' : 'Nieuwe taak'}</h2><p>Maak het samen een beetje makkelijker.</p></div><button type="button" class="close" data-action="close-modal" aria-label="Sluiten">×</button></div>
     <div class="form-grid"><div class="field full"><label for="title">Naam van de taak</label><input id="title" name="title" value="${escapeHtml(task.title)}" required maxlength="200" placeholder="Bijvoorbeeld: tafel afruimen"></div>
-    <div class="task-options-row"><div class="field"><label for="frequency">Frequentie</label><select id="frequency" name="frequency">${Object.entries(FREQUENCIES).map(([value, label]) => `<option value="${value}" ${activeSchedule.frequency === value ? 'selected' : ''}>${label}</option>`).join('')}</select></div><div class="task-flag-options"><label class="important-checkbox"><input type="checkbox" name="important" ${task.important ? 'checked' : ''}> Markeer als belangrijk</label><label class="important-checkbox"><input type="checkbox" name="freeToTake" ${task.freeToTake ? 'checked' : ''}> Vrij op te nemen taak</label><label id="flexible-schedule-option" class="important-checkbox" style="${task.freeToTake ? 'display:none' : ''}"><input type="checkbox" name="flexibleSchedule" ${task.flexibleSchedule ? 'checked' : ''}> Vrij in te plannen</label><label id="multiple-members-option" class="important-checkbox" style="${task.freeToTake ? 'display:none' : ''}"><input type="checkbox" name="allowMultipleMembers" ${task.allowMultipleMembers ? 'checked' : ''}> Gedeelde taak</label></div></div>
+    <div class="task-options-row"><div class="field"><label for="frequency">Frequentie</label><select id="frequency" name="frequency">${Object.entries(FREQUENCIES).map(([value, label]) => `<option value="${value}" ${activeSchedule.frequency === value ? 'selected' : ''}>${label}</option>`).join('')}</select></div><div class="task-flag-options"><label class="important-checkbox"><input type="checkbox" name="important" ${task.important ? 'checked' : ''}> Markeer als belangrijk</label><label class="important-checkbox"><input type="checkbox" name="freeToTake" ${task.freeToTake ? 'checked' : ''}> Voor iedereen</label><label class="important-checkbox"><input type="checkbox" name="flexibleSchedule" ${task.flexibleSchedule ? 'checked' : ''}> Vrij in te plannen</label><label id="multiple-members-option" class="important-checkbox" style="${task.freeToTake ? 'display:none' : ''}"><input type="checkbox" name="allowMultipleMembers" ${task.allowMultipleMembers ? 'checked' : ''}> Gedeelde taak</label></div></div>
     ${task.schedules ? `<div class="field full"><label for="schedule-index">Schema bewerken</label><select id="schedule-index">${task.schedules.map((part, index) => `<option value="${index}">${index + 1}. ${escapeHtml(part.title)} (${FREQUENCIES[part.frequency]})</option>`).join('')}</select><span class="field-help">Bij overlap heeft het eerste passende schema voorrang. Wijzigingen aan alle schema's worden samen opgeslagen.</span></div>` : ''}
       <div id="schedule-fields" class="field full" style="display:contents">${scheduleFields(activeSchedule, task.allowMultipleMembers, task.freeToTake, task.flexibleSchedule)}</div></div>
     <div class="modal-actions">${existing ? '<button type="button" class="button danger" data-action="delete-task">Verwijderen</button>' : ''}<button type="button" class="button secondary" data-action="close-modal">Annuleren</button><button type="submit" class="button">Opslaan</button></div></form>`;
@@ -1214,7 +1224,6 @@ function openTask(id) {
     const renderActiveSchedule = () => {
       document.querySelector('#schedule-fields').innerHTML = scheduleFields(activeSchedule, task.allowMultipleMembers, task.freeToTake, task.flexibleSchedule);
       document.querySelector('#multiple-members-option').style.display = task.freeToTake ? 'none' : '';
-      document.querySelector('#flexible-schedule-option').style.display = task.freeToTake ? 'none' : '';
     };
     form.elements.frequency.addEventListener('change', () => {
       readSchedule(activeSchedule, new FormData(form), task.allowMultipleMembers, task.freeToTake, task.flexibleSchedule);
@@ -1224,11 +1233,7 @@ function openTask(id) {
     form.elements.freeToTake.addEventListener('change', () => {
       readSchedule(activeSchedule, new FormData(form), task.allowMultipleMembers, task.freeToTake, task.flexibleSchedule);
       task.freeToTake = form.elements.freeToTake.checked;
-      if (task.freeToTake) {
-        task.flexibleSchedule = false;
-        form.elements.flexibleSchedule.checked = false;
-        clearTaskAssignments(task);
-      }
+      if (task.freeToTake) clearTaskAssignments(task);
       renderActiveSchedule();
     });
     form.elements.flexibleSchedule.addEventListener('change', () => {
@@ -1244,10 +1249,6 @@ function openTask(id) {
         activeSchedule.memberId = activeSchedule.memberIds[0] || '';
       }
       task.flexibleSchedule = form.elements.flexibleSchedule.checked;
-      if (task.flexibleSchedule) {
-        task.freeToTake = false;
-        form.elements.freeToTake.checked = false;
-      }
       renderActiveSchedule();
     });
     form.elements.allowMultipleMembers.addEventListener('change', () => {
@@ -1289,20 +1290,18 @@ function openTask(id) {
     updated.freeToTake = data.has('freeToTake');
     updated.flexibleSchedule = data.has('flexibleSchedule');
     if (updated.freeToTake) {
-      updated.flexibleSchedule = false;
       clearTaskAssignments(updated);
       updated.freeSince = initiallyFreeToTake
         ? task.freeSince || task.createdAt || dateKey(new Date())
         : dateKey(new Date());
-      delete updated.flexibleSince;
     } else {
       delete updated.freeSince;
-      if (updated.flexibleSchedule) {
-        updated.flexibleSince = initiallyFlexibleSchedule
-          ? task.flexibleSince || task.createdAt || dateKey(new Date())
-          : dateKey(new Date());
-      } else delete updated.flexibleSince;
     }
+    if (updated.flexibleSchedule) {
+      updated.flexibleSince = initiallyFlexibleSchedule
+        ? task.flexibleSince || task.createdAt || dateKey(new Date())
+        : dateKey(new Date());
+    } else delete updated.flexibleSince;
     if (existing) state.tasks[state.tasks.indexOf(existing)] = updated;
     else state.tasks.push(updated);
     if (await save()) { document.querySelector('#modal').close(); render(); showToast('Taak opgeslagen'); }

@@ -50,14 +50,14 @@ test('flexible monthly and yearly tasks use the calendar period without a fixed 
   assert.equal(flexibleTaskOccurrenceDate(monthly, '2026-12-01', '2026-11-15', completed), '2026-12-01');
 });
 
-test('flexible tasks appear under their assigned member until that period is completed', () => {
+test('combined free tasks stay unassigned and in the plan until the period is completed', () => {
   const app = readFileSync(require.resolve('../app'), 'utf8');
   const context = vm.createContext({
     state: {
       members: [{ id: 'm1', name: 'Ada' }],
       tasks: [{
         id: 'weekly', title: 'Badkamer schoonmaken', frequency: 'weekly',
-        flexibleSchedule: true, flexibleSince: '2026-11-16', memberIds: ['m1']
+        flexibleSchedule: true, freeToTake: true, flexibleSince: '2026-11-16', memberIds: ['m1']
       }],
       completed: {}
     },
@@ -72,18 +72,22 @@ test('flexible tasks appear under their assigned member until that period is com
   });
   vm.runInContext(readFileSync(require.resolve('../task-scheduling'), 'utf8'), context);
   vm.runInContext(
-    app.slice(app.indexOf('function membersForAssignment('), app.indexOf('function birthdaysOn(')),
+    app.slice(app.indexOf('function membersForAssignment('), app.indexOf('function birthdaysOn(')) +
+    app.slice(app.indexOf('function completionKey('), app.indexOf('function isDone(')),
     context
   );
 
   const tasksOn = date => context.tasksOn(context.parseDate(date));
   assert.equal(tasksOn('2026-11-18').length, 1);
-  assert.equal(context.membersOn(context.state.tasks[0], context.parseDate('2026-11-18'))[0].id, 'm1');
+  assert.deepEqual([...context.membersOn(context.state.tasks[0], context.parseDate('2026-11-18'))], []);
+  assert.deepEqual([...context.assignedMemberIds(context.state.tasks[0])], []);
   assert.equal(context.isScheduled(context.state.tasks[0]), true);
+  assert.equal(context.completionKey(context.state.tasks[0], context.parseDate('2026-11-18')), 'weekly|2026-11-16');
 
   context.state.completed['weekly|2026-11-16'] = { completedAt: '2026-11-18' };
   assert.equal(tasksOn('2026-11-18').length, 1);
   assert.equal(tasksOn('2026-11-19').length, 0);
+  assert.equal(tasksOn('2026-11-23').length, 1);
 });
 
 test('daily free task keeps its original instance until completed', () => {
