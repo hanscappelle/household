@@ -428,11 +428,15 @@ function currentAuthorName() {
   return currentMember()?.name || accountEmail;
 }
 
-function taskMenu(task) {
+function taskMenu(task, date, memberId) {
   if (isChild()) return '';
   const id = escapeHtml(task.id);
   const title = escapeHtml(task.title);
-  return `<button type="button" class="task-action" data-action="edit-task" data-id="${id}" aria-label="${title} bewerken">···</button>`;
+  const memberData = memberId ? ` data-member-id="${escapeHtml(memberId)}"` : '';
+  const lateAction = isLate(task, date, memberId)
+    ? `<button type="button" data-action="mark-not-late" data-id="${id}" data-date="${dateKey(date)}"${memberData}>Niet te laat</button>`
+    : '';
+  return `<div class="note-menu-wrap task-menu-wrap"><button type="button" class="note-menu-trigger task-action" data-action="toggle-note-menu" aria-label="Acties voor ${title}" aria-expanded="false">···</button><div class="note-actions-menu" hidden><button type="button" data-action="edit-task" data-id="${id}">Taak bewerken</button>${lateAction}</div></div>`;
 }
 
 function taskSchedule(task) {
@@ -501,7 +505,7 @@ function renderTaskRows(tasks, date, memberId) {
   return tasks.map(task => {
     const done = memberId ? isDone(task, date, memberId) : isDone(task, date);
     const memberData = memberId ? ` data-member-id="${escapeHtml(memberId)}"` : '';
-    return `<div class="task-row planned-task-row ${done ? 'done' : ''}"><label class="task-completion"><input class="check" type="checkbox" data-action="complete" data-id="${escapeHtml(task.id)}"${memberData} aria-label="${escapeHtml(task.title)} afronden" ${done ? 'checked' : ''}><span class="task-info"><strong>${escapeHtml(task.title)}${task.important ? '<span class="important-icon" title="Belangrijke taak" aria-label="Belangrijke taak"><svg viewBox="0 0 16 16" focusable="false"><circle cx="8" cy="8" r="7"/><path class="important-icon-mark" d="M8 3.8v5.1M8 11.5v.1"/></svg></span>' : ''}</strong><small>${frequencyLabel(task)}</small>${isLate(task, date, memberId) ? '<small class="late-label">Te laat uitgevoerd</small>' : ''}</span></label>${speakButton('speak-task', task.id, task.title, 'Taak voorlezen', taskSpeechText(task, done))}${taskMenu(task)}</div>`;
+    return `<div class="task-row planned-task-row ${done ? 'done' : ''}"><label class="task-completion"><input class="check" type="checkbox" data-action="complete" data-id="${escapeHtml(task.id)}"${memberData} aria-label="${escapeHtml(task.title)} afronden" ${done ? 'checked' : ''}><span class="task-info"><strong>${escapeHtml(task.title)}${task.important ? '<span class="important-icon" title="Belangrijke taak" aria-label="Belangrijke taak"><svg viewBox="0 0 16 16" focusable="false"><circle cx="8" cy="8" r="7"/><path class="important-icon-mark" d="M8 3.8v5.1M8 11.5v.1"/></svg></span>' : ''}</strong><small>${frequencyLabel(task)}</small>${isLate(task, date, memberId) ? '<small class="late-label">Te laat uitgevoerd</small>' : ''}</span></label>${speakButton('speak-task', task.id, task.title, 'Taak voorlezen', taskSpeechText(task, done))}${taskMenu(task, date, memberId)}</div>`;
   }).join('');
 }
 
@@ -558,6 +562,35 @@ async function updateTaskCompletion({ taskId, date, memberId, checked }) {
     state.completed[key] = completion;
   } else delete state.completed[key];
   if (await save()) render();
+}
+
+async function markCompletionNotLate({ taskId, date, memberId }) {
+  if (isChild()) return;
+  const task = state.tasks.find(item => item.id === taskId);
+  if (!task) return;
+  const selectedDate = parseDate(date);
+  if (!isLate(task, selectedDate, memberId)) return;
+  const key = completionKey(task, selectedDate);
+  const completion = state.completed[key];
+  if (completion?.memberCompletions && memberId) {
+    const record = completion.memberCompletions[memberId];
+    if (!record || typeof record !== 'object') return;
+    state.completed[key] = {
+      ...completion,
+      memberCompletions: {
+        ...completion.memberCompletions,
+        [memberId]: { ...record, completedAt: dateKey(selectedDate) }
+      }
+    };
+  } else if (completion && typeof completion === 'object') {
+    state.completed[key] = { ...completion, completedAt: dateKey(selectedDate) };
+  } else {
+    return;
+  }
+  if (await save()) {
+    render();
+    showToast('Taak gemarkeerd als niet te laat');
+  }
 }
 
 function speakText(text) {
@@ -1419,6 +1452,13 @@ document.addEventListener('click', async event => {
   if (action === 'new-note') openNewNote();
   if (action === 'new-task') openTask();
   if (action === 'edit-task') openTask(button.dataset.id);
+  if (action === 'mark-not-late') {
+    await markCompletionNotLate({
+      taskId: button.dataset.id,
+      date: button.dataset.date,
+      memberId: button.dataset.memberId
+    });
+  }
   if (action === 'sort-status') {
     statusSort = statusSort === 'scheduled-first' ? 'unscheduled-first' : 'scheduled-first';
     render();

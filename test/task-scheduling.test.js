@@ -151,6 +151,45 @@ test('flexible task completion stays on the selected planner date', async () => 
   assert.equal(context.tasksOn(context.parseDate('2026-11-21')).length, 0);
 });
 
+test('parent can mark a late shared-task completion as not late without reopening it', async () => {
+  const app = readFileSync(require.resolve('../app'), 'utf8');
+  const context = vm.createContext({
+    state: {
+      tasks: [{ id: 'shared', title: 'Badkamer', frequency: 'weekly' }],
+      completed: {
+        'shared|2026-11-16': {
+          memberCompletions: {
+            m1: { completedAt: '2026-11-20', completedByUserId: '5' },
+            m2: { completedAt: '2026-11-17', completedByUserId: '6' }
+          }
+        }
+      }
+    },
+    isChild: () => false,
+    parseDate: key => {
+      const [year, month, day] = key.split('-').map(Number);
+      return new Date(year, month - 1, day);
+    },
+    completionKey: (task, date) => `${task.id}|${context.dateKey(date)}`,
+    dateKey: date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
+    isLate: (task, date, memberId) => context.state.completed[`${task.id}|2026-11-16`]
+      ?.memberCompletions?.[memberId]?.completedAt > context.dateKey(date),
+    save: async () => true,
+    render() {},
+    showToast() {}
+  });
+  vm.runInContext(
+    app.slice(app.indexOf('async function markCompletionNotLate('), app.indexOf('function speakText(')),
+    context
+  );
+
+  await context.markCompletionNotLate({ taskId: 'shared', date: '2026-11-16', memberId: 'm1' });
+  assert.equal(context.state.completed['shared|2026-11-16'].memberCompletions.m1.completedAt, '2026-11-16');
+  assert.equal(context.state.completed['shared|2026-11-16'].memberCompletions.m1.completedByUserId, '5');
+  assert.equal(context.state.completed['shared|2026-11-16'].memberCompletions.m2.completedAt, '2026-11-17');
+  assert.ok(context.state.completed['shared|2026-11-16'].memberCompletions.m1);
+});
+
 test('daily free task keeps its original instance until completed', () => {
   const task = { id: 'daily', frequency: 'daily' };
   const completed = {};
