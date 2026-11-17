@@ -86,6 +86,7 @@ function normalizeTask(task) {
     frequency: task.frequency === 'occasional' ? 'yearly' : task.frequency,
     important: task.important === true,
     freeToTake: task.freeToTake === true,
+    flexibleSchedule: task.flexibleSchedule === true,
     allowMultipleMembers: task.allowMultipleMembers === true || legacyMultipleAssignments,
     memberId: memberIds[0] ?? '',
     memberIds,

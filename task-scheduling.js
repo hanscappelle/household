@@ -57,6 +57,47 @@ function freeTaskOccurrenceDate(task, selectedDate, freeSince, completed) {
   return null;
 }
 
+function flexibleTaskOccurrenceDate(task, selectedDate, freeSince, completed) {
+  const start = parseDate(freeSince);
+  const end = parseDate(selectedDate);
+  if (start > end || !['daily', 'weekly', 'monthly', 'yearly'].includes(task.frequency)) return null;
+
+  const periodStart = date => {
+    if (task.frequency === 'daily') return date;
+    if (task.frequency === 'weekly') {
+      const mondayOffset = (date.getDay() + 6) % 7;
+      return addDays(date, -mondayOffset);
+    }
+    if (task.frequency === 'monthly') return new Date(date.getFullYear(), date.getMonth(), 1);
+    return new Date(date.getFullYear(), 0, 1);
+  };
+  const nextPeriodStart = date => {
+    if (task.frequency === 'daily') return addDays(date, 1);
+    if (task.frequency === 'weekly') return addDays(periodStart(date), 7);
+    if (task.frequency === 'monthly') return new Date(date.getFullYear(), date.getMonth() + 1, 1);
+    return new Date(date.getFullYear() + 1, 0, 1);
+  };
+
+  let dueDate = periodStart(start);
+  if (dueDate < start) dueDate = start;
+  while (dueDate <= end) {
+    const dueDateKey = dateKey(dueDate);
+    const completion = completed[`${task.id}|${dueDateKey}`];
+    if (!completion) return dueDateKey;
+
+    const completedAt = typeof completion === 'object' &&
+      /^\d{4}-\d{2}-\d{2}$/.test(completion.completedAt || '')
+      ? completion.completedAt
+      : dueDateKey;
+    const finishedDate = completedAt > dueDateKey ? completedAt : dueDateKey;
+    if (finishedDate >= selectedDate) return dueDateKey;
+
+    dueDate = nextPeriodStart(parseDate(finishedDate));
+  }
+  return null;
+}
+
 global.freeTaskOccurrenceDate = freeTaskOccurrenceDate;
-if (typeof module !== 'undefined') module.exports = { freeTaskOccurrenceDate };
+global.flexibleTaskOccurrenceDate = flexibleTaskOccurrenceDate;
+if (typeof module !== 'undefined') module.exports = { freeTaskOccurrenceDate, flexibleTaskOccurrenceDate };
 })(globalThis);

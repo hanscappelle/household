@@ -107,6 +107,23 @@ test('saved empty member selections load and normalize without becoming assignme
   assert.equal(result.tasks[0].allowMultipleMembers, false);
 });
 
+test('flexible scheduling is preserved and requires a boolean flag', () => {
+  const task = {
+    id: 'flexible', title: 'Badkamer schoonmaken', frequency: 'weekly',
+    flexibleSchedule: true, memberIds: ['m1'], flexibleSince: '2026-11-17'
+  };
+  const result = context.validateBackup(backup(task));
+  assert.equal(result.tasks[0].flexibleSchedule, true);
+  assert.deepEqual(result.tasks[0].memberIds, ['m1']);
+
+  assert.throws(() => context.validateBackup(backup({
+    ...task, flexibleSchedule: 'yes'
+  })), /ongeldige gegevens/);
+  assert.throws(() => context.validateBackup(backup({
+    ...task, flexibleSince: 'not-a-date'
+  })), /ongeldig schema/);
+});
+
 test('invalid member IDs remain rejected', () => {
   for (const memberIds of [['invalid|id'], [null], [' ', 'm1'], ['m1', 'm1']]) {
     assert.throws(() => context.validateBackup(backup({
