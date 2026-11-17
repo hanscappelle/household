@@ -113,6 +113,8 @@ test(`accounts en opslag op ${basePath || '/'}`, { skip: !configured, timeout: 3
   ];
   const saved = await request('/api/state', { method: 'PUT', cookie: first.cookie, body: { data: changed, revision: state.json.revision } });
   assert.equal(saved.status, 200);
+  assert.deepEqual(saved.json.data, (await request('/api/state', { cookie: first.cookie })).json.data);
+  assert.equal(saved.json.revision, state.json.revision + 1);
   assert.equal((await request('/api/state', { method: 'PUT', cookie: first.cookie, body: { data: changed, revision: state.json.revision } })).status, 409);
   assert.deepEqual((await request('/api/state', { cookie: first.cookie })).json.data.groceries, changed.groceries);
   assert.equal((await request('/api/state', { cookie: first.cookie })).json.data.customization.websiteTitle, 'De familie test');

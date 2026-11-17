@@ -294,8 +294,11 @@ passende schema voorrang.
 Wijzigingen worden na opslaan aan het account op de server gekoppeld. Open je
 de app op een ander apparaat, log dan in met hetzelfde account. Gegevens
 worden niet automatisch live bijgewerkt in een al geopend tabblad: herlaad
-dat voordat je verder werkt. Bij gelijktijdige wijzigingen wordt een conflict
-gemeld in plaats van gegevens ongemerkt te overschrijven. Bij een mislukte of
+dat voordat je verder werkt. Bij het opslaan probeert de app wijzigingen aan
+verschillende gegevens automatisch samen te voegen met de nieuwste versie op
+de server. Wijzigingen aan hetzelfde item, of wijzigingen die niet veilig kunnen
+worden samengevoegd, kunnen nog steeds een conflict geven. Back-ups worden niet
+automatisch samengevoegd: terugzetten vervangt de gegevens. Bij een mislukte of
 niet bevestigde opslag kan een ouder de lokale wijziging eerst als back-up
 downloaden en daarna herladen. Kindaccounts kunnen herladen; de laatste
 niet-bevestigde wijziging kan dan verloren gaan. Terugzetten van een back-up

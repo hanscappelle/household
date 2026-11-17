@@ -36,6 +36,7 @@ function validateMealIdeas(ideas, members) {
 
 let state = null;
 let revision = null;
+let savedState = null;
 let householdInfo = { members: [], invitations: [], canInvite: false };
 let createdInvitationUrl = '';
 let createdPasswordResetUrl = '';
@@ -95,20 +96,44 @@ async function api(url, options = {}) {
   return result;
 }
 
-async function save(nextState = state) {
+async function save(nextState = state, { mergeOnConflict = true } = {}) {
   if (demoMode) return true;
   const attempted = structuredClone(nextState);
   saving = true;
   document.querySelector('#app').inert = true;
   document.querySelector('#modal').inert = true;
   try {
-    const result = await api('api/state', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data: attempted, revision })
-    });
-    revision = result.revision;
-    return true;
+    let candidate = attempted;
+    let candidateRevision = revision;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try {
+        const result = await api('api/state', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data: candidate, revision: candidateRevision })
+        });
+        const confirmed = validateBackup({ format: BACKUP_FORMAT, version: 1, data: result.data });
+        for (const key of Object.keys(nextState)) delete nextState[key];
+        Object.assign(nextState, confirmed);
+        state = nextState;
+        savedState = structuredClone(confirmed);
+        revision = result.revision;
+        return true;
+      } catch (error) {
+        if (error.status !== 409 || !mergeOnConflict || attempt === 3) throw error;
+        const latest = await api('api/state');
+        if (latest.email !== accountEmail || latest.role !== currentRole) {
+          throw new Error('Het aangemelde account is gewijzigd. Herlaad voordat je verdergaat.');
+        }
+        const remote = validateBackup({ format: BACKUP_FORMAT, version: 1, data: latest.data });
+        candidate = validateBackup({
+          format: BACKUP_FORMAT,
+          version: 1,
+          data: mergeHouseholdState(savedState, attempted, remote)
+        });
+        candidateRevision = latest.revision;
+      }
+    }
   } catch (error) {
     console.error('Gegevens opslaan mislukt:', error);
     state = attempted;
@@ -856,7 +881,7 @@ function renderHelp() {
         <p>Je kunt daar ook een JSON-back-up downloaden of terugzetten. Terugzetten vervangt de huidige gezinsgegevens; maak eventueel eerst een back-up. Bewaar het bestand veilig, want het bevat persoonlijke gegevens.</p>
       </section>
       <section class="panel help-panel"><h2>Wijzigingen op meerdere apparaten</h2>
-        <p>Wijzigingen worden op de server opgeslagen en zijn beschikbaar voor alle gezinsaccounts. Een ander geopend tabblad wordt niet automatisch bijgewerkt; herlaad de pagina voordat je daar verder werkt. Bij gelijktijdige wijzigingen kan de app een conflict melden. Herlaad dan om de meest recente gegevens te bekijken.</p>
+        <p>Wijzigingen worden op de server opgeslagen en zijn beschikbaar voor alle gezinsaccounts. Een ander geopend tabblad wordt niet automatisch bijgewerkt. Bij het opslaan probeert de app afzonderlijke wijzigingen automatisch samen te voegen. Als dezelfde gegevens gewijzigd zijn of samenvoegen niet veilig is, meldt de app een conflict. Herlaad dan om de meest recente gegevens te bekijken.</p>
       </section>
     </div>`;
 }
@@ -1045,7 +1070,7 @@ async function importBackup() {
     return;
   }
   if (!confirm('De huidige gegevens van je account worden volledig vervangen. Wil je deze back-up terugzetten?')) return;
-  if (!await save(restored)) return;
+  if (!await save(restored, { mergeOnConflict: false })) return;
   state = restored;
   taskSearch = '';
   frequencyFilter = 'all';
@@ -1692,6 +1717,7 @@ async function openAccount() {
   householdInfo = await api('api/household');
   const preferences = await api('api/preferences');
   state = validateBackup({ format: BACKUP_FORMAT, version: 1, data: result.data });
+  savedState = structuredClone(state);
   revision = result.revision;
   accountEmail = result.email;
   currentRole = result.role;
@@ -1854,6 +1880,7 @@ document.querySelector('#logout').addEventListener('click', async () => {
     }
     state = null;
     revision = null;
+    savedState = null;
     householdInfo = { members: [], invitations: [], canInvite: false };
     createdInvitationUrl = '';
     createdPasswordResetUrl = '';

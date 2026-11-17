@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
 const vm = require('node:vm');
 const { normalizeTask, validTaskAssignments } = require('../seed');
+const { mergeHouseholdState } = require('../state-merge');
 
 const app = readFileSync(require.resolve('../app'), 'utf8');
 const context = vm.createContext({
@@ -17,11 +18,25 @@ const context = vm.createContext({
   validTaskAssignments
 });
 vm.runInContext(
+  app.slice(app.indexOf('function validateMealIdeas('), app.indexOf('let state = null;')) +
   app.slice(app.indexOf('function dateKey('), app.indexOf('function addDays(')) +
   app.slice(app.indexOf('function validBackupDate('), app.indexOf('function exportBackup(')) +
   app.slice(app.indexOf('function readSchedule('), app.indexOf('function clearTaskAssignments(')),
   context
 );
+
+test('a concurrent completion of a deleted task cannot be saved as a merge', () => {
+  const base = {
+    members: [], tasks: [{ id: 't1', title: 'Taak', frequency: 'daily' }],
+    groceries: [], mealIdeas: [], notes: [], completed: {}, customization: {}
+  };
+  const local = structuredClone(base);
+  const remote = structuredClone(base);
+  local.tasks = [];
+  remote.completed['t1|2026-11-16'] = true;
+  const merged = mergeHouseholdState(base, local, remote);
+  assert.throws(() => context.validateBackup({ format: 'ons-huishouden-backup', version: 1, data: merged }), /afvinkje bevat ongeldige gegevens/);
+});
 
 function backup(task) {
   return { format: 'ons-huishouden-backup', version: 1, data: { members: [], tasks: [task], completed: {} } };

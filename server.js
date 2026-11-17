@@ -502,10 +502,10 @@ router.put('/api/state', authenticate, async (req, res) => {
   }
   const [result] = await pool.execute('UPDATE households SET data = ?, revision = revision + 1 WHERE id = ? AND revision = ?', [JSON.stringify(nextData), req.user.household_id, revision]);
   if (!result.affectedRows) return res.status(409).json({ error: 'De gegevens zijn ondertussen op een ander apparaat gewijzigd.' });
-  res.json({ revision: revision + 1 });
+  res.json({ revision: revision + 1, data: nextData });
 });
 
-for (const file of ['index.html', 'style.css', 'seed.js', 'task-scheduling.js', 'app.js']) {
+for (const file of ['index.html', 'style.css', 'seed.js', 'task-scheduling.js', 'state-merge.js', 'app.js']) {
   router.get(file === 'index.html' ? ['/', '/index.html'] : `/${file}`, (req, res) => res.sendFile(path.join(__dirname, file)));
 }
 router.use((error, req, res, next) => {
