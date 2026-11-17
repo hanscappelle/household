@@ -10,6 +10,9 @@ import android.net.Uri
 import android.net.http.SslError
 import android.os.Build
 import android.os.Bundle
+import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
+import android.util.Log
 import android.view.Gravity
 import android.view.View
 import android.view.WindowInsets
@@ -33,6 +36,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import java.io.IOException
+import java.util.Locale
 
 class MainActivity : Activity() {
     private lateinit var webView: WebView
@@ -41,6 +45,9 @@ class MainActivity : Activity() {
     private lateinit var errorView: View
     private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
     private var pendingBackupContents: String? = null
+    private var textToSpeech: TextToSpeech? = null
+    private var speechReady = false
+    private var pendingSpeech: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -59,7 +66,7 @@ class MainActivity : Activity() {
             javaScriptCanOpenWindowsAutomatically = false
             setSupportMultipleWindows(false)
         }
-        webView.addJavascriptInterface(BackupBridge(), "HouseholdAndroid")
+        webView.addJavascriptInterface(HouseholdBridge(), "HouseholdAndroid")
         CookieManager.getInstance().apply {
             setAcceptCookie(true)
             setAcceptThirdPartyCookies(webView, false)
@@ -126,6 +133,8 @@ class MainActivity : Activity() {
     }
 
     override fun onPause() {
+        pendingSpeech = null
+        textToSpeech?.stop()
         if (::webView.isInitialized) webView.onPause()
         super.onPause()
     }
@@ -176,6 +185,11 @@ class MainActivity : Activity() {
         fileChooserCallback?.onReceiveValue(null)
         fileChooserCallback = null
         pendingBackupContents = null
+        pendingSpeech = null
+        textToSpeech?.stop()
+        textToSpeech?.shutdown()
+        textToSpeech = null
+        speechReady = false
         webView.destroy()
         super.onDestroy()
     }
@@ -246,7 +260,76 @@ class MainActivity : Activity() {
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
-    private inner class BackupBridge {
+    private fun showSpeechError(message: String) {
+        Log.e("HouseholdSpeech", message)
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+    }
+
+    private fun speak(text: String) {
+        if (speechReady) {
+            if (textToSpeech?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "task") != TextToSpeech.SUCCESS) {
+                showSpeechError("Voorlezen is niet gelukt. Controleer de spraakinstellingen van je apparaat.")
+            }
+            return
+        }
+        pendingSpeech = text
+        if (textToSpeech != null) return
+        textToSpeech = TextToSpeech(this) { status ->
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                val engine = textToSpeech
+                if (status != TextToSpeech.SUCCESS || engine == null) {
+                    pendingSpeech = null
+                    engine?.shutdown()
+                    textToSpeech = null
+                    showSpeechError("Voorlezen is niet beschikbaar. Controleer de tekst-naar-spraakinstellingen van je apparaat.")
+                    return@runOnUiThread
+                }
+                var language = engine.setLanguage(Locale("nl", "BE"))
+                if (language == TextToSpeech.LANG_MISSING_DATA || language == TextToSpeech.LANG_NOT_SUPPORTED) {
+                    language = engine.setLanguage(Locale("nl", "NL"))
+                }
+                if (language == TextToSpeech.LANG_MISSING_DATA || language == TextToSpeech.LANG_NOT_SUPPORTED) {
+                    pendingSpeech = null
+                    engine.shutdown()
+                    textToSpeech = null
+                    showSpeechError("Een Nederlandse stem ontbreekt. Installeer deze in de tekst-naar-spraakinstellingen.")
+                    return@runOnUiThread
+                }
+                engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                    override fun onStart(utteranceId: String) {}
+                    override fun onDone(utteranceId: String) {}
+                    @Deprecated("Deprecated in Android")
+                    override fun onError(utteranceId: String) {
+                        runOnUiThread {
+                            if (!isFinishing && !isDestroyed) {
+                                showSpeechError("Voorlezen is niet gelukt. Controleer de spraakinstellingen van je apparaat.")
+                            }
+                        }
+                    }
+                })
+                speechReady = true
+                val queued = pendingSpeech
+                pendingSpeech = null
+                if (queued != null) speak(queued)
+            }
+        }
+    }
+
+    private inner class HouseholdBridge {
+        @JavascriptInterface
+        fun speakTask(text: String) {
+            runOnUiThread {
+                val pageUri = webView.url?.let(Uri::parse)
+                if (pageUri == null || !isHouseholdUrl(pageUri)) return@runOnUiThread
+                if (text.isBlank() || text.length >= TextToSpeech.getMaxSpeechInputLength()) {
+                    showSpeechError("De taaktekst kan niet worden voorgelezen.")
+                    return@runOnUiThread
+                }
+                speak(text)
+            }
+        }
+
         @JavascriptInterface
         fun saveBackup(fileName: String, contents: String) {
             runOnUiThread {

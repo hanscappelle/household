@@ -387,12 +387,57 @@ function renderLoadDistribution(title, loads) {
   return `<section class="daily-load"><strong>${escapeHtml(title)}</strong><ul>${loads.map(({ member, count }) => `<li><span class="load-name">${escapeHtml(member.name)}</span><span class="load-track" aria-hidden="true"><span class="load-bar" style="width:${maxLoad ? count / maxLoad * 100 : 0}%"></span></span><span class="load-count">${count} ${count === 1 ? 'taak' : 'taken'}</span></li>`).join('')}</ul></section>`;
 }
 
+function speakButton(action, id, text, title) {
+  return `<button type="button" class="task-speak" data-action="${escapeHtml(action)}" data-id="${escapeHtml(id)}" aria-label="${escapeHtml(text)} voorlezen" title="${escapeHtml(title)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/></svg></button>`;
+}
+
 function renderTaskRows(tasks, date, memberId) {
   return tasks.map(task => {
     const done = memberId ? isDone(task, date, memberId) : isDone(task, date);
     const memberData = memberId ? ` data-member-id="${escapeHtml(memberId)}"` : '';
-    return `<div class="task-row ${done ? 'done' : ''}"><input class="check" type="checkbox" data-action="complete" data-id="${escapeHtml(task.id)}"${memberData} aria-label="${escapeHtml(task.title)} afronden" ${done ? 'checked' : ''}><div class="task-info"><strong>${escapeHtml(task.title)}${task.important ? '<span class="important-icon" title="Belangrijke taak" aria-label="Belangrijke taak"><svg viewBox="0 0 16 16" focusable="false"><circle cx="8" cy="8" r="7"/><path class="important-icon-mark" d="M8 3.8v5.1M8 11.5v.1"/></svg></span>' : ''}</strong><small>${frequencyLabel(task)}</small>${isLate(task, date, memberId) ? '<small class="late-label">Te laat uitgevoerd</small>' : ''}</div>${taskMenu(task)}</div>`;
+    return `<div class="task-row planned-task-row ${done ? 'done' : ''}"><label class="task-completion"><input class="check" type="checkbox" data-action="complete" data-id="${escapeHtml(task.id)}"${memberData} aria-label="${escapeHtml(task.title)} afronden" ${done ? 'checked' : ''}><span class="task-info"><strong>${escapeHtml(task.title)}${task.important ? '<span class="important-icon" title="Belangrijke taak" aria-label="Belangrijke taak"><svg viewBox="0 0 16 16" focusable="false"><circle cx="8" cy="8" r="7"/><path class="important-icon-mark" d="M8 3.8v5.1M8 11.5v.1"/></svg></span>' : ''}</strong><small>${frequencyLabel(task)}</small>${isLate(task, date, memberId) ? '<small class="late-label">Te laat uitgevoerd</small>' : ''}</span></label>${speakButton('speak-task', task.id, task.title, 'Taak voorlezen')}${taskMenu(task)}</div>`;
   }).join('');
+}
+
+function speakText(text) {
+  if (typeof window.HouseholdAndroid?.speakTask === 'function') {
+    try {
+      window.HouseholdAndroid.speakTask(text);
+    } catch (error) {
+      console.error('Voorlezen mislukt:', error);
+      showToast('Voorlezen is niet gelukt. Controleer de spraakinstellingen van je apparaat.');
+    }
+    return;
+  }
+  if (!('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) {
+    showToast('Voorlezen is niet beschikbaar op dit apparaat.');
+    return;
+  }
+  try {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'nl-BE';
+    utterance.onerror = event => {
+      if (event.error === 'canceled' || event.error === 'interrupted') return;
+      console.error('Voorlezen mislukt:', event.error);
+      showToast('Voorlezen is niet gelukt. Controleer de spraakinstellingen van je apparaat.');
+    };
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
+  } catch (error) {
+    console.error('Voorlezen mislukt:', error);
+    showToast('Voorlezen is niet gelukt. Controleer de spraakinstellingen van je apparaat.');
+  }
+}
+
+function speakItem(action, id) {
+  const item = (action === 'speak-task' ? state.tasks : action === 'speak-member' ? state.members : state.notes)
+    .find(entry => entry.id === id);
+  if (!item) {
+    console.error('De tekst om voor te lezen is niet gevonden.');
+    showToast('De tekst om voor te lezen kon niet worden gevonden.');
+    return;
+  }
+  speakText(action === 'speak-task' ? item.title : action === 'speak-member' ? item.name : `${item.title}. ${item.description}`);
 }
 
 function memberStatistics(member) {
@@ -470,8 +515,9 @@ function renderDashboard() {
   const plannedTasksToday = tasksOn(today);
   const doneToday = plannedTasksToday.filter(task => isDone(task, today)).length;
   const birthdays = birthdaysOn(date);
-  const memberLoads = state.members.map(member => ({
+  const memberLoads = state.members.map((member, index) => ({
     member,
+    index,
     tasks: todayTasks.filter(task => membersOn(task, date).some(assigned => assigned.id === member.id))
   }));
   const freeTasks = todayTasks.filter(task => task.freeToTake);
@@ -495,7 +541,7 @@ function renderDashboard() {
       <div class="stat"><span class="stat-icon">!</span><div><strong>${importantTasks}</strong><small>Belangrijke taken deze week</small></div></div>
     </div>
     <div class="dashboard-grid">
-      <section><div class="section-heading"><div><h2>De week in beeld</h2><p>Een klein beetje planning, een groot verschil.</p></div><button class="text-button" data-action="today">Vandaag</button></div>
+      <section><div class="section-heading"><div><h2>De week in beeld</h2><p>Een klein beetje planning, een groot verschil.</p></div><button class="button" data-action="today">Vandaag</button></div>
         <div class="panel"><div class="calendar-head"><div><strong>Week ${week} <span style="color:#9eaca0;font-weight:400">· ${week % 2 ? 'oneven' : 'even'} week</span></strong><small>${escapeHtml(range)}</small></div><div class="calendar-controls"><button class="icon-button" data-action="previous-week" aria-label="Vorige week">‹</button><button class="icon-button" data-action="next-week" aria-label="Volgende week">›</button></div></div>
           <div class="weekdays">${weekDates.map(day => {
             const dayBirthdays = birthdaysOn(day);
@@ -505,7 +551,7 @@ function renderDashboard() {
           }).join('')}</div>
           <div class="day-detail"><div class="day-detail-head"><strong>${escapeHtml(formatDate(date, { weekday: 'long', day: 'numeric', month: 'long' }))}</strong><span>${todayTasks.length} ${todayTasks.length === 1 ? 'taak' : 'taken'}</span></div>
             ${birthdays.map(member => `<div class="birthday-row"><span class="birthday-icon" aria-hidden="true">🎂</span><div><strong>Verjaardag van ${escapeHtml(member.name)}</strong><small>${date.getFullYear() - parseDate(member.birthDate).getFullYear()} jaar</small></div></div>`).join('')}
-            ${memberLoads.filter(group => group.tasks.length).map(({ member, tasks }) => `<section class="day-task-group"><h3>${escapeHtml(member.name)}</h3>${renderTaskRows(tasks, date, member.id)}</section>`).join('')}
+            ${memberLoads.filter(group => group.tasks.length).map(({ member, index, tasks }) => `<section class="day-task-group"><div class="day-task-member"><h3 class="day-task-member-heading"><span aria-hidden="true">${avatar(member, index)}</span><span>${escapeHtml(member.name)}</span></h3>${speakButton('speak-member', member.id, member.name, 'Naam voorlezen')}</div>${renderTaskRows(tasks, date, member.id)}</section>`).join('')}
             ${freeTasks.length ? `<section class="day-task-group"><h3>Vrij op te nemen taken</h3>${renderTaskRows(freeTasks, date)}</section>` : ''}
             ${!todayTasks.length && !birthdays.length ? `<div class="empty"><span class="empty-icon">☼</span><strong>Een lekker lege planning</strong>Plan een taak in en hij verschijnt hier.</div>` : ''}
           </div>
@@ -536,7 +582,7 @@ function renderNoteCards(notes, type) {
     const actions = type === 'active'
       ? `<button type="button" data-action="edit-note" data-id="${noteId}">Bewerken</button><button type="button" data-action="archive-note" data-id="${noteId}">Archiveren</button>`
       : `<button type="button" data-action="restore-note" data-id="${noteId}">Herstellen</button><button type="button" data-action="delete-note" data-id="${noteId}">Definitief verwijderen</button>`;
-    return `<article class="note-card ${note.important ? 'important-note' : ''}"><div class="note-card-heading"><h3>${note.important ? '<span class="note-important-mark" aria-label="Belangrijke notitie" title="Belangrijke notitie">!</span>' : ''}${escapeHtml(note.title)}</h3>${isChild() ? '' : `<div class="note-menu-wrap"><button type="button" class="note-menu-trigger" data-action="toggle-note-menu" aria-label="Acties voor ${escapeHtml(note.title)}" aria-expanded="false">⋯</button><div class="note-actions-menu" hidden>${actions}</div></div>`}</div><p>${escapeHtml(note.description).replace(/\n/g, '<br>')}</p><small>Door ${escapeHtml(note.author)}${note.editedBy ? ` · Bewerkt door ${escapeHtml(note.editedBy)}${note.editedAt ? ` op ${escapeHtml(new Date(note.editedAt).toLocaleString('nl-BE'))}` : ''}` : ''}</small></article>`;
+    return `<article class="note-card ${note.important ? 'important-note' : ''}"><div class="note-card-heading"><h3>${note.important ? '<span class="note-important-mark" aria-label="Belangrijke notitie" title="Belangrijke notitie">!</span>' : ''}${escapeHtml(note.title)}</h3><div class="note-card-actions">${type === 'active' ? speakButton('speak-note', note.id, note.title, 'Notitie voorlezen') : ''}${isChild() ? '' : `<div class="note-menu-wrap"><button type="button" class="note-menu-trigger" data-action="toggle-note-menu" aria-label="Acties voor ${escapeHtml(note.title)}" aria-expanded="false">⋯</button><div class="note-actions-menu" hidden>${actions}</div></div>`}</div></div><p>${escapeHtml(note.description).replace(/\n/g, '<br>')}</p><small>Door ${escapeHtml(note.author)}${note.editedBy ? ` · Bewerkt door ${escapeHtml(note.editedBy)}${note.editedAt ? ` op ${escapeHtml(new Date(note.editedAt).toLocaleString('nl-BE'))}` : ''}` : ''}</small></article>`;
   }).join('');
 }
 
@@ -1157,6 +1203,7 @@ document.addEventListener('click', async event => {
     return;
   }
   closeNoteMenus();
+  if (action === 'speak-task' || action === 'speak-member' || action === 'speak-note') speakItem(action, button.dataset.id);
   if (action === 'new-note') openNewNote();
   if (action === 'new-task') openTask();
   if (action === 'edit-task') openTask(button.dataset.id);

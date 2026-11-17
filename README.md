@@ -244,6 +244,7 @@ staat naast de weekplanning en de notities staan daaronder. Voeg een notitie
 toe met de plusknop. Via het driepuntjesmenu op een post-it kun je die
 bewerken of archiveren; in het archief gebruik je hetzelfde menu om een
 notitie te herstellen of definitief te verwijderen.
+Met de luidsprekerknop op een post-it lees je de titel en beschrijving voor.
 Archiveer notities om ze van het overzicht te halen. Via **Notitiearchief**
 kun je ze herstellen of definitief verwijderen.
 
@@ -270,6 +271,11 @@ geplande datum. Bestaande planningen worden automatisch overgenomen.
 De tegels boven de weekplanning tonen het aantal geplande taken vandaag,
 afgeronde taken vandaag en ingeplande belangrijke taken in de weergegeven week.
 De taken van de geselecteerde dag staan gegroepeerd per verantwoordelijke.
+Met de luidsprekerknop naast een taak of gezinslid kan ieder profiel de
+taaknaam of naam voorlezen.
+De website gebruikt hiervoor de spraakfunctie van de browser. De Android-app
+gebruikt de tekst-naar-spraakfunctie van het apparaat. Installeer zo nodig een
+Nederlandse stem via de tekst-naar-spraakinstellingen van Android.
 Voor de geselecteerde dag toont de staafgrafiek **Verdeling per gezinslid**
 hoeveel taken ieder gezinslid heeft, inclusief afgevinkte taken. De langste
 staaf geeft het hoogste aantal van die dag weer. Verjaardagen tellen niet mee.
