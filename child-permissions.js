@@ -17,6 +17,22 @@ function validId(id) {
   return typeof id === 'string' && id.trim() !== '' && !id.includes('|');
 }
 
+function validCompletion(value) {
+  if (typeof value === 'boolean') return true;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const keys = Object.keys(value);
+  const validDate = typeof value.completedAt === 'string' &&
+    /^\d{4}-\d{2}-\d{2}$/.test(value.completedAt) &&
+    !Number.isNaN(Date.parse(`${value.completedAt}T00:00:00Z`)) &&
+    new Date(`${value.completedAt}T00:00:00Z`).toISOString().slice(0, 10) === value.completedAt;
+  const validActor = actor => actor == null ||
+    typeof actor === 'string' && actor.trim() !== '' ||
+    typeof actor === 'number' && Number.isSafeInteger(actor) && actor > 0;
+  return keys.length > 0 &&
+    keys.every(key => ['completedAt', 'completedByUserId', 'completedByMemberId'].includes(key)) &&
+    validDate && validActor(value.completedByUserId) && validActor(value.completedByMemberId);
+}
+
 function allowedList(previous, submitted, mutableKeys, validItem, validNew) {
   if (!Array.isArray(submitted)) return false;
   const oldById = new Map(previous.map(item => [item.id, item]));
@@ -48,7 +64,7 @@ function childChangesAllowed(previous, submitted, defaultCustomization) {
     const [id, date, extra] = key.split('|');
     const parsed = /^\d{4}-\d{2}-\d{2}$/.test(date || '') ? new Date(`${date}T00:00:00Z`) : null;
     return extra === undefined && taskIds.has(id) && parsed && !Number.isNaN(parsed.getTime()) &&
-      parsed.toISOString().slice(0, 10) === date && typeof value === 'boolean';
+      parsed.toISOString().slice(0, 10) === date && validCompletion(value);
   })) return false;
 
   const validName = item => typeof item.name === 'string' && Boolean(item.name.trim()) && item.name.length <= 120;

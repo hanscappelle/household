@@ -96,6 +96,13 @@ function normalizeTask(task) {
   };
 }
 
+function validTaskAssignments(value) {
+  const validId = id => typeof id === 'string' && id.trim() !== '' && !id.includes('|');
+  return Array.isArray(value)
+    ? new Set(value).size === value.length && value.every(id => id === '' || validId(id))
+    : value === '' || validId(value);
+}
+
 if (typeof module !== 'undefined') {
-  module.exports = { SEED_MEMBERS, SEED_TASKS, SEED_MEAL_IDEAS, normalizeTask };
+  module.exports = { SEED_MEMBERS, SEED_TASKS, SEED_MEAL_IDEAS, normalizeTask, validTaskAssignments };
 }

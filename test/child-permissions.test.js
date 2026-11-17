@@ -84,12 +84,26 @@ test('oude gegevens en nieuwe gezinsprofielen blijven bruikbaar', () => {
   assert.equal(childChangesAllowed(old, data, defaults), true);
 });
 
-test('kind kan taken met meerdere toegewezen gezinsleden ongewijzigd afvinken', () => {
+test('kind kan ook een te late taak met meerdere toegewezen gezinsleden afvinken', () => {
   const previous = clientState();
   previous.tasks[0].dailyAssignments[1] = ['m1', 'm2'];
   const submitted = structuredClone(previous);
-  submitted.completed['t1|2026-11-16'] = true;
+  const scheduledDate = '2026-11-16';
+  const completedDate = '2026-11-17';
+  submitted.completed[`t1|${scheduledDate}`] = {
+    completedAt: completedDate,
+    completedByUserId: '5'
+  };
+  assert.ok(completedDate > scheduledDate);
   assert.equal(childChangesAllowed(previous, submitted, defaults), true);
+
+  const unchecked = structuredClone(submitted);
+  delete unchecked.completed['t1|2026-11-16'];
+  assert.equal(childChangesAllowed(submitted, unchecked, defaults), true);
+
+  const invalid = structuredClone(previous);
+  invalid.completed['t1|2026-11-16'] = { completedAt: '2026-02-30', completedByUserId: '5' };
+  assert.equal(childChangesAllowed(previous, invalid, defaults), false);
 });
 
 test('oude sporadische taken worden jaarlijkse taken', () => {

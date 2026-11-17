@@ -269,6 +269,17 @@ function isDone(task, date) {
   return Boolean(state.completed[completionKey(task, date)]);
 }
 
+function completionDate(value) {
+  return value && typeof value === 'object' && validBackupDate(value.completedAt)
+    ? value.completedAt
+    : null;
+}
+
+function isLate(task, date) {
+  const completedAt = completionDate(state.completed[completionKey(task, date)]);
+  return completedAt !== null && completedAt > dateKey(date);
+}
+
 function showToast(message) {
   const toast = document.querySelector('#toast');
   toast.textContent = message;
@@ -348,6 +359,7 @@ function memberStatistics(member) {
   const end = parseDate(dateKey(new Date()));
   let scheduled = 0;
   let completed = 0;
+  let completedLate = 0;
   for (let date = start; date <= end; date = addDays(date, 1)) {
     for (const task of state.tasks) {
       if (occursOn(task, date) && membersOn(task, date).some(assigned => assigned.id === member.id)) {
@@ -358,6 +370,18 @@ function memberStatistics(member) {
   }
   const creator = demoMode ? member.id : householdInfo.members.find(item =>
     item.email.toLowerCase() === member.email?.toLowerCase())?.id;
+  if (creator != null) {
+    const taskIds = new Set(state.tasks.map(task => task.id));
+    completedLate = Object.entries(state.completed).filter(([key, value]) => {
+      const [taskId, dueDate] = key.split('|');
+      const completedAt = completionDate(value);
+      const completedBy = demoMode ? value.completedByMemberId : value.completedByUserId;
+      return taskIds.has(taskId) && validBackupDate(dueDate) &&
+        completedAt !== null && completedAt > dueDate &&
+        completedAt >= member.createdAt && completedAt <= dateKey(end) &&
+        String(completedBy) === String(creator);
+    }).length;
+  }
   const collections = [
     { key: 'tasks', label: 'Aangemaakte taken' },
     { key: 'groceries', label: 'Aangemaakte boodschappen' },
@@ -373,7 +397,7 @@ function memberStatistics(member) {
       : String(item.createdByUserId) === String(creator))).length;
     return { label, count, percentage: inRange.length ? Math.round(count / inRange.length * 100) : 0 };
   });
-  return { scheduled, completed, creations };
+  return { scheduled, completed, completedLate, creations };
 }
 
 function localCreationMetadata() {
@@ -399,8 +423,9 @@ function renderMemberStatistics(member) {
     ${statistics ? `<div class="stats member-statistics">
       <div class="stat"><span class="stat-icon">◷</span><div><strong>${statistics.scheduled}</strong><small>Ingeplande taken</small></div></div>
       <div class="stat"><span class="stat-icon">✓</span><div><strong>${statistics.completed}</strong><small>Uitgevoerde taken</small></div></div>
+      <div class="stat"><span class="stat-icon">!</span><div><strong>${statistics.completedLate}</strong><small>Te laat uitgevoerde taken</small></div></div>
       ${statistics.creations.map(({ label, count, percentage }) => `<div class="stat"><span class="stat-icon">＋</span><div><strong>${count}</strong><small>${escapeHtml(label)} · ${percentage}% van gezin</small></div></div>`).join('')}
-    </div><p class="member-statistics-note">Taken zijn geteld op basis van de huidige planning en opgeslagen afvinkjes. De percentages zijn het aandeel van alle geregistreerde aanmaakacties in die categorie sinds de aanmaakdatum. Oudere items zonder makerregistratie tellen niet mee. Voor makerstatistieken moet het account via het e-mailadres aan een gezinslid zijn gekoppeld.</p>` : '<div class="panel member-statistics-empty">Er zijn nog geen statistieken te berekenen. Vul de aanmaakdatum in via <a href="#gezin">Ons gezin</a> → <strong>Gegevens bewerken</strong>.</div>'}`;
+    </div><p class="member-statistics-note">Taken zijn geteld op basis van de huidige planning en opgeslagen afvinkjes. Te laat uitgevoerde taken worden toegerekend aan het account dat ze heeft afgevinkt. De percentages zijn het aandeel van alle geregistreerde aanmaakacties in die categorie sinds de aanmaakdatum. Oudere items zonder makerregistratie tellen niet mee. Voor makerstatistieken moet het account via het e-mailadres aan een gezinslid zijn gekoppeld.</p>` : '<div class="panel member-statistics-empty">Er zijn nog geen statistieken te berekenen. Vul de aanmaakdatum in via <a href="#gezin">Ons gezin</a> → <strong>Gegevens bewerken</strong>.</div>'}`;
 }
 
 function renderDashboard() {
@@ -448,7 +473,7 @@ function renderDashboard() {
           }).join('')}</div>
           <div class="day-detail"><div class="day-detail-head"><strong>${escapeHtml(formatDate(date, { weekday: 'long', day: 'numeric', month: 'long' }))}</strong><span>${todayTasks.length} ${todayTasks.length === 1 ? 'taak' : 'taken'}</span></div>
             ${birthdays.map(member => `<div class="birthday-row"><span class="birthday-icon" aria-hidden="true">🎂</span><div><strong>Verjaardag van ${escapeHtml(member.name)}</strong><small>${date.getFullYear() - parseDate(member.birthDate).getFullYear()} jaar</small></div></div>`).join('')}
-            ${memberLoads.filter(group => group.tasks.length).map(({ member, tasks }) => `<section class="day-task-group"><h3>${escapeHtml(member.name)}</h3>${tasks.map(task => `<div class="task-row ${isDone(task, date) ? 'done' : ''}"><input class="check" type="checkbox" data-action="complete" data-id="${escapeHtml(task.id)}" aria-label="${escapeHtml(task.title)} afronden" ${isDone(task, date) ? 'checked' : ''}><div class="task-info"><strong>${escapeHtml(task.title)}${task.important ? '<span class="important-icon" title="Belangrijke taak" aria-label="Belangrijke taak"><svg viewBox="0 0 16 16" focusable="false"><circle cx="8" cy="8" r="7"/><path class="important-icon-mark" d="M8 3.8v5.1M8 11.5v.1"/></svg></span>' : ''}</strong><small>${frequencyLabel(task)}</small></div>${taskMenu(task)}</div>`).join('')}</section>`).join('')}
+            ${memberLoads.filter(group => group.tasks.length).map(({ member, tasks }) => `<section class="day-task-group"><h3>${escapeHtml(member.name)}</h3>${tasks.map(task => `<div class="task-row ${isDone(task, date) ? 'done' : ''}"><input class="check" type="checkbox" data-action="complete" data-id="${escapeHtml(task.id)}" aria-label="${escapeHtml(task.title)} afronden" ${isDone(task, date) ? 'checked' : ''}><div class="task-info"><strong>${escapeHtml(task.title)}${task.important ? '<span class="important-icon" title="Belangrijke taak" aria-label="Belangrijke taak"><svg viewBox="0 0 16 16" focusable="false"><circle cx="8" cy="8" r="7"/><path class="important-icon-mark" d="M8 3.8v5.1M8 11.5v.1"/></svg></span>' : ''}</strong><small>${frequencyLabel(task)}</small>${isLate(task, date) ? '<small class="late-label">Te laat uitgevoerd</small>' : ''}</div>${taskMenu(task)}</div>`).join('')}</section>`).join('')}
             ${!todayTasks.length && !birthdays.length ? `<div class="empty"><span class="empty-icon">☼</span><strong>Een lekker lege planning</strong>Plan een taak in en hij verschijnt hier.</div>` : ''}
           </div>
         </div>
@@ -654,6 +679,7 @@ function renderHelp() {
         <p>Naast de weekplanning zie je de gezinsleden; daaronder staan gedeelde notities als post-its. Kies <strong>Notitie toevoegen</strong> om in een venster een titel en beschrijving in te vullen. De auteur wordt automatisch ingevuld. Zet eventueel <strong>Markeer als belangrijk</strong> aan; dit staat standaard uit. Belangrijke notities krijgen een uitroepteken en staan bovenaan.</p>
         <p>Open het driepuntjesmenu op een post-it om die te bewerken of te archiveren. Bij bewerken door een ander gezinslid worden diens naam en bewerktijd vermeld. Gearchiveerde notities verdwijnen van het overzicht. Via <a href="#notitiearchief">Notitiearchief</a> kun je ze herstellen of definitief verwijderen.</p>
         <p>Op <a href="#taken">Alle taken</a> kun je een taak openen om de planning te wijzigen. Kies per dag, week, maand of eenmalige datum wie de taak uitvoert. Standaard wijs je de taak aan één gezinslid toe; zet <strong>Taak door meerdere gezinsleden laten uitvoeren</strong> aan om meerdere personen te selecteren. Markeer in het taakformulier belangrijke taken; die herken je aan het label <strong>Belangrijk</strong>. Gebruik de zoekbalk en filters om taken terug te vinden.</p>
+        <p>Vink je een taak na de geplande dag af, dan krijgt die het label <strong>Te laat uitgevoerd</strong>. Bij elk gezinslid kun je via <strong>Statistieken bekijken</strong> zien hoeveel taken die gebruiker te laat heeft afgevinkt.</p>
       </section>
       <section class="panel help-panel"><h2>Gezinsleden</h2>
         <p>Voeg op <a href="#gezin">Ons gezin</a> gezinsleden toe en bewerk hun naam, geboortedatum en optioneel e-mailadres. Een geboortedatum wordt gebruikt om de leeftijd te tonen en verjaardagen op het overzicht te markeren.</p>
@@ -738,9 +764,7 @@ function validateBackup(backup) {
     memberIds.add(member.id);
   }
   const validAssignment = value => value === '' || id(value);
-  const validAssignments = value => Array.isArray(value)
-    ? new Set(value).size === value.length && value.every(id)
-    : validAssignment(value);
+  const validAssignments = validTaskAssignments;
   const validSchedule = schedule => {
     if (!object(schedule) || (!Object.hasOwn(FREQUENCIES, schedule.frequency) && schedule.frequency !== 'occasional') || !optionalString(schedule.memberId) ||
       (schedule.memberId && !validAssignment(schedule.memberId)) ||
@@ -771,7 +795,15 @@ function validateBackup(backup) {
   }
   for (const [key, value] of Object.entries(data.completed)) {
     const parts = key.split('|');
-    if (parts.length !== 2 || !taskIds.has(parts[0]) || !validBackupDate(parts[1]) || typeof value !== 'boolean') throw new Error('Een afvinkje bevat ongeldige gegevens.');
+    const completionKeys = value && typeof value === 'object' && !Array.isArray(value) ? Object.keys(value) : [];
+    const validActor = actor => actor == null || typeof actor === 'string' && actor.trim() !== '' ||
+      typeof actor === 'number' && Number.isSafeInteger(actor) && actor > 0;
+    const validRecord = completionKeys.length >= 1 && completionKeys.every(field =>
+      ['completedAt', 'completedByUserId', 'completedByMemberId'].includes(field)) &&
+      validBackupDate(value.completedAt) &&
+      validActor(value.completedByUserId) && validActor(value.completedByMemberId);
+    if (parts.length !== 2 || !taskIds.has(parts[0]) || !validBackupDate(parts[1]) ||
+        typeof value !== 'boolean' && !validRecord) throw new Error('Een afvinkje bevat ongeldige gegevens.');
   }
   if (data.groceries !== undefined && !Array.isArray(data.groceries)) throw new Error('De boodschappenlijst is ongeldig.');
   const groceryIds = new Set();
@@ -1189,7 +1221,16 @@ document.addEventListener('change', async event => {
     const task = state.tasks.find(item => item.id === target.dataset.id);
     if (!task) return;
     const key = completionKey(task, parseDate(selectedDate));
-    if (target.checked) state.completed[key] = true;
+    if (target.checked) {
+      const completion = { completedAt: dateKey(new Date()) };
+      if (demoMode) {
+        const member = currentMember();
+        if (member) completion.completedByMemberId = member.id;
+      } else {
+        completion.completedByUserId = currentUserId;
+      }
+      state.completed[key] = completion;
+    }
     else delete state.completed[key];
     if (await save()) render();
   }

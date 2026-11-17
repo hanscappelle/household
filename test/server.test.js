@@ -100,6 +100,12 @@ test(`accounts en opslag op ${basePath || '/'}`, { skip: !configured, timeout: 3
   changed.customization.websiteTitle = 'De familie test';
   changed.customization.brandSubtitle = 'SAMEN STERK';
   changed.tasks[0].important = true;
+  const completedAt = new Date().toISOString().slice(0, 10);
+  const dueDate = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  changed.completed[`${changed.tasks[0].id}|${dueDate}`] = {
+    completedAt,
+    completedByUserId: 'spoofed-user'
+  };
   changed.groceries.push({ id: 'test', name: 'Melk', done: false, urgent: false });
   changed.notes = [
     { id: 'note-test', title: 'Testnotitie', description: 'Een beschrijving', author: 'Niet vertrouwen', archived: false, important: true },
@@ -112,6 +118,12 @@ test(`accounts en opslag op ${basePath || '/'}`, { skip: !configured, timeout: 3
   assert.equal((await request('/api/state', { cookie: first.cookie })).json.data.customization.websiteTitle, 'De familie test');
   assert.equal((await request('/api/state', { cookie: first.cookie })).json.data.customization.brandSubtitle, 'SAMEN STERK');
   assert.equal((await request('/api/state', { cookie: first.cookie })).json.data.tasks[0].important, true);
+  const savedCompletion = (await request('/api/state', { cookie: first.cookie })).json.data.completed[
+    `${changed.tasks[0].id}|${dueDate}`
+  ];
+  assert.equal(savedCompletion.completedAt, completedAt);
+  const householdMembers = (await request('/api/household', { cookie: first.cookie })).json.members;
+  assert.equal(String(savedCompletion.completedByUserId), String(householdMembers.find(member => member.email === emails[0]).id));
   assert.equal((await request('/api/state', { cookie: first.cookie })).json.data.notes[0].author, emails[0]);
   assert.equal((await request('/api/state', { cookie: first.cookie })).json.data.notes[0].important, true);
   assert.equal((await request('/api/state', { cookie: first.cookie })).json.data.notes[1].important, false);

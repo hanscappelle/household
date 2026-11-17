@@ -4,7 +4,7 @@ const express = require('express');
 const { rateLimit } = require('express-rate-limit');
 const mysql = require('mysql2/promise');
 const { randomBytes, scrypt: scryptCallback, timingSafeEqual, createHash } = require('node:crypto');
-const { promisify } = require('node:util');
+const { promisify, isDeepStrictEqual } = require('node:util');
 const path = require('node:path');
 const { SEED_MEMBERS, SEED_TASKS, SEED_MEAL_IDEAS } = require('./seed');
 const { registerCreatedItems } = require('./creation-metadata');
@@ -99,6 +99,21 @@ const notesValid = notes => Array.isArray(notes) && notes.length <= 1000 &&
     (note.editedBy == null || typeof note.editedBy === 'string' && note.editedBy.length <= 254) &&
     (note.editedAt == null || typeof note.editedAt === 'string' &&
       (note.editedAt === '' || Number.isFinite(Date.parse(note.editedAt)))));
+const validCompletion = value => {
+  if (typeof value === 'boolean') return true;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const keys = Object.keys(value);
+  const validDate = typeof value.completedAt === 'string' &&
+    /^\d{4}-\d{2}-\d{2}$/.test(value.completedAt) &&
+    !Number.isNaN(Date.parse(`${value.completedAt}T00:00:00Z`)) &&
+    new Date(`${value.completedAt}T00:00:00Z`).toISOString().slice(0, 10) === value.completedAt;
+  const validActor = actor => actor == null ||
+    typeof actor === 'string' && actor.trim() !== '' ||
+    typeof actor === 'number' && Number.isSafeInteger(actor) && actor > 0;
+  return keys.length > 0 &&
+    keys.every(key => ['completedAt', 'completedByUserId', 'completedByMemberId'].includes(key)) &&
+    validDate && validActor(value.completedByUserId) && validActor(value.completedByMemberId);
+};
 const customizationLimits = { websiteTitle: 60, brandSubtitle: 40, welcomeTitle: 80, welcomeText: 160, sidebarTitle: 100, sidebarText: 200 };
 const defaultCustomization = {
   websiteTitle: 'Ons huishouden',
@@ -411,7 +426,7 @@ router.put('/api/state', authenticate, async (req, res) => {
   if (!Number.isSafeInteger(revision) || revision < 1 || !data || typeof data !== 'object' || Array.isArray(data) ||
       !Array.isArray(data.members) || !Array.isArray(data.tasks) || !Array.isArray(data.groceries) ||
       !Array.isArray(data.mealIdeas) || !data.completed || typeof data.completed !== 'object' || Array.isArray(data.completed) ||
-      notesInvalid) {
+      !Object.values(data.completed).every(validCompletion) || notesInvalid) {
     return res.status(400).json({ error: 'Ongeldige gegevens of revisie.' });
   }
   const [currentRows] = await pool.execute('SELECT data FROM households WHERE id = ? AND revision = ?', [req.user.household_id, revision]);
@@ -444,7 +459,13 @@ router.put('/api/state', authenticate, async (req, res) => {
     };
   });
   const createdAt = new Date().toISOString().slice(0, 10);
-  let nextData = { ...data, notes };
+  const completed = Object.fromEntries(Object.entries(data.completed).map(([key, value]) => {
+    if (!value || typeof value !== 'object' || isDeepStrictEqual(value, currentData.completed?.[key])) {
+      return [key, value];
+    }
+    return [key, { completedAt: value.completedAt, completedByUserId: req.user.id }];
+  }));
+  let nextData = { ...data, completed, notes };
   for (const collection of ['tasks', 'groceries', 'mealIdeas', 'notes']) {
     nextData[collection] = registerCreatedItems(currentData[collection], nextData[collection], req.user.id, createdAt);
   }
