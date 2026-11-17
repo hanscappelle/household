@@ -414,6 +414,7 @@ function renderLoadDistribution(title, loads) {
 }
 
 function speakButton(action, id, text, title, speechText, visibleLabel = '') {
+  if (!isChild()) return '';
   const speechData = speechText ? ` data-speech-text="${escapeHtml(speechText)}"` : '';
   return `<button type="button" class="task-speak" data-action="${escapeHtml(action)}" data-id="${escapeHtml(id)}"${speechData} aria-label="${escapeHtml(text)} voorlezen" title="${escapeHtml(title)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/></svg>${visibleLabel ? `<span>${escapeHtml(visibleLabel)}</span>` : ''}</button>`;
 }

@@ -244,7 +244,8 @@ staat naast de weekplanning en de notities staan daaronder. Voeg een notitie
 toe met de plusknop. Via het driepuntjesmenu op een post-it kun je die
 bewerken of archiveren; in het archief gebruik je hetzelfde menu om een
 notitie te herstellen of definitief te verwijderen.
-Met de luidsprekerknop op een post-it lees je de titel en beschrijving voor.
+Kindaccounts kunnen met de luidsprekerknop op een post-it de titel en
+beschrijving laten voorlezen.
 Archiveer notities om ze van het overzicht te halen. Via **Notitiearchief**
 kun je ze herstellen of definitief verwijderen.
 
@@ -271,8 +272,8 @@ geplande datum. Bestaande planningen worden automatisch overgenomen.
 De tegels boven de weekplanning tonen het aantal geplande taken vandaag,
 afgeronde taken vandaag en ingeplande belangrijke taken in de weergegeven week.
 De taken van de geselecteerde dag staan gegroepeerd per verantwoordelijke.
-Met de luidsprekerknop naast een taak of gezinslid kan ieder profiel de
-taaknaam of naam voorlezen.
+Kindaccounts kunnen met de luidsprekerknop naast een taak of gezinslid de
+taaknaam of naam laten voorlezen. Ouders zien deze knoppen niet.
 De website gebruikt hiervoor de spraakfunctie van de browser. De Android-app
 gebruikt de tekst-naar-spraakfunctie van het apparaat. Installeer zo nodig een
 Nederlandse stem via de tekst-naar-spraakinstellingen van Android.
@@ -322,6 +323,7 @@ ook weer uitvinken. De gerechten met de meeste wensen staan bovenaan. Per
 gerecht zie je het aantal geïnteresseerde gezinsleden en een markering als
 meer dan de helft van de gezinsleden er zin in heeft. Met **Recept zoeken**
 open je een zoekopdracht voor recepten van dat gerecht in een nieuw tabblad.
+Kindaccounts kunnen een gerecht met de luidsprekerknop laten voorlezen.
 Bij het verwijderen van een gezinslid verdwijnen diens wensen, maar de
 gerechten blijven staan. De lijst hoort bij je account.
 
