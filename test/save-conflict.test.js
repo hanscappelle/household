@@ -19,7 +19,10 @@ function setup(api) {
   };
   const context = vm.createContext({
     api, document, mergeHouseholdState, structuredClone, console: { error() {} },
-    validateBackup: backup => structuredClone(backup.data),
+    validateBackup: backup => {
+      if (!backup.data || typeof backup.data !== 'object') throw new Error('Onbekend back-upformaat of versie.');
+      return structuredClone(backup.data);
+    },
     BACKUP_FORMAT: 'ons-huishouden-backup', state: structuredClone(base),
     savedState: structuredClone(base), revision: 1, demoMode: false, saving: false,
     needsRecovery: false, accountEmail: 'a@example.test', currentRole: 'owner', isChild: () => false
@@ -110,4 +113,60 @@ test('does not retry after the session switches accounts', async () => {
   assert.equal(await context.save(structuredClone(base)), false);
   assert.equal(calls, 2);
   assert.match(context.document.querySelector('#recovery-message').textContent, /account is gewijzigd/);
+});
+
+test('reads the saved state from older servers that return only a revision', async () => {
+  let calls = 0;
+  let base;
+  const { context, base: initial } = setup(async (url, options) => {
+    calls++;
+    if (options) return { revision: 2 };
+    return {
+      email: 'a@example.test', role: 'owner', revision: 3,
+      data: { ...base, groceries: [
+        { id: 'local', name: 'Brood', done: false, createdByUserId: 7 },
+        { id: 'remote', name: 'Melk', done: false }
+      ] }
+    };
+  });
+  base = initial;
+  const next = structuredClone(base);
+  next.groceries.push({ id: 'local', name: 'Brood', done: false });
+  assert.equal(await context.save(next), true);
+  assert.equal(calls, 2);
+  assert.equal(context.revision, 3);
+  assert.equal(next.groceries[0].createdByUserId, 7);
+  assert.equal(next.groceries[1].id, 'remote');
+  assert.deepEqual(context.savedState, next);
+});
+
+test('reports a confirmed write if reloading its data fails, without retrying the write', async () => {
+  let calls = 0;
+  const { context, base } = setup(async (url, options) => {
+    calls++;
+    if (options) return { revision: 2 };
+    throw new Error('Verbinding verbroken');
+  });
+  assert.equal(await context.save(structuredClone(base)), false);
+  assert.equal(calls, 2);
+  assert.match(context.document.querySelector('#recovery-message').textContent, /wijziging is opgeslagen/);
+  assert.equal(context.document.querySelector('#recovery-title').textContent, 'Opgeslagen gegevens niet geladen');
+  assert.doesNotMatch(context.document.querySelector('#recovery-advice').textContent, /mogelijk niet opgeslagen/);
+  assert.equal(context.needsRecovery, true);
+});
+
+test('rejects a stale read after a confirmed write', async () => {
+  let base;
+  const { context, base: initial } = setup(async (url, options) => options
+    ? { revision: 2 }
+    : { email: 'a@example.test', role: 'owner', revision: 1, data: base });
+  base = initial;
+  assert.equal(await context.save(structuredClone(base)), false);
+  assert.match(context.document.querySelector('#recovery-message').textContent, /verouderde of ongeldige revisie/);
+});
+
+test('does not accept an invalid successful save response', async () => {
+  const { context, base } = setup(async () => ({ revision: 5, data: base }));
+  assert.equal(await context.save(structuredClone(base)), false);
+  assert.match(context.document.querySelector('#recovery-message').textContent, /ongeldige revisie/);
 });

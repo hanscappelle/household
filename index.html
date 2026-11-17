@@ -8,7 +8,6 @@
   <link rel="stylesheet" href="style.css">
   <script defer src="seed.js"></script>
   <script defer src="task-scheduling.js"></script>
-  <script defer src="state-merge.js"></script>
   <script defer src="app.js"></script>
 </head>
 <body>
@@ -102,7 +101,7 @@
   </dialog>
   <section class="recovery" id="recovery" role="alert" hidden>
     <div class="panel auth-panel">
-      <h2>Opslaan niet bevestigd</h2>
+      <h2 id="recovery-title">Opslaan niet bevestigd</h2>
       <p id="recovery-message"></p>
       <p id="recovery-advice">Download eventueel eerst een back-up van je laatste wijziging. Herlaad daarna om de gegevens op de server te bekijken. Je kunt de back-up desgewenst terugzetten.</p>
       <button class="button" id="recovery-export" type="button">Back-up downloaden</button>

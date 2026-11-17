@@ -3,6 +3,8 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { mergeHouseholdState } = require('../state-merge');
+const { readFileSync } = require('node:fs');
+const vm = require('node:vm');
 
 function data() {
   return {
@@ -12,6 +14,21 @@ function data() {
     mealIdeas: [], notes: [], completed: {}, customization: { websiteTitle: 'Thuis', welcomeTitle: 'Welkom' }
   };
 }
+
+test('merge is available in the browser from the script served by older servers', () => {
+  const seed = readFileSync(require.resolve('../seed'), 'utf8');
+  const browser = vm.createContext({});
+  vm.runInContext(seed, browser);
+  assert.equal(typeof browser.mergeHouseholdState, 'function');
+  const base = data();
+  const local = structuredClone(base);
+  const remote = structuredClone(base);
+  local.tasks[0].title = 'Eerste aangepast';
+  remote.tasks[1].title = 'Tweede aangepast';
+  const merged = browser.mergeHouseholdState(base, local, remote);
+  assert.equal(merged.tasks[0].title, 'Eerste aangepast');
+  assert.equal(merged.tasks[1].title, 'Tweede aangepast');
+});
 
 test('merges independent additions, edits, deletions and completion keys', () => {
   const base = data();

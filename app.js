@@ -100,25 +100,20 @@ async function save(nextState = state, { mergeOnConflict = true } = {}) {
   if (demoMode) return true;
   const attempted = structuredClone(nextState);
   saving = true;
+  let writeConfirmed = false;
   document.querySelector('#app').inert = true;
   document.querySelector('#modal').inert = true;
   try {
     let candidate = attempted;
     let candidateRevision = revision;
     for (let attempt = 0; attempt < 4; attempt++) {
+      let result;
       try {
-        const result = await api('api/state', {
+        result = await api('api/state', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ data: candidate, revision: candidateRevision })
         });
-        const confirmed = validateBackup({ format: BACKUP_FORMAT, version: 1, data: result.data });
-        for (const key of Object.keys(nextState)) delete nextState[key];
-        Object.assign(nextState, confirmed);
-        state = nextState;
-        savedState = structuredClone(confirmed);
-        revision = result.revision;
-        return true;
       } catch (error) {
         if (error.status !== 409 || !mergeOnConflict || attempt === 3) throw error;
         const latest = await api('api/state');
@@ -132,18 +127,47 @@ async function save(nextState = state, { mergeOnConflict = true } = {}) {
           data: mergeHouseholdState(savedState, attempted, remote)
         });
         candidateRevision = latest.revision;
+        continue;
       }
+      writeConfirmed = true;
+      if (!Number.isSafeInteger(result.revision) || result.revision !== candidateRevision + 1) {
+        throw new Error('De server gaf een ongeldige revisie terug.');
+      }
+      if (result.data === undefined) {
+        const latest = await api('api/state');
+        if (latest.email !== accountEmail || latest.role !== currentRole) {
+          throw new Error('Het aangemelde account is gewijzigd. Herlaad voordat je verdergaat.');
+        }
+        if (!Number.isSafeInteger(latest.revision) || latest.revision < result.revision) {
+          throw new Error('De server gaf een verouderde of ongeldige revisie terug.');
+        }
+        result = latest;
+      }
+      const confirmed = validateBackup({ format: BACKUP_FORMAT, version: 1, data: result.data });
+      for (const key of Object.keys(nextState)) delete nextState[key];
+      Object.assign(nextState, confirmed);
+      state = nextState;
+      savedState = structuredClone(confirmed);
+      revision = result.revision;
+      return true;
     }
   } catch (error) {
     console.error('Gegevens opslaan mislukt:', error);
     state = attempted;
     needsRecovery = true;
     document.querySelector('#modal').close();
-    document.querySelector('#recovery-message').textContent = `De wijziging is niet bevestigd: ${error.message}`;
+    document.querySelector('#recovery-title').textContent = writeConfirmed
+      ? 'Opgeslagen gegevens niet geladen'
+      : 'Opslaan niet bevestigd';
+    document.querySelector('#recovery-message').textContent = writeConfirmed
+      ? `De wijziging is opgeslagen, maar de opgeslagen gegevens konden niet worden geladen: ${error.message}`
+      : `De wijziging is niet bevestigd: ${error.message}`;
     document.querySelector('#recovery-export').hidden = isChild();
-    document.querySelector('#recovery-advice').textContent = isChild()
-      ? 'Herlaad om de gegevens op de server te bekijken. Je laatste wijziging is mogelijk niet opgeslagen.'
-      : 'Download eventueel eerst een back-up van je laatste wijziging. Herlaad daarna om de gegevens op de server te bekijken. Een back-up terugzetten vervangt ook de nieuwere gegevens op de server.';
+    document.querySelector('#recovery-advice').textContent = writeConfirmed
+      ? 'Herlaad om de meest recente gegevens op de server te bekijken.'
+      : isChild()
+        ? 'Herlaad om de gegevens op de server te bekijken. Je laatste wijziging is mogelijk niet opgeslagen.'
+        : 'Download eventueel eerst een back-up van je laatste wijziging. Herlaad daarna om de gegevens op de server te bekijken. Een back-up terugzetten vervangt ook de nieuwere gegevens op de server.';
     document.querySelector('#recovery').hidden = false;
     return false;
   } finally {
