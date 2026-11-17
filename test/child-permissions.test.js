@@ -60,6 +60,7 @@ test('kind kan geen beschermde gegevens wijzigen of verwijderen', async t => {
     'notitie archiveren': data => { data.notes[0].archived = true; },
     'teksten aanpassen': data => { data.customization.websiteTitle = 'Anders'; },
     'onbekende eigenschap toevoegen': data => { data.extra = true; },
+    'gezinslid toevoegen': data => { data.members.push({ id: 'm3', name: 'Nieuw', birthDate: null, email: null }); },
     'gezinslid bewerken': data => { data.members[0].name = 'Andere naam'; },
     'gezinslid verwijderen': data => { data.members = data.members.filter(member => member.id !== 'm2'); }
   };
@@ -72,7 +73,7 @@ test('kind kan geen beschermde gegevens wijzigen of verwijderen', async t => {
   }
 });
 
-test('oude gegevens en nieuwe gezinsprofielen blijven bruikbaar', () => {
+test('oude gegevens blijven bruikbaar en kinderen kunnen geen nieuw gezinsprofiel toevoegen', () => {
   const old = structuredClone(original);
   delete old.notes;
   delete old.customization;
@@ -80,8 +81,10 @@ test('oude gegevens en nieuwe gezinsprofielen blijven bruikbaar', () => {
   data.tasks = data.tasks.map(normalizeTask);
   data.notes = [];
   data.customization = { ...defaults };
-  data.members.push({ id: 'm3', name: 'Nieuw', birthDate: null, email: null });
   assert.equal(childChangesAllowed(old, data, defaults), true);
+
+  data.members.push({ id: 'm3', name: 'Nieuw', birthDate: null, email: null });
+  assert.equal(childChangesAllowed(old, data, defaults), false);
 });
 
 test('kind kan ook een te late taak met meerdere toegewezen gezinsleden afvinken', () => {

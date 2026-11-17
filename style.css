@@ -76,6 +76,9 @@ h1{font-size:36px;letter-spacing:-.7px;line-height:1.15}
 .button.danger{background:#fff4f1;color:#ad665a}
 .hero{background:#dcebdc;border-radius:13px;padding:25px 30px;min-height:154px;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:space-between}
 .hero-copy{position:relative;z-index:1}
+.hero-today{display:block;border:0;padding:0;background:transparent;text-align:left;color:inherit}
+.hero-today:hover .eyebrow{text-decoration:underline;text-underline-offset:3px}
+.hero-today:focus-visible{outline:2px solid currentColor;outline-offset:5px;border-radius:3px}
 .hero .eyebrow{color:#74977b;margin-bottom:10px}
 .hero h2{font-size:27px;color:#345a40;line-height:1.1}
 .hero p{margin-top:9px;color:#72947a;font-size:12px;line-height:1.5}
@@ -251,6 +254,8 @@ input:focus,select:focus{border-color:#85ad8d;box-shadow:0 0 0 3px #e9f2e9}
 .meal-idea{display:grid;grid-template-columns:minmax(80px,1fr) minmax(0,2fr) auto auto;align-items:center;gap:8px 12px;padding:8px 0;border-bottom:1px solid #f0f2ef}
 .meal-idea:last-child{border-bottom:0}
 .meal-title{display:flex;align-items:center;gap:10px;min-width:0}
+.meal-rank{min-width:20px;color:var(--palette-accent);font-size:13px;font-weight:700;text-align:center}
+.meal-title .task-speak{width:36px;height:36px}
 .meal-avatar{width:35px;height:35px;flex-shrink:0}
 .meal-heading{display:grid;gap:5px;min-width:0}
 .recipe-search{font-size:10px;font-weight:700;color:#507a60;text-decoration:underline;text-underline-offset:2px}

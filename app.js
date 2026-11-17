@@ -387,15 +387,30 @@ function renderLoadDistribution(title, loads) {
   return `<section class="daily-load"><strong>${escapeHtml(title)}</strong><ul>${loads.map(({ member, count }) => `<li><span class="load-name">${escapeHtml(member.name)}</span><span class="load-track" aria-hidden="true"><span class="load-bar" style="width:${maxLoad ? count / maxLoad * 100 : 0}%"></span></span><span class="load-count">${count} ${count === 1 ? 'taak' : 'taken'}</span></li>`).join('')}</ul></section>`;
 }
 
-function speakButton(action, id, text, title) {
-  return `<button type="button" class="task-speak" data-action="${escapeHtml(action)}" data-id="${escapeHtml(id)}" aria-label="${escapeHtml(text)} voorlezen" title="${escapeHtml(title)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/></svg></button>`;
+function speakButton(action, id, text, title, speechText) {
+  const speechData = speechText ? ` data-speech-text="${escapeHtml(speechText)}"` : '';
+  return `<button type="button" class="task-speak" data-action="${escapeHtml(action)}" data-id="${escapeHtml(id)}"${speechData} aria-label="${escapeHtml(text)} voorlezen" title="${escapeHtml(title)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/></svg></button>`;
+}
+
+function taskSpeechText(task, done) {
+  return `${task.title}.${task.important ? ' Belangrijke taak.' : ''} ${done ? 'Deze taak is al uitgevoerd.' : 'Deze taak is nog niet uitgevoerd.'}`;
+}
+
+function mealSpeechText(idea, rank = [...state.mealIdeas]
+  .sort((a, b) => b.wishedBy.length - a.wishedBy.length)
+  .findIndex(item => item.id === idea.id) + 1) {
+  const members = state.members.filter(member => idea.wishedBy.includes(member.id)).map(member => member.name);
+  const interest = members.length
+    ? `${idea.name}. Zin in dit gerecht: ${members.join(', ')}.`
+    : `${idea.name}. Nog niemand heeft aangegeven zin te hebben in dit gerecht.`;
+  return `${interest} Dit gerecht staat op plek ${rank}.`;
 }
 
 function renderTaskRows(tasks, date, memberId) {
   return tasks.map(task => {
     const done = memberId ? isDone(task, date, memberId) : isDone(task, date);
     const memberData = memberId ? ` data-member-id="${escapeHtml(memberId)}"` : '';
-    return `<div class="task-row planned-task-row ${done ? 'done' : ''}"><label class="task-completion"><input class="check" type="checkbox" data-action="complete" data-id="${escapeHtml(task.id)}"${memberData} aria-label="${escapeHtml(task.title)} afronden" ${done ? 'checked' : ''}><span class="task-info"><strong>${escapeHtml(task.title)}${task.important ? '<span class="important-icon" title="Belangrijke taak" aria-label="Belangrijke taak"><svg viewBox="0 0 16 16" focusable="false"><circle cx="8" cy="8" r="7"/><path class="important-icon-mark" d="M8 3.8v5.1M8 11.5v.1"/></svg></span>' : ''}</strong><small>${frequencyLabel(task)}</small>${isLate(task, date, memberId) ? '<small class="late-label">Te laat uitgevoerd</small>' : ''}</span></label>${speakButton('speak-task', task.id, task.title, 'Taak voorlezen')}${taskMenu(task)}</div>`;
+    return `<div class="task-row planned-task-row ${done ? 'done' : ''}"><label class="task-completion"><input class="check" type="checkbox" data-action="complete" data-id="${escapeHtml(task.id)}"${memberData} aria-label="${escapeHtml(task.title)} afronden" ${done ? 'checked' : ''}><span class="task-info"><strong>${escapeHtml(task.title)}${task.important ? '<span class="important-icon" title="Belangrijke taak" aria-label="Belangrijke taak"><svg viewBox="0 0 16 16" focusable="false"><circle cx="8" cy="8" r="7"/><path class="important-icon-mark" d="M8 3.8v5.1M8 11.5v.1"/></svg></span>' : ''}</strong><small>${frequencyLabel(task)}</small>${isLate(task, date, memberId) ? '<small class="late-label">Te laat uitgevoerd</small>' : ''}</span></label>${speakButton('speak-task', task.id, task.title, 'Taak voorlezen', taskSpeechText(task, done))}${taskMenu(task)}</div>`;
   }).join('');
 }
 
@@ -429,15 +444,19 @@ function speakText(text) {
   }
 }
 
-function speakItem(action, id) {
-  const item = (action === 'speak-task' ? state.tasks : action === 'speak-member' ? state.members : state.notes)
+function speakItem(action, id, speechText) {
+  const item = (action === 'speak-task' ? state.tasks :
+    action === 'speak-member' ? state.members :
+      action === 'speak-meal' ? state.mealIdeas : state.notes)
     .find(entry => entry.id === id);
   if (!item) {
     console.error('De tekst om voor te lezen is niet gevonden.');
     showToast('De tekst om voor te lezen kon niet worden gevonden.');
     return;
   }
-  speakText(action === 'speak-task' ? item.title : action === 'speak-member' ? item.name : `${item.title}. ${item.description}`);
+  speakText(action === 'speak-task' ? speechText || taskSpeechText(item, false) :
+    action === 'speak-meal' ? speechText || mealSpeechText(item) :
+      action === 'speak-member' ? item.name : `${item.title}. ${item.description}`);
 }
 
 function memberStatistics(member) {
@@ -531,7 +550,7 @@ function renderDashboard() {
   return `
     <div class="page-heading"><div><h1>${escapeHtml(state.customization.welcomeTitle)} <span style="color:#9cbd9f">✳</span></h1><p>${escapeHtml(state.customization.welcomeText)}</p></div>${isChild() ? '' : '<button class="button" data-action="new-task"><span class="plus">+</span> Taak toevoegen</button>'}</div>
     <section class="hero">
-      <div class="hero-copy"><div class="eyebrow">SAMEN VOOR EEN FIJN THUIS</div><h2>Een opgeruimd huis,<br><em>een beetje meer rust.</em></h2><p>Alle taken en plannen voor jullie gezin, overzichtelijk op één plek.</p></div>
+      <button type="button" class="hero-copy hero-today" data-action="today" aria-label="Weekplanner op vandaag zetten"><div class="eyebrow">SAMEN VOOR EEN FIJN THUIS</div><h2>Een opgeruimd huis,<br><em>een beetje meer rust.</em></h2><p>Alle taken en plannen voor jullie gezin, overzichtelijk op één plek.</p></button>
       <span class="hero-badge">♡ &nbsp; SAMEN DOEN</span>
       <div class="hero-art" aria-hidden="true"><svg viewBox="0 0 260 210" fill="none" stroke="currentColor" stroke-width="2"><circle cx="142" cy="104" r="77"/><path d="M75 132l67-57 67 57M90 119v65h104v-65M129 184v-40h27v40M65 184h154"/><path d="M48 183c-3-25-10-37-23-44 20 2 29 14 29 35m-6 10c4-26 14-38 27-43-10 14-15 28-15 43M217 184c1-21 7-35 21-43-6 16-9 27-9 43"/><path d="M95 60l3-10 4 10 10 3-10 4-4 10-3-10-10-4zM200 71l2-7 3 7 7 3-7 3-3 7-2-7-7-3z"/></svg></div>
     </section>
@@ -668,7 +687,7 @@ function renderTasks() {
 
 function renderFamily() {
   const roles = { owner: 'Ouder', parent: 'Ouder', partner: 'Ouder', child: 'Kind' };
-  return `<div class="page-heading"><div><h1>Ons gezin</h1><p>Iedereen draagt op zijn eigen manier bij.</p></div><button class="button" data-action="new-member"><span class="plus">+</span> Gezinslid toevoegen</button></div>
+  return `<div class="page-heading"><div><h1>Ons gezin</h1><p>Iedereen draagt op zijn eigen manier bij.</p></div>${isChild() ? '' : '<button class="button" data-action="new-member"><span class="plus">+</span> Gezinslid toevoegen</button>'}</div>
     <div class="members-grid">${state.members.map((member, index) => `<div class="panel member-card">${avatar(member, index)}<h3>${escapeHtml(member.name)}</h3><p>${escapeHtml(memberDetails(member))}${member.email ? `<br>${escapeHtml(member.email)}` : ''}<br>${state.tasks.filter(task => assignedMemberIds(task).includes(member.id)).length} toegewezen taken</p><p class="member-created"><strong>Aangemaakt:</strong> ${escapeHtml(createdDateLabel(member))}</p><a class="text-button member-stats-link" href="#statistieken/${encodeURIComponent(member.id)}">Statistieken bekijken →</a>${isChild() ? '' : `<button class="text-button" data-action="edit-member" data-id="${escapeHtml(member.id)}">Gegevens bewerken →</button>`}</div>`).join('')}</div>
     ${demoMode ? '<div class="panel backup-panel"><h2>Gezinsaccounts</h2><p>Uitnodigingen en wachtwoordreset zijn beschikbaar nadat je een account hebt aangemaakt.</p></div>' : `<section class="household-access">
       <div class="section-heading"><div><h2>Samen in hetzelfde dashboard</h2><p>Nodig je partner of kinderen uit met hun eigen e-mailadres en wachtwoord.</p></div></div>
@@ -711,7 +730,7 @@ function renderMealIdeas() {
   return `<div class="page-heading"><div><h1>Kookinspiratie</h1><p>Bewaar gerechten en ontdek waar iedereen zin in heeft.</p></div></div>
     <div class="panel groceries-panel meal-ideas-panel">
       <form id="meal-ideas-form" class="groceries-form"><label class="sr-only" for="meal-idea-name">Gerecht of voeding</label><input id="meal-idea-name" name="name" required maxlength="120" placeholder="Voeg een gerecht of voeding toe"><button class="button" type="submit"><span class="plus">+</span> Toevoegen</button></form>
-      ${sortedIdeas.length ? `<div class="meal-ideas-list">${sortedIdeas.map(idea => `<div class="meal-idea"><div class="meal-title">${mealAvatar(idea)}<div class="meal-heading"><strong class="meal-name">${escapeHtml(idea.name)}</strong><a class="recipe-search" href="https://www.google.com/search?${new URLSearchParams({ q: `recept ${idea.name}` })}" target="_blank" rel="noopener noreferrer">Recept zoeken ↗</a></div></div>
+      ${sortedIdeas.length ? `<div class="meal-ideas-list">${sortedIdeas.map((idea, index) => `<div class="meal-idea"><div class="meal-title"><span class="meal-rank" aria-label="Rang ${index + 1}">${index + 1}.</span>${mealAvatar(idea)}<div class="meal-heading"><strong class="meal-name">${escapeHtml(idea.name)}</strong><a class="recipe-search" href="https://www.google.com/search?${new URLSearchParams({ q: `recept ${idea.name}` })}" target="_blank" rel="noopener noreferrer">Recept zoeken ↗</a></div>${speakButton('speak-meal', idea.id, idea.name, 'Gerecht voorlezen', mealSpeechText(idea, index + 1))}</div>
         ${state.members.length ? `<fieldset class="meal-wishes"><legend class="sr-only">Wie heeft er zin in ${escapeHtml(idea.name)}?</legend>${state.members.map(member => `<label><input type="checkbox" class="check" data-action="meal-wish" data-id="${escapeHtml(idea.id)}" data-member-id="${escapeHtml(member.id)}" ${idea.wishedBy.includes(member.id) ? 'checked' : ''}><span>${escapeHtml(member.name)}</span></label>`).join('')}</fieldset>` : '<p class="meal-empty-members">Voeg een gezinslid toe om wensen aan te duiden.</p>'}
         <span class="meal-count ${idea.wishedBy.length > state.members.length / 2 ? 'majority' : ''}">${idea.wishedBy.length} ${idea.wishedBy.length === 1 ? 'persoon' : 'personen'}${idea.wishedBy.length > state.members.length / 2 ? ' · Meerderheid' : ''}</span>
         ${isChild() ? '' : `<button type="button" class="text-button meal-delete" data-action="delete-meal-idea" data-id="${escapeHtml(idea.id)}" aria-label="${escapeHtml(idea.name)} verwijderen">Verwijderen</button>`}</div>`).join('')}</div>` : '<div class="empty"><strong>Nog geen kookinspiratie</strong>Voeg een gerecht of voeding toe.</div>'}
@@ -1192,7 +1211,7 @@ document.addEventListener('click', async event => {
     return;
   }
   const action = button.dataset.action;
-  if (isChild() && ['new-task', 'edit-task', 'edit-member', 'export-backup', 'import-backup', 'reset-customization', 'toggle-grocery-urgent', 'delete-grocery', 'delete-meal-idea', 'edit-note', 'archive-note', 'restore-note', 'delete-note'].includes(action)) return;
+  if (isChild() && ['new-task', 'edit-task', 'new-member', 'edit-member', 'export-backup', 'import-backup', 'reset-customization', 'toggle-grocery-urgent', 'delete-grocery', 'delete-meal-idea', 'edit-note', 'archive-note', 'restore-note', 'delete-note'].includes(action)) return;
   if (action === 'toggle-note-menu') {
     const shouldOpen = button.getAttribute('aria-expanded') !== 'true';
     closeNoteMenus();
@@ -1203,7 +1222,7 @@ document.addEventListener('click', async event => {
     return;
   }
   closeNoteMenus();
-  if (action === 'speak-task' || action === 'speak-member' || action === 'speak-note') speakItem(action, button.dataset.id);
+  if (action === 'speak-task' || action === 'speak-member' || action === 'speak-meal' || action === 'speak-note') speakItem(action, button.dataset.id, button.dataset.speechText);
   if (action === 'new-note') openNewNote();
   if (action === 'new-task') openTask();
   if (action === 'edit-task') openTask(button.dataset.id);
