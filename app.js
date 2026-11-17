@@ -143,7 +143,7 @@ async function save(nextState = state, { mergeOnConflict = true } = {}) {
     document.querySelector('#recovery-export').hidden = isChild();
     document.querySelector('#recovery-advice').textContent = isChild()
       ? 'Herlaad om de gegevens op de server te bekijken. Je laatste wijziging is mogelijk niet opgeslagen.'
-      : 'Download eventueel eerst een back-up van je laatste wijziging. Herlaad daarna om de gegevens op de server te bekijken. Je kunt de back-up desgewenst terugzetten.';
+      : 'Download eventueel eerst een back-up van je laatste wijziging. Herlaad daarna om de gegevens op de server te bekijken. Een back-up terugzetten vervangt ook de nieuwere gegevens op de server.';
     document.querySelector('#recovery').hidden = false;
     return false;
   } finally {
