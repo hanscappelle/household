@@ -135,6 +135,9 @@ h1{font-size:36px;letter-spacing:-.7px;line-height:1.15}
 .day-detail-head strong{font-size:12px}
 .day-detail-head span{font-size:10px;color:#a7b3a9}
 .day-task-group h3{margin:16px 0 0;font-size:11px;color:#718676;overflow-wrap:anywhere}
+.day-task-group h3.free-task-heading{display:flex;align-items:center;gap:7px}
+.free-task-heading .free-task-avatar{width:35px;height:35px}
+.free-task-heading .free-task-avatar svg{width:18px;height:18px}
 .day-task-member{display:flex;align-items:center;gap:11px;margin-top:16px}
 .day-task-group h3.day-task-member-heading{display:flex;align-items:center;gap:11px;margin:0;min-width:0;font-size:16px}
 .day-task-member-heading>span:last-child{min-width:0}

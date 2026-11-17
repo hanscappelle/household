@@ -361,10 +361,15 @@ function completionKey(task, date) {
 
 function isDone(task, date, memberId) {
   const completion = state.completed[completionKey(task, date)];
-  if (!completion || typeof completion !== 'object' || !completion.memberCompletions) return Boolean(completion);
-  if (memberId) return Boolean(completion.memberCompletions[memberId]);
+  const completedOnDate = record => {
+    if (!task.flexibleSchedule) return Boolean(record);
+    const completedAt = completionDate(record);
+    return completedAt ? completedAt <= dateKey(date) : Boolean(record);
+  };
+  if (!completion || typeof completion !== 'object' || !completion.memberCompletions) return completedOnDate(completion);
+  if (memberId) return completedOnDate(completion.memberCompletions[memberId]);
   const members = membersOn(task, date);
-  return members.length > 0 && members.every(member => Boolean(completion.memberCompletions[member.id]));
+  return members.length > 0 && members.every(member => completedOnDate(completion.memberCompletions[member.id]));
 }
 
 function completionDate(value) {
@@ -374,6 +379,7 @@ function completionDate(value) {
 }
 
 function isLate(task, date, memberId) {
+  if (task.flexibleSchedule) return false;
   const completion = state.completed[completionKey(task, date)];
   const record = completion?.memberCompletions
     ? completion.memberCompletions[memberId]
@@ -513,6 +519,7 @@ async function updateTaskCompletion({ taskId, date, memberId, checked }) {
   const task = state.tasks.find(item => item.id === taskId);
   if (!task) return;
   const selectedDate = parseDate(date);
+  const completedAt = dateKey(task.flexibleSchedule ? selectedDate : new Date());
   const key = completionKey(task, selectedDate);
   const existing = state.completed[key];
   const assignedMemberIds = membersOn(task, selectedDate).map(member => member.id);
@@ -528,7 +535,7 @@ async function updateTaskCompletion({ taskId, date, memberId, checked }) {
       ? Object.entries(existing.memberCompletions).filter(([id]) => id !== memberId)
       : assignedMemberIds.filter(id => id !== memberId).map(id => [id, existing]);
     if (checked) {
-      const completion = { completedAt: dateKey(new Date()) };
+      const completion = { completedAt };
       if (demoMode) {
         const member = currentMember();
         if (member) completion.completedByMemberId = member.id;
@@ -541,7 +548,7 @@ async function updateTaskCompletion({ taskId, date, memberId, checked }) {
     if (Object.keys(records).length) state.completed[key] = { memberCompletions: records };
     else delete state.completed[key];
   } else if (checked) {
-    const completion = { completedAt: dateKey(new Date()) };
+    const completion = { completedAt };
     if (demoMode) {
       const member = currentMember();
       if (member) completion.completedByMemberId = member.id;
@@ -710,7 +717,7 @@ function renderDashboard() {
           <div class="day-detail"><div class="day-detail-head"><strong>${escapeHtml(formatDate(date, { weekday: 'long', day: 'numeric', month: 'long' }))}</strong><span>${todayTasks.length} ${todayTasks.length === 1 ? 'taak' : 'taken'}</span></div>
             ${birthdays.map(member => `<div class="birthday-row"><span class="birthday-icon" aria-hidden="true">🎂</span><div><strong>Verjaardag van ${escapeHtml(member.name)}</strong><small>${date.getFullYear() - parseDate(member.birthDate).getFullYear()} jaar</small></div></div>`).join('')}
             ${memberLoads.filter(group => group.tasks.length).map(({ member, index, tasks }) => `<section class="day-task-group"><div class="day-task-member"><h3 class="day-task-member-heading"><span aria-hidden="true">${avatar(member, index)}</span><span>${escapeHtml(member.name)}</span></h3>${speakButton('speak-member', member.id, member.name, 'Naam voorlezen')}</div>${renderTaskRows(tasks, date, member.id)}</section>`).join('')}
-            ${freeTasks.length ? `<section class="day-task-group"><h3>Voor iedereen</h3>${renderTaskRows(freeTasks, date)}</section>` : ''}
+            ${freeTasks.length ? `<section class="day-task-group"><h3 class="free-task-heading"><span class="avatar free-task-avatar" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3.5 19v-1.5a5.5 5.5 0 0 1 11 0V19z"/><path d="M16 5.3a3 3 0 0 1 0 5.4M17 13a5 5 0 0 1 3.5 4.8V19h-4"/></svg></span><span>Voor iedereen</span></h3>${renderTaskRows(freeTasks, date)}</section>` : ''}
             ${!todayTasks.length && !birthdays.length ? `<div class="empty"><span class="empty-icon">☼</span><strong>Een lekker lege planning</strong>Plan een taak in en hij verschijnt hier.</div>` : ''}
           </div>
         </div>

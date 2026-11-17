@@ -85,12 +85,29 @@ function flexibleTaskOccurrenceDate(task, selectedDate, freeSince, completed) {
     const completion = completed[`${task.id}|${dueDateKey}`];
     if (!completion) return dueDateKey;
 
-    const completedAt = typeof completion === 'object' &&
-      /^\d{4}-\d{2}-\d{2}$/.test(completion.completedAt || '')
-      ? completion.completedAt
-      : dueDateKey;
-    const finishedDate = completedAt > dueDateKey ? completedAt : dueDateKey;
-    if (finishedDate >= selectedDate) return dueDateKey;
+    let finishedDate = dueDateKey;
+    if (completion.memberCompletions && typeof completion.memberCompletions === 'object') {
+      const assignedIds = task.memberIds || (task.memberId ? [task.memberId] : []);
+      const memberIds = (Array.isArray(assignedIds) ? assignedIds : [assignedIds]).filter(Boolean);
+      const records = (memberIds.length ? memberIds : Object.keys(completion.memberCompletions))
+        .map(memberId => completion.memberCompletions[memberId]);
+      if (records.some(record => !record)) return dueDateKey;
+      for (const record of records) {
+        const completedAt = record === true ? dueDateKey :
+          typeof record === 'object' && /^\d{4}-\d{2}-\d{2}$/.test(record.completedAt || '')
+            ? record.completedAt
+            : dueDateKey;
+        if (completedAt > finishedDate) finishedDate = completedAt;
+      }
+    } else {
+      const completedAt = typeof completion === 'object' &&
+        /^\d{4}-\d{2}-\d{2}$/.test(completion.completedAt || '')
+        ? completion.completedAt
+        : dueDateKey;
+      if (completedAt > finishedDate) finishedDate = completedAt;
+    }
+    if (finishedDate === selectedDate) return dueDateKey;
+    if (finishedDate > selectedDate) return null;
 
     dueDate = nextPeriodStart(parseDate(finishedDate));
   }

@@ -39,6 +39,21 @@ test('flexible weekly tasks stay due through the week and restart next week', ()
   assert.equal(flexibleTaskOccurrenceDate(task, '2026-11-23', '2026-11-16', completed), '2026-11-23');
 });
 
+test('flexible shared tasks remain due until every assigned member completes them', () => {
+  const task = { id: 'shared', frequency: 'weekly', memberIds: ['m1', 'm2'] };
+  const completed = {
+    'shared|2026-11-16': {
+      memberCompletions: { m1: { completedAt: '2026-11-18' } }
+    }
+  };
+  assert.equal(flexibleTaskOccurrenceDate(task, '2026-11-19', '2026-11-16', completed), '2026-11-16');
+
+  completed['shared|2026-11-16'].memberCompletions.m2 = { completedAt: '2026-11-19' };
+  assert.equal(flexibleTaskOccurrenceDate(task, '2026-11-18', '2026-11-16', completed), null);
+  assert.equal(flexibleTaskOccurrenceDate(task, '2026-11-19', '2026-11-16', completed), '2026-11-16');
+  assert.equal(flexibleTaskOccurrenceDate(task, '2026-11-20', '2026-11-16', completed), null);
+});
+
 test('flexible monthly and yearly tasks use the calendar period without a fixed date', () => {
   const monthly = { id: 'monthly', frequency: 'monthly' };
   const yearly = { id: 'yearly', frequency: 'yearly' };
@@ -64,6 +79,7 @@ test('combined free tasks stay unassigned and in the plan until the period is co
     DAYS: ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'],
     FREQUENCIES: { daily: 'Dagelijks', weekly: 'Wekelijks', monthly: 'Maandelijks', yearly: 'Jaarlijks' },
     dateKey: date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
+    validBackupDate: value => /^\d{4}-\d{2}-\d{2}$/.test(value || ''),
     parseDate: key => {
       const [year, month, day] = key.split('-').map(Number);
       return new Date(year, month - 1, day);
@@ -73,7 +89,7 @@ test('combined free tasks stay unassigned and in the plan until the period is co
   vm.runInContext(readFileSync(require.resolve('../task-scheduling'), 'utf8'), context);
   vm.runInContext(
     app.slice(app.indexOf('function membersForAssignment('), app.indexOf('function birthdaysOn(')) +
-    app.slice(app.indexOf('function completionKey('), app.indexOf('function isDone(')),
+    app.slice(app.indexOf('function completionKey('), app.indexOf('function showToast(')),
     context
   );
 
@@ -85,9 +101,54 @@ test('combined free tasks stay unassigned and in the plan until the period is co
   assert.equal(context.completionKey(context.state.tasks[0], context.parseDate('2026-11-18')), 'weekly|2026-11-16');
 
   context.state.completed['weekly|2026-11-16'] = { completedAt: '2026-11-18' };
+  assert.equal(tasksOn('2026-11-17').length, 0);
   assert.equal(tasksOn('2026-11-18').length, 1);
+  assert.equal(context.isDone(context.state.tasks[0], context.parseDate('2026-11-18')), true);
+  assert.equal(context.isLate(context.state.tasks[0], context.parseDate('2026-11-18')), false);
   assert.equal(tasksOn('2026-11-19').length, 0);
   assert.equal(tasksOn('2026-11-23').length, 1);
+});
+
+test('flexible task completion stays on the selected planner date', async () => {
+  const app = readFileSync(require.resolve('../app'), 'utf8');
+  const context = vm.createContext({
+    state: {
+      members: [{ id: 'm1', name: 'Ada' }],
+      tasks: [{
+        id: 'weekly', title: 'Badkamer schoonmaken', frequency: 'weekly',
+        flexibleSchedule: true, flexibleSince: '2026-11-16', memberIds: ['m1']
+      }],
+      completed: {}
+    },
+    DAYS: ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'],
+    FREQUENCIES: { daily: 'Dagelijks', weekly: 'Wekelijks', monthly: 'Maandelijks', yearly: 'Jaarlijks' },
+    currentUserId: 'user-1',
+    demoMode: false,
+    dateKey: date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
+    validBackupDate: value => /^\d{4}-\d{2}-\d{2}$/.test(value || ''),
+    parseDate: key => {
+      const [year, month, day] = key.split('-').map(Number);
+      return new Date(year, month - 1, day);
+    },
+    isoWeek: () => 1,
+    save: async () => true,
+    render() {}
+  });
+  vm.runInNewContext(readFileSync(require.resolve('../task-scheduling'), 'utf8'), context);
+  vm.runInContext(
+    app.slice(app.indexOf('function membersForAssignment('), app.indexOf('function birthdaysOn(')) +
+    app.slice(app.indexOf('function completionKey('), app.indexOf('function showToast(')) +
+    app.slice(app.indexOf('async function updateTaskCompletion('), app.indexOf('function speakText(')),
+    context
+  );
+
+  await context.updateTaskCompletion({
+    taskId: 'weekly', date: '2026-11-20', memberId: 'm1', checked: true
+  });
+  assert.equal(context.state.completed['weekly|2026-11-16'].completedAt, '2026-11-20');
+  assert.equal(context.isDone(context.state.tasks[0], context.parseDate('2026-11-20'), 'm1'), true);
+  assert.equal(context.tasksOn(context.parseDate('2026-11-20')).length, 1);
+  assert.equal(context.tasksOn(context.parseDate('2026-11-21')).length, 0);
 });
 
 test('daily free task keeps its original instance until completed', () => {
