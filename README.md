@@ -66,9 +66,11 @@ waarop die is ingepland.
 Onder **Ons gezin** staat ook de aanmaakdatum van elk gezinslid. Via
 **Statistieken bekijken** zie je hoeveel taakmomenten er vanaf die datum tot
 en met vandaag volgens de huidige planning aan die persoon waren toegewezen,
-hoeveel daarvan zijn afgevinkt en hoeveel taken die persoon te laat heeft
-afgevinkt. Een taak geldt als te laat wanneer die na de geplande dag wordt
-afgevinkt; oudere afvinkjes zonder registratiedatum tellen niet mee als te laat.
+hoeveel daarvan zijn afgevinkt en hoeveel daarvan te laat zijn afgevinkt. Een
+te late taak telt mee voor de gezinsleden aan wie die op de geplande dag was
+toegewezen, ongeacht welk account de taak heeft afgevinkt. Een taak geldt als
+te laat wanneer die na de geplande dag wordt afgevinkt; oudere afvinkjes zonder
+registratiedatum tellen niet mee als te laat.
 Bij oudere profielen waarvan de
 aanmaakdatum niet werd opgeslagen, kun je de datum aanvullen via
 **Gegevens bewerken**; zonder datum zijn de statistieken niet te berekenen.

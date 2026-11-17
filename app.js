@@ -368,20 +368,19 @@ function memberStatistics(member) {
       }
     }
   }
+  const tasksById = new Map(state.tasks.map(task => [task.id, task]));
+  completedLate = Object.entries(state.completed).filter(([key, value]) => {
+    const [taskId, dueDate] = key.split('|');
+    const task = tasksById.get(taskId);
+    const scheduledDate = validBackupDate(dueDate) ? parseDate(dueDate) : null;
+    const completedAt = completionDate(value);
+    return task && scheduledDate && dueDate >= member.createdAt && dueDate <= dateKey(end) &&
+      occursOn(task, scheduledDate) &&
+      membersOn(task, scheduledDate).some(assigned => assigned.id === member.id) &&
+      completedAt !== null && completedAt > dueDate && completedAt <= dateKey(end);
+  }).length;
   const creator = demoMode ? member.id : householdInfo.members.find(item =>
     item.email.toLowerCase() === member.email?.toLowerCase())?.id;
-  if (creator != null) {
-    const taskIds = new Set(state.tasks.map(task => task.id));
-    completedLate = Object.entries(state.completed).filter(([key, value]) => {
-      const [taskId, dueDate] = key.split('|');
-      const completedAt = completionDate(value);
-      const completedBy = demoMode ? value.completedByMemberId : value.completedByUserId;
-      return taskIds.has(taskId) && validBackupDate(dueDate) &&
-        completedAt !== null && completedAt > dueDate &&
-        completedAt >= member.createdAt && completedAt <= dateKey(end) &&
-        String(completedBy) === String(creator);
-    }).length;
-  }
   const collections = [
     { key: 'tasks', label: 'Aangemaakte taken' },
     { key: 'groceries', label: 'Aangemaakte boodschappen' },
@@ -425,7 +424,7 @@ function renderMemberStatistics(member) {
       <div class="stat"><span class="stat-icon">✓</span><div><strong>${statistics.completed}</strong><small>Uitgevoerde taken</small></div></div>
       <div class="stat"><span class="stat-icon">!</span><div><strong>${statistics.completedLate}</strong><small>Te laat uitgevoerde taken</small></div></div>
       ${statistics.creations.map(({ label, count, percentage }) => `<div class="stat"><span class="stat-icon">＋</span><div><strong>${count}</strong><small>${escapeHtml(label)} · ${percentage}% van gezin</small></div></div>`).join('')}
-    </div><p class="member-statistics-note">Taken zijn geteld op basis van de huidige planning en opgeslagen afvinkjes. Te laat uitgevoerde taken worden toegerekend aan het account dat ze heeft afgevinkt. De percentages zijn het aandeel van alle geregistreerde aanmaakacties in die categorie sinds de aanmaakdatum. Oudere items zonder makerregistratie tellen niet mee. Voor makerstatistieken moet het account via het e-mailadres aan een gezinslid zijn gekoppeld.</p>` : '<div class="panel member-statistics-empty">Er zijn nog geen statistieken te berekenen. Vul de aanmaakdatum in via <a href="#gezin">Ons gezin</a> → <strong>Gegevens bewerken</strong>.</div>'}`;
+    </div><p class="member-statistics-note">Taken zijn geteld op basis van de huidige planning en opgeslagen afvinkjes. Te laat uitgevoerde taken worden toegerekend aan de gezinsleden voor wie ze op de geplande dag waren ingepland, ongeacht wie ze heeft afgevinkt. De percentages zijn het aandeel van alle geregistreerde aanmaakacties in die categorie sinds de aanmaakdatum. Oudere items zonder makerregistratie tellen niet mee. Voor makerstatistieken moet het account via het e-mailadres aan een gezinslid zijn gekoppeld.</p>` : '<div class="panel member-statistics-empty">Er zijn nog geen statistieken te berekenen. Vul de aanmaakdatum in via <a href="#gezin">Ons gezin</a> → <strong>Gegevens bewerken</strong>.</div>'}`;
 }
 
 function renderDashboard() {
@@ -679,7 +678,7 @@ function renderHelp() {
         <p>Naast de weekplanning zie je de gezinsleden; daaronder staan gedeelde notities als post-its. Kies <strong>Notitie toevoegen</strong> om in een venster een titel en beschrijving in te vullen. De auteur wordt automatisch ingevuld. Zet eventueel <strong>Markeer als belangrijk</strong> aan; dit staat standaard uit. Belangrijke notities krijgen een uitroepteken en staan bovenaan.</p>
         <p>Open het driepuntjesmenu op een post-it om die te bewerken of te archiveren. Bij bewerken door een ander gezinslid worden diens naam en bewerktijd vermeld. Gearchiveerde notities verdwijnen van het overzicht. Via <a href="#notitiearchief">Notitiearchief</a> kun je ze herstellen of definitief verwijderen.</p>
         <p>Op <a href="#taken">Alle taken</a> kun je een taak openen om de planning te wijzigen. Kies per dag, week, maand of eenmalige datum wie de taak uitvoert. Standaard wijs je de taak aan één gezinslid toe; zet <strong>Taak door meerdere gezinsleden laten uitvoeren</strong> aan om meerdere personen te selecteren. Markeer in het taakformulier belangrijke taken; die herken je aan het label <strong>Belangrijk</strong>. Gebruik de zoekbalk en filters om taken terug te vinden.</p>
-        <p>Vink je een taak na de geplande dag af, dan krijgt die het label <strong>Te laat uitgevoerd</strong>. Bij elk gezinslid kun je via <strong>Statistieken bekijken</strong> zien hoeveel taken die gebruiker te laat heeft afgevinkt.</p>
+        <p>Vink je een taak na de geplande dag af, dan krijgt die het label <strong>Te laat uitgevoerd</strong>. Bij elk gezinslid kun je via <strong>Statistieken bekijken</strong> zien hoeveel taken die persoon te laat ingepland had; dit wordt niet gekoppeld aan het account dat de taak heeft afgevinkt.</p>
       </section>
       <section class="panel help-panel"><h2>Gezinsleden</h2>
         <p>Voeg op <a href="#gezin">Ons gezin</a> gezinsleden toe en bewerk hun naam, geboortedatum en optioneel e-mailadres. Een geboortedatum wordt gebruikt om de leeftijd te tonen en verjaardagen op het overzicht te markeren.</p>
