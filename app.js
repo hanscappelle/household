@@ -290,8 +290,12 @@ function completionKey(task, date) {
   return `${task.id}|${occurrenceDate || dateKey(date)}`;
 }
 
-function isDone(task, date) {
-  return Boolean(state.completed[completionKey(task, date)]);
+function isDone(task, date, memberId) {
+  const completion = state.completed[completionKey(task, date)];
+  if (!completion || typeof completion !== 'object' || !completion.memberCompletions) return Boolean(completion);
+  if (memberId) return Boolean(completion.memberCompletions[memberId]);
+  const members = membersOn(task, date);
+  return members.length > 0 && members.every(member => Boolean(completion.memberCompletions[member.id]));
 }
 
 function completionDate(value) {
@@ -300,8 +304,12 @@ function completionDate(value) {
     : null;
 }
 
-function isLate(task, date) {
-  const completedAt = completionDate(state.completed[completionKey(task, date)]);
+function isLate(task, date, memberId) {
+  const completion = state.completed[completionKey(task, date)];
+  const record = completion?.memberCompletions
+    ? completion.memberCompletions[memberId]
+    : completion;
+  const completedAt = completionDate(record);
   return completedAt !== null && completedAt > dateKey(date);
 }
 
@@ -379,8 +387,12 @@ function renderLoadDistribution(title, loads) {
   return `<section class="daily-load"><strong>${escapeHtml(title)}</strong><ul>${loads.map(({ member, count }) => `<li><span class="load-name">${escapeHtml(member.name)}</span><span class="load-track" aria-hidden="true"><span class="load-bar" style="width:${maxLoad ? count / maxLoad * 100 : 0}%"></span></span><span class="load-count">${count} ${count === 1 ? 'taak' : 'taken'}</span></li>`).join('')}</ul></section>`;
 }
 
-function renderTaskRows(tasks, date) {
-  return tasks.map(task => `<div class="task-row ${isDone(task, date) ? 'done' : ''}"><input class="check" type="checkbox" data-action="complete" data-id="${escapeHtml(task.id)}" aria-label="${escapeHtml(task.title)} afronden" ${isDone(task, date) ? 'checked' : ''}><div class="task-info"><strong>${escapeHtml(task.title)}${task.important ? '<span class="important-icon" title="Belangrijke taak" aria-label="Belangrijke taak"><svg viewBox="0 0 16 16" focusable="false"><circle cx="8" cy="8" r="7"/><path class="important-icon-mark" d="M8 3.8v5.1M8 11.5v.1"/></svg></span>' : ''}</strong><small>${frequencyLabel(task)}</small>${isLate(task, date) ? '<small class="late-label">Te laat uitgevoerd</small>' : ''}</div>${taskMenu(task)}</div>`).join('');
+function renderTaskRows(tasks, date, memberId) {
+  return tasks.map(task => {
+    const done = memberId ? isDone(task, date, memberId) : isDone(task, date);
+    const memberData = memberId ? ` data-member-id="${escapeHtml(memberId)}"` : '';
+    return `<div class="task-row ${done ? 'done' : ''}"><input class="check" type="checkbox" data-action="complete" data-id="${escapeHtml(task.id)}"${memberData} aria-label="${escapeHtml(task.title)} afronden" ${done ? 'checked' : ''}><div class="task-info"><strong>${escapeHtml(task.title)}${task.important ? '<span class="important-icon" title="Belangrijke taak" aria-label="Belangrijke taak"><svg viewBox="0 0 16 16" focusable="false"><circle cx="8" cy="8" r="7"/><path class="important-icon-mark" d="M8 3.8v5.1M8 11.5v.1"/></svg></span>' : ''}</strong><small>${frequencyLabel(task)}</small>${isLate(task, date, memberId) ? '<small class="late-label">Te laat uitgevoerd</small>' : ''}</div>${taskMenu(task)}</div>`;
+  }).join('');
 }
 
 function memberStatistics(member) {
@@ -394,21 +406,11 @@ function memberStatistics(member) {
     for (const task of state.tasks) {
       if (occursOn(task, date) && membersOn(task, date).some(assigned => assigned.id === member.id)) {
         scheduled += 1;
-        if (isDone(task, date)) completed += 1;
+        if (isDone(task, date, member.id)) completed += 1;
+        if (isLate(task, date, member.id)) completedLate += 1;
       }
     }
   }
-  const tasksById = new Map(state.tasks.map(task => [task.id, task]));
-  completedLate = Object.entries(state.completed).filter(([key, value]) => {
-    const [taskId, dueDate] = key.split('|');
-    const task = tasksById.get(taskId);
-    const scheduledDate = validBackupDate(dueDate) ? parseDate(dueDate) : null;
-    const completedAt = completionDate(value);
-    return task && scheduledDate && dueDate >= member.createdAt && dueDate <= dateKey(end) &&
-      occursOn(task, scheduledDate) &&
-      membersOn(task, scheduledDate).some(assigned => assigned.id === member.id) &&
-      completedAt !== null && completedAt > dueDate && completedAt <= dateKey(end);
-  }).length;
   const creator = demoMode ? member.id : householdInfo.members.find(item =>
     item.email.toLowerCase() === member.email?.toLowerCase())?.id;
   const collections = [
@@ -503,7 +505,7 @@ function renderDashboard() {
           }).join('')}</div>
           <div class="day-detail"><div class="day-detail-head"><strong>${escapeHtml(formatDate(date, { weekday: 'long', day: 'numeric', month: 'long' }))}</strong><span>${todayTasks.length} ${todayTasks.length === 1 ? 'taak' : 'taken'}</span></div>
             ${birthdays.map(member => `<div class="birthday-row"><span class="birthday-icon" aria-hidden="true">🎂</span><div><strong>Verjaardag van ${escapeHtml(member.name)}</strong><small>${date.getFullYear() - parseDate(member.birthDate).getFullYear()} jaar</small></div></div>`).join('')}
-            ${memberLoads.filter(group => group.tasks.length).map(({ member, tasks }) => `<section class="day-task-group"><h3>${escapeHtml(member.name)}</h3>${renderTaskRows(tasks, date)}</section>`).join('')}
+            ${memberLoads.filter(group => group.tasks.length).map(({ member, tasks }) => `<section class="day-task-group"><h3>${escapeHtml(member.name)}</h3>${renderTaskRows(tasks, date, member.id)}</section>`).join('')}
             ${freeTasks.length ? `<section class="day-task-group"><h3>Vrij op te nemen taken</h3>${renderTaskRows(freeTasks, date)}</section>` : ''}
             ${!todayTasks.length && !birthdays.length ? `<div class="empty"><span class="empty-icon">☼</span><strong>Een lekker lege planning</strong>Plan een taak in en hij verschijnt hier.</div>` : ''}
           </div>
@@ -832,12 +834,23 @@ function validateBackup(backup) {
     const completionKeys = value && typeof value === 'object' && !Array.isArray(value) ? Object.keys(value) : [];
     const validActor = actor => actor == null || typeof actor === 'string' && actor.trim() !== '' ||
       typeof actor === 'number' && Number.isSafeInteger(actor) && actor > 0;
-    const validRecord = completionKeys.length >= 1 && completionKeys.every(field =>
-      ['completedAt', 'completedByUserId', 'completedByMemberId'].includes(field)) &&
-      validBackupDate(value.completedAt) &&
-      validActor(value.completedByUserId) && validActor(value.completedByMemberId);
+    const validRecord = record => {
+      if (!object(record)) return false;
+      const fields = Object.keys(record);
+      return fields.length >= 1 && fields.every(field =>
+        ['completedAt', 'completedByUserId', 'completedByMemberId'].includes(field)) &&
+        validBackupDate(record.completedAt) &&
+        validActor(record.completedByUserId) && validActor(record.completedByMemberId);
+    };
+    const validMemberCompletions = value && object(value.memberCompletions) &&
+      completionKeys.length === 1 && completionKeys[0] === 'memberCompletions' &&
+      Object.keys(value.memberCompletions).length > 0 &&
+      Object.entries(value.memberCompletions).every(([memberId, record]) =>
+        id(memberId) && (record === true || validRecord(record)));
     if (parts.length !== 2 || !taskIds.has(parts[0]) || !validBackupDate(parts[1]) ||
-        typeof value !== 'boolean' && !validRecord) throw new Error('Een afvinkje bevat ongeldige gegevens.');
+        typeof value !== 'boolean' && !validMemberCompletions && !validRecord(value)) {
+      throw new Error('Een afvinkje bevat ongeldige gegevens.');
+    }
   }
   if (data.groceries !== undefined && !Array.isArray(data.groceries)) throw new Error('De boodschappenlijst is ongeldig.');
   const groceryIds = new Set();
@@ -926,7 +939,9 @@ function assignmentChoices(name, selectedIds, allowMultipleMembers) {
 
 function scheduleFields(task, allowMultipleMembers = false, freeToTake = false) {
   const memberWord = allowMultipleMembers ? 'Gezinsleden' : 'Gezinslid';
-  const selectionHelp = allowMultipleMembers ? 'Selecteer iedereen die de taak uitvoert' : 'Kies wie de taak uitvoert';
+  const selectionHelp = allowMultipleMembers
+    ? 'Selecteer iedereen die de taak uitvoert; elk gezinslid vinkt de taak apart af'
+    : 'Kies wie de taak uitvoert';
   if (freeToTake) {
     if (task.frequency === 'daily') return '<div class="field full"><span class="field-help">Deze taak verschijnt dagelijks bij de vrij op te nemen taken en schuift door tot iemand hem afvinkt.</span></div>';
     if (task.frequency === 'weekly') return `<div class="field full"><label for="weekday">Dag van de week</label><select id="weekday" name="weekday">${DAYS.map((day, index) => `<option value="${index + 1}" ${task.weekday === index + 1 ? 'selected' : ''}>${day}</option>`).join('')}</select><span class="field-help">De taak verschijnt wekelijks op deze dag en schuift daarna dagelijks door tot iemand hem afvinkt.</span></div>`;
@@ -1288,7 +1303,34 @@ document.addEventListener('change', async event => {
     const task = state.tasks.find(item => item.id === target.dataset.id);
     if (!task) return;
     const key = completionKey(task, parseDate(selectedDate));
-    if (target.checked) {
+    const existing = state.completed[key];
+    const memberIds = membersOn(task, parseDate(selectedDate)).map(member => member.id);
+    const usesMemberCompletions = !task.freeToTake &&
+      (Boolean(existing?.memberCompletions) || memberIds.length > 1);
+    if (usesMemberCompletions) {
+      const memberId = target.dataset.memberId;
+      if (!memberIds.includes(memberId)) {
+        console.error('De afgevinkte gezinslid hoort niet bij deze taak.');
+        render();
+        return;
+      }
+      const memberCompletions = existing?.memberCompletions
+        ? Object.entries(existing.memberCompletions).filter(([id]) => id !== memberId)
+        : memberIds.filter(id => id !== memberId).map(id => [id, existing]);
+      if (target.checked) {
+        const completion = { completedAt: dateKey(new Date()) };
+        if (demoMode) {
+          const member = currentMember();
+          if (member) completion.completedByMemberId = member.id;
+        } else {
+          completion.completedByUserId = currentUserId;
+        }
+        memberCompletions.push([memberId, completion]);
+      }
+      const records = Object.fromEntries(memberCompletions);
+      if (Object.keys(records).length) state.completed[key] = { memberCompletions: records };
+      else delete state.completed[key];
+    } else if (target.checked) {
       const completion = { completedAt: dateKey(new Date()) };
       if (demoMode) {
         const member = currentMember();
@@ -1297,8 +1339,7 @@ document.addEventListener('change', async event => {
         completion.completedByUserId = currentUserId;
       }
       state.completed[key] = completion;
-    }
-    else delete state.completed[key];
+    } else delete state.completed[key];
     if (await save()) render();
   }
   if (target.id === 'frequency-filter') { frequencyFilter = target.value; render(); }

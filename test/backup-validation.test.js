@@ -46,6 +46,20 @@ test('invalid member IDs remain rejected', () => {
   }
 });
 
+test('shared task completion records can be stored per member', () => {
+  const data = backup({ id: 'shared', title: 'Samen opruimen', frequency: 'daily' });
+  data.data.completed['shared|2026-11-16'] = {
+    memberCompletions: {
+      m1: { completedAt: '2026-11-16', completedByUserId: '5' },
+      m2: true
+    }
+  };
+  assert.doesNotThrow(() => context.validateBackup(data));
+
+  data.data.completed['shared|2026-11-16'].memberCompletions.m1.completedAt = '2026-02-30';
+  assert.throws(() => context.validateBackup(data), /afvinkje bevat ongeldige gegevens/);
+});
+
 test('saving an empty member selection does not store a placeholder ID', () => {
   const task = { frequency: 'monthly' };
   const formData = {
@@ -55,4 +69,38 @@ test('saving an empty member selection does not store a placeholder ID', () => {
   context.readSchedule(task, formData, false);
   assert.deepEqual(Array.from(task.memberIds), []);
   assert.equal(task.memberId, '');
+});
+
+test('a shared task remains open until each assigned member has completed it', () => {
+  const date = '2026-11-16';
+  const members = [{ id: 'm1' }, { id: 'm2' }];
+  const state = {
+    completed: {
+      [`shared|${date}`]: {
+        memberCompletions: {
+          m1: { completedAt: '2026-11-17' }
+        }
+      }
+    }
+  };
+  const sharedTask = { id: 'shared' };
+  const completionContext = vm.createContext({
+    state,
+    membersOn: () => members,
+    dateKey: () => date,
+    validBackupDate: value => /^\d{4}-\d{2}-\d{2}$/.test(value)
+  });
+  vm.runInContext(
+    app.slice(app.indexOf('function completionKey('), app.indexOf('function showToast(')),
+    completionContext
+  );
+
+  assert.equal(completionContext.isDone(sharedTask, {}, 'm1'), true);
+  assert.equal(completionContext.isDone(sharedTask, {}, 'm2'), false);
+  assert.equal(completionContext.isDone(sharedTask, {}), false);
+  assert.equal(completionContext.isLate(sharedTask, {}, 'm1'), true);
+
+  state.completed[`shared|${date}`].memberCompletions.m2 = { completedAt: date };
+  assert.equal(completionContext.isDone(sharedTask, {}), true);
+  assert.equal(completionContext.isLate(sharedTask, {}, 'm2'), false);
 });

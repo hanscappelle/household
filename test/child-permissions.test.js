@@ -106,6 +106,24 @@ test('kind kan ook een te late taak met meerdere toegewezen gezinsleden afvinken
   assert.equal(childChangesAllowed(previous, invalid, defaults), false);
 });
 
+test('kind kan gedeelde taakafvinkjes per gezinslid bijhouden', () => {
+  const previous = clientState();
+  previous.tasks[0].dailyAssignments[1] = ['m1', 'm2'];
+  const submitted = structuredClone(previous);
+  submitted.completed['t1|2026-11-16'] = {
+    memberCompletions: {
+      m1: { completedAt: '2026-11-16', completedByUserId: '5' }
+    }
+  };
+  assert.equal(childChangesAllowed(previous, submitted, defaults), true);
+
+  submitted.completed['t1|2026-11-16'].memberCompletions.m2 = {
+    completedAt: '2026-02-30',
+    completedByUserId: '5'
+  };
+  assert.equal(childChangesAllowed(previous, submitted, defaults), false);
+});
+
 test('oude sporadische taken worden jaarlijkse taken', () => {
   const task = normalizeTask({ id: 't1', title: 'Ramen wassen', frequency: 'occasional', date: '2024-06-15' });
   assert.equal(task.frequency, 'yearly');

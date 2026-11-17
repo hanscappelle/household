@@ -103,16 +103,28 @@ const validCompletion = value => {
   if (typeof value === 'boolean') return true;
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const keys = Object.keys(value);
-  const validDate = typeof value.completedAt === 'string' &&
-    /^\d{4}-\d{2}-\d{2}$/.test(value.completedAt) &&
-    !Number.isNaN(Date.parse(`${value.completedAt}T00:00:00Z`)) &&
-    new Date(`${value.completedAt}T00:00:00Z`).toISOString().slice(0, 10) === value.completedAt;
   const validActor = actor => actor == null ||
     typeof actor === 'string' && actor.trim() !== '' ||
     typeof actor === 'number' && Number.isSafeInteger(actor) && actor > 0;
-  return keys.length > 0 &&
-    keys.every(key => ['completedAt', 'completedByUserId', 'completedByMemberId'].includes(key)) &&
-    validDate && validActor(value.completedByUserId) && validActor(value.completedByMemberId);
+  const validRecord = record => {
+    if (!record || typeof record !== 'object' || Array.isArray(record)) return false;
+    const fields = Object.keys(record);
+    const validDate = typeof record.completedAt === 'string' &&
+      /^\d{4}-\d{2}-\d{2}$/.test(record.completedAt) &&
+      !Number.isNaN(Date.parse(`${record.completedAt}T00:00:00Z`)) &&
+      new Date(`${record.completedAt}T00:00:00Z`).toISOString().slice(0, 10) === record.completedAt;
+    return fields.length > 0 &&
+      fields.every(field => ['completedAt', 'completedByUserId', 'completedByMemberId'].includes(field)) &&
+      validDate && validActor(record.completedByUserId) && validActor(record.completedByMemberId);
+  };
+  if (Object.hasOwn(value, 'memberCompletions')) {
+    const memberCompletions = value.memberCompletions;
+    return keys.length === 1 && memberCompletions && typeof memberCompletions === 'object' &&
+      !Array.isArray(memberCompletions) && Object.keys(memberCompletions).length > 0 &&
+      Object.entries(memberCompletions).every(([memberId, record]) =>
+        memberId.trim() !== '' && !memberId.includes('|') && (record === true || validRecord(record)));
+  }
+  return validRecord(value);
 };
 const customizationLimits = { websiteTitle: 60, brandSubtitle: 40, welcomeTitle: 80, welcomeText: 160, sidebarTitle: 100, sidebarText: 200 };
 const defaultCustomization = {
@@ -460,6 +472,16 @@ router.put('/api/state', authenticate, async (req, res) => {
   });
   const createdAt = new Date().toISOString().slice(0, 10);
   const completed = Object.fromEntries(Object.entries(data.completed).map(([key, value]) => {
+    if (value?.memberCompletions) {
+      const previous = currentData.completed?.[key];
+      const previousMembers = previous?.memberCompletions || {};
+      const memberCompletions = Object.fromEntries(Object.entries(value.memberCompletions).map(([memberId, record]) => {
+        const previousRecord = previousMembers[memberId] ?? previous;
+        if (record === true || isDeepStrictEqual(record, previousRecord)) return [memberId, record];
+        return [memberId, { completedAt: record.completedAt, completedByUserId: req.user.id }];
+      }));
+      return [key, { memberCompletions }];
+    }
     if (!value || typeof value !== 'object' || isDeepStrictEqual(value, currentData.completed?.[key])) {
       return [key, value];
     }
