@@ -55,6 +55,7 @@ let frequencyFilter = 'all';
 let memberFilter = 'all';
 let statusFilter = 'all';
 let statusSort = 'none';
+let pendingTaskCompletion = null;
 let toastTimer;
 
 function applyTheme(theme) {
@@ -387,13 +388,21 @@ function renderLoadDistribution(title, loads) {
   return `<section class="daily-load"><strong>${escapeHtml(title)}</strong><ul>${loads.map(({ member, count }) => `<li><span class="load-name">${escapeHtml(member.name)}</span><span class="load-track" aria-hidden="true"><span class="load-bar" style="width:${maxLoad ? count / maxLoad * 100 : 0}%"></span></span><span class="load-count">${count} ${count === 1 ? 'taak' : 'taken'}</span></li>`).join('')}</ul></section>`;
 }
 
-function speakButton(action, id, text, title, speechText) {
+function speakButton(action, id, text, title, speechText, visibleLabel = '') {
   const speechData = speechText ? ` data-speech-text="${escapeHtml(speechText)}"` : '';
-  return `<button type="button" class="task-speak" data-action="${escapeHtml(action)}" data-id="${escapeHtml(id)}"${speechData} aria-label="${escapeHtml(text)} voorlezen" title="${escapeHtml(title)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/></svg></button>`;
+  return `<button type="button" class="task-speak" data-action="${escapeHtml(action)}" data-id="${escapeHtml(id)}"${speechData} aria-label="${escapeHtml(text)} voorlezen" title="${escapeHtml(title)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/></svg>${visibleLabel ? `<span>${escapeHtml(visibleLabel)}</span>` : ''}</button>`;
 }
 
-function taskSpeechText(task, done) {
-  return `${task.title}.${task.important ? ' Belangrijke taak.' : ''} ${done ? 'Deze taak is al uitgevoerd.' : 'Deze taak is nog niet uitgevoerd.'}`;
+function taskSpeechText(task, done, date) {
+  let scheduledFor = '';
+  if (date && task.freeToTake) scheduledFor = 'Deze taak is vrij op te nemen.';
+  else if (date) {
+    const members = membersOn(task, date).map(member => member.name);
+    scheduledFor = members.length
+      ? `Deze taak is ingepland voor ${members.join(', ')}.`
+      : 'Deze taak is niet aan een gezinslid toegewezen.';
+  }
+  return `${task.title}.${task.important ? ' Belangrijke taak.' : ''} ${done ? 'Deze taak is al uitgevoerd.' : 'Deze taak is nog niet uitgevoerd.'} ${scheduledFor}`;
 }
 
 function mealSpeechText(idea, rank = [...state.mealIdeas]
@@ -412,6 +421,60 @@ function renderTaskRows(tasks, date, memberId) {
     const memberData = memberId ? ` data-member-id="${escapeHtml(memberId)}"` : '';
     return `<div class="task-row planned-task-row ${done ? 'done' : ''}"><label class="task-completion"><input class="check" type="checkbox" data-action="complete" data-id="${escapeHtml(task.id)}"${memberData} aria-label="${escapeHtml(task.title)} afronden" ${done ? 'checked' : ''}><span class="task-info"><strong>${escapeHtml(task.title)}${task.important ? '<span class="important-icon" title="Belangrijke taak" aria-label="Belangrijke taak"><svg viewBox="0 0 16 16" focusable="false"><circle cx="8" cy="8" r="7"/><path class="important-icon-mark" d="M8 3.8v5.1M8 11.5v.1"/></svg></span>' : ''}</strong><small>${frequencyLabel(task)}</small>${isLate(task, date, memberId) ? '<small class="late-label">Te laat uitgevoerd</small>' : ''}</span></label>${speakButton('speak-task', task.id, task.title, 'Taak voorlezen', taskSpeechText(task, done))}${taskMenu(task)}</div>`;
   }).join('');
+}
+
+function confirmTaskCompletion(task, date, memberId) {
+  pendingTaskCompletion = { taskId: task.id, date: dateKey(date), memberId };
+  const currentlyDone = memberId ? isDone(task, date, memberId) : isDone(task, date);
+  const dialog = document.querySelector('#modal');
+  const taskSpeech = `${taskSpeechText(task, currentlyDone, date)} Gebruik de groene knop als je deze taak al gedaan hebt, de rode knop wanneer je deze nog moet doen.`;
+  document.querySelector('#modal-content').innerHTML = `<div class="modal-inner task-confirmation"><div class="modal-head"><div><h2 id="modal-title">Heb je deze taak al uitgevoerd?</h2></div><button type="button" class="close" data-action="close-modal" aria-label="Sluiten">×</button></div><div class="task-confirmation-title"><strong>${escapeHtml(task.title)}</strong>${speakButton('speak-task', task.id, task.title, 'Taak voorlezen', taskSpeech)}${task.important ? '<span>Belangrijke taak</span>' : ''}</div><div class="modal-actions task-confirm-actions"><button type="button" class="button" data-action="task-completion-answer" data-checked="true"><span aria-hidden="true">✓</span> Ja</button><button type="button" class="button secondary" data-action="task-completion-answer" data-checked="false"><span aria-hidden="true">✕</span> Nee</button></div></div>`;
+  dialog.showModal();
+  dialog.querySelector('.modal-actions [data-action="task-completion-answer"]').focus();
+}
+
+async function updateTaskCompletion({ taskId, date, memberId, checked }) {
+  const task = state.tasks.find(item => item.id === taskId);
+  if (!task) return;
+  const selectedDate = parseDate(date);
+  const key = completionKey(task, selectedDate);
+  const existing = state.completed[key];
+  const assignedMemberIds = membersOn(task, selectedDate).map(member => member.id);
+  const usesMemberCompletions = !task.freeToTake &&
+    (Boolean(existing?.memberCompletions) || assignedMemberIds.length > 1);
+  if (usesMemberCompletions) {
+    if (!assignedMemberIds.includes(memberId)) {
+      console.error('De afgevinkte gezinslid hoort niet bij deze taak.');
+      render();
+      return;
+    }
+    const memberCompletions = existing?.memberCompletions
+      ? Object.entries(existing.memberCompletions).filter(([id]) => id !== memberId)
+      : assignedMemberIds.filter(id => id !== memberId).map(id => [id, existing]);
+    if (checked) {
+      const completion = { completedAt: dateKey(new Date()) };
+      if (demoMode) {
+        const member = currentMember();
+        if (member) completion.completedByMemberId = member.id;
+      } else {
+        completion.completedByUserId = currentUserId;
+      }
+      memberCompletions.push([memberId, completion]);
+    }
+    const records = Object.fromEntries(memberCompletions);
+    if (Object.keys(records).length) state.completed[key] = { memberCompletions: records };
+    else delete state.completed[key];
+  } else if (checked) {
+    const completion = { completedAt: dateKey(new Date()) };
+    if (demoMode) {
+      const member = currentMember();
+      if (member) completion.completedByMemberId = member.id;
+    } else {
+      completion.completedByUserId = currentUserId;
+    }
+    state.completed[key] = completion;
+  } else delete state.completed[key];
+  if (await save()) render();
 }
 
 function speakText(text) {
@@ -1204,6 +1267,14 @@ document.addEventListener('keydown', event => {
   }
 });
 
+const modalDialog = document.querySelector('#modal');
+modalDialog.addEventListener('close', () => {
+  pendingTaskCompletion = null;
+});
+modalDialog.addEventListener('click', event => {
+  if (event.target === modalDialog) modalDialog.close();
+});
+
 document.addEventListener('click', async event => {
   const button = event.target.closest('[data-action]');
   if (!button) {
@@ -1342,7 +1413,16 @@ document.addEventListener('click', async event => {
       showToast(`Uitnodiging intrekken is niet gelukt: ${error.message}`);
     }
   }
-  if (action === 'close-modal') document.querySelector('#modal').close();
+  if (action === 'close-modal') {
+    pendingTaskCompletion = null;
+    document.querySelector('#modal').close();
+  }
+  if (action === 'task-completion-answer') {
+    const pending = pendingTaskCompletion;
+    pendingTaskCompletion = null;
+    document.querySelector('#modal').close();
+    if (pending) await updateTaskCompletion({ ...pending, checked: button.dataset.checked === 'true' });
+  }
   if (action === 'select-day') { selectedDate = button.dataset.date; render(); }
   if (action === 'today') { selectedDate = dateKey(new Date()); render(); }
   if (action === 'previous-week' || action === 'next-week') { selectedDate = dateKey(addDays(parseDate(selectedDate), action === 'previous-week' ? -7 : 7)); render(); }
@@ -1368,45 +1448,15 @@ document.addEventListener('change', async event => {
   if (target.dataset.action === 'complete') {
     const task = state.tasks.find(item => item.id === target.dataset.id);
     if (!task) return;
-    const key = completionKey(task, parseDate(selectedDate));
-    const existing = state.completed[key];
-    const memberIds = membersOn(task, parseDate(selectedDate)).map(member => member.id);
-    const usesMemberCompletions = !task.freeToTake &&
-      (Boolean(existing?.memberCompletions) || memberIds.length > 1);
-    if (usesMemberCompletions) {
-      const memberId = target.dataset.memberId;
-      if (!memberIds.includes(memberId)) {
-        console.error('De afgevinkte gezinslid hoort niet bij deze taak.');
-        render();
-        return;
-      }
-      const memberCompletions = existing?.memberCompletions
-        ? Object.entries(existing.memberCompletions).filter(([id]) => id !== memberId)
-        : memberIds.filter(id => id !== memberId).map(id => [id, existing]);
-      if (target.checked) {
-        const completion = { completedAt: dateKey(new Date()) };
-        if (demoMode) {
-          const member = currentMember();
-          if (member) completion.completedByMemberId = member.id;
-        } else {
-          completion.completedByUserId = currentUserId;
-        }
-        memberCompletions.push([memberId, completion]);
-      }
-      const records = Object.fromEntries(memberCompletions);
-      if (Object.keys(records).length) state.completed[key] = { memberCompletions: records };
-      else delete state.completed[key];
-    } else if (target.checked) {
-      const completion = { completedAt: dateKey(new Date()) };
-      if (demoMode) {
-        const member = currentMember();
-        if (member) completion.completedByMemberId = member.id;
-      } else {
-        completion.completedByUserId = currentUserId;
-      }
-      state.completed[key] = completion;
-    } else delete state.completed[key];
-    if (await save()) render();
+    const date = parseDate(selectedDate);
+    const memberId = target.dataset.memberId;
+    const checked = target.checked;
+    if (isChild()) {
+      target.checked = memberId ? isDone(task, date, memberId) : isDone(task, date);
+      confirmTaskCompletion(task, date, memberId);
+      return;
+    }
+    await updateTaskCompletion({ taskId: task.id, date: dateKey(date), memberId, checked });
   }
   if (target.id === 'frequency-filter') { frequencyFilter = target.value; render(); }
   if (target.id === 'member-filter') { memberFilter = target.value; render(); }

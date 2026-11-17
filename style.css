@@ -305,6 +305,11 @@ dialog::backdrop{background:rgba(34,50,38,.42)}
 .day-options input:checked+span{background:#e5f0e4;color:#507a60;border-color:#a9c7aa}
 .day-options input:focus-visible+span{outline:2px solid #507a60}
 .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:23px}.modal-actions .danger{margin-right:auto}
+.task-confirmation-title{display:flex;align-items:center;gap:12px;min-width:0}
+.task-confirmation-title>strong{flex:1;overflow-wrap:anywhere}
+.task-confirmation-title>span{font-size:11px;font-weight:700;color:var(--palette-accent)}
+.task-confirm-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:min(100%,390px);margin:28px auto 0}
+.task-confirm-actions .button{min-height:48px;font-size:15px}
 #toast{position:fixed;bottom:22px;right:22px;background:#355d44;color:white;padding:12px 17px;border-radius:8px;font-size:12px;opacity:0;transform:translateY(8px);transition:.2s;pointer-events:none;z-index:10}
 #toast.visible{opacity:1;transform:none}
 :root[data-theme="dark"]{color-scheme:dark;color:#e3ebe3;background:#17231c;--ink:#e3ebe3}
@@ -491,3 +496,7 @@ dialog::backdrop{background:rgba(34,50,38,.42)}
 [data-theme="dark"][data-palette] .button:not(.secondary):not(.danger),[data-theme="dark"][data-palette] .day.selected{color:var(--dark-accent-text)}
 [data-theme="dark"][data-palette] .day.selected .day-number,[data-theme="dark"][data-palette] .day.selected .day-task-count{color:var(--dark-accent-text)}
 [data-theme="dark"][data-palette] .day.selected .day-dot{background:var(--dark-accent-text)}
+:root[data-theme][data-palette] .task-confirm-actions .button[data-checked="true"]{background:#2f7d32;color:#fff}
+:root[data-theme][data-palette] .task-confirm-actions .button[data-checked="true"]:hover{background:#256528;color:#fff}
+:root[data-theme][data-palette] .task-confirm-actions .button[data-checked="false"]{background:#c62828;border:1px solid #c62828;color:#fff}
+:root[data-theme][data-palette] .task-confirm-actions .button[data-checked="false"]:hover{background:#a91f1f;border-color:#a91f1f;color:#fff}
