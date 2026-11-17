@@ -67,10 +67,11 @@ const SEED_TASKS = [
 
 function normalizeTask(task) {
   const hasMultipleAssignments = value => Array.isArray(value) && value.length > 1;
+  const normalizeIds = ids => (Array.isArray(ids) ? ids : ids ? [ids] : []).filter(id => id !== '');
   const normalizeAssignments = assignments => Object.fromEntries(
-    Object.entries(assignments).map(([key, ids]) => [key, Array.isArray(ids) ? ids : ids ? [ids] : []])
+    Object.entries(assignments).map(([key, ids]) => [key, normalizeIds(ids)])
   );
-  const memberIds = task.memberIds ?? (task.memberId ? [task.memberId] : []);
+  const memberIds = normalizeIds(task.memberIds ?? task.memberId);
   const dailyAssignments = normalizeAssignments(task.dailyAssignments ?? Object.fromEntries((task.days || []).map(day => [day, task.memberId || ''])));
   const weeklyAssignments = normalizeAssignments(task.weeklyAssignments ?? {
     even: task.week === 'odd' ? '' : task.memberId || '',
@@ -84,6 +85,7 @@ function normalizeTask(task) {
     ...task,
     frequency: task.frequency === 'occasional' ? 'yearly' : task.frequency,
     important: task.important === true,
+    freeToTake: task.freeToTake === true,
     allowMultipleMembers: task.allowMultipleMembers === true || legacyMultipleAssignments,
     memberId: memberIds[0] ?? '',
     memberIds,

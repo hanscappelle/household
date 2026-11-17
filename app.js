@@ -195,6 +195,7 @@ function frequencyLabel(task) {
 }
 
 function assignedMemberIds(task) {
+  if (task.freeToTake) return [];
   if (task.schedules) return [...new Set(task.schedules.flatMap(assignedMemberIds))];
   const assignments = task.frequency === 'daily' ? Object.values(task.dailyAssignments) :
     task.frequency === 'weekly' ? Object.values(task.weeklyAssignments) : [task.memberIds || (task.memberId ? [task.memberId] : [])];
@@ -203,6 +204,7 @@ function assignedMemberIds(task) {
 }
 
 function membersOn(task, date) {
+  if (task.freeToTake) return [];
   if (task.schedules) {
     const schedule = task.schedules.find(part => occursOn(part, date));
     return schedule ? membersOn(schedule, date) : [];
@@ -216,6 +218,14 @@ function membersOn(task, date) {
 }
 
 function occursOn(task, date) {
+  if (task.freeToTake) {
+    return schedulesFor(task).some(schedule => {
+      if (schedule.frequency === 'daily') return true;
+      if (schedule.frequency === 'weekly') return schedule.weekday === (date.getDay() || 7);
+      if (schedule.frequency === 'monthly') return schedule.monthDay === date.getDate();
+      return schedule.frequency === 'yearly' && schedule.date?.slice(5) === dateKey(date).slice(5);
+    });
+  }
   if (task.schedules) return task.schedules.some(part => occursOn(part, date));
   if (!membersOn(task, date).length) return false;
   const weekday = date.getDay() || 7;
@@ -226,6 +236,15 @@ function occursOn(task, date) {
 }
 
 function isScheduled(task) {
+  if (task.freeToTake) {
+    return schedulesFor(task).some(schedule => {
+      if (schedule.frequency === 'daily') return true;
+      if (schedule.frequency === 'weekly') return Number.isInteger(schedule.weekday) && schedule.weekday >= 1 && schedule.weekday <= 7;
+      if (schedule.frequency === 'monthly') return Number.isInteger(schedule.monthDay) && schedule.monthDay >= 1 && schedule.monthDay <= 31;
+      return schedule.frequency === 'yearly' && /^\d{4}-\d{2}-\d{2}$/.test(schedule.date || '') &&
+        validBackupDate(schedule.date);
+    });
+  }
   return schedulesFor(task).some(schedule => {
     if (schedule.frequency === 'daily') {
       return DAYS.some((_, index) => membersForAssignment(schedule.dailyAssignments[index + 1]).length);
@@ -245,7 +264,10 @@ function isScheduled(task) {
 }
 
 function tasksOn(date) {
-  return state.tasks.filter(task => occursOn(task, date));
+  const selectedDateKey = dateKey(date);
+  return state.tasks.filter(task => task.freeToTake
+    ? Boolean(globalThis.freeTaskOccurrenceDate(task, selectedDateKey, task.freeSince || task.createdAt || selectedDateKey, state.completed))
+    : occursOn(task, date));
 }
 
 function birthdaysOn(date) {
@@ -262,7 +284,10 @@ function birthdaysOn(date) {
 }
 
 function completionKey(task, date) {
-  return `${task.id}|${dateKey(date)}`;
+  const occurrenceDate = task.freeToTake
+    ? globalThis.freeTaskOccurrenceDate(task, dateKey(date), task.freeSince || task.createdAt || dateKey(date), state.completed)
+    : dateKey(date);
+  return `${task.id}|${occurrenceDate || dateKey(date)}`;
 }
 
 function isDone(task, date) {
@@ -328,6 +353,7 @@ function taskMenu(task) {
 }
 
 function taskSchedule(task) {
+  if (task.freeToTake) return 'Vrij op te nemen';
   if (task.schedules) return task.schedules.map(part => `${FREQUENCIES[part.frequency]}: ${part.frequency === 'monthly' || part.frequency === 'yearly' ? `${membersForAssignment(part.memberIds || (part.memberId ? [part.memberId] : [])).map(member => member.name).join(', ') || 'Niet toegewezen'} · ` : ''}${taskSchedule(part)}`).join(' | ');
   if (task.frequency === 'daily') {
     const days = DAYS.map((day, index) => {
@@ -351,6 +377,10 @@ function taskSchedule(task) {
 function renderLoadDistribution(title, loads) {
   const maxLoad = Math.max(0, ...loads.map(item => item.count));
   return `<section class="daily-load"><strong>${escapeHtml(title)}</strong><ul>${loads.map(({ member, count }) => `<li><span class="load-name">${escapeHtml(member.name)}</span><span class="load-track" aria-hidden="true"><span class="load-bar" style="width:${maxLoad ? count / maxLoad * 100 : 0}%"></span></span><span class="load-count">${count} ${count === 1 ? 'taak' : 'taken'}</span></li>`).join('')}</ul></section>`;
+}
+
+function renderTaskRows(tasks, date) {
+  return tasks.map(task => `<div class="task-row ${isDone(task, date) ? 'done' : ''}"><input class="check" type="checkbox" data-action="complete" data-id="${escapeHtml(task.id)}" aria-label="${escapeHtml(task.title)} afronden" ${isDone(task, date) ? 'checked' : ''}><div class="task-info"><strong>${escapeHtml(task.title)}${task.important ? '<span class="important-icon" title="Belangrijke taak" aria-label="Belangrijke taak"><svg viewBox="0 0 16 16" focusable="false"><circle cx="8" cy="8" r="7"/><path class="important-icon-mark" d="M8 3.8v5.1M8 11.5v.1"/></svg></span>' : ''}</strong><small>${frequencyLabel(task)}</small>${isLate(task, date) ? '<small class="late-label">Te laat uitgevoerd</small>' : ''}</div>${taskMenu(task)}</div>`).join('');
 }
 
 function memberStatistics(member) {
@@ -442,6 +472,7 @@ function renderDashboard() {
     member,
     tasks: todayTasks.filter(task => membersOn(task, date).some(assigned => assigned.id === member.id))
   }));
+  const freeTasks = todayTasks.filter(task => task.freeToTake);
   const dailyLoads = memberLoads.map(({ member, tasks }) => ({ member, count: tasks.length }));
   const weeklyLoads = state.members.map(member => ({
     member,
@@ -472,7 +503,8 @@ function renderDashboard() {
           }).join('')}</div>
           <div class="day-detail"><div class="day-detail-head"><strong>${escapeHtml(formatDate(date, { weekday: 'long', day: 'numeric', month: 'long' }))}</strong><span>${todayTasks.length} ${todayTasks.length === 1 ? 'taak' : 'taken'}</span></div>
             ${birthdays.map(member => `<div class="birthday-row"><span class="birthday-icon" aria-hidden="true">🎂</span><div><strong>Verjaardag van ${escapeHtml(member.name)}</strong><small>${date.getFullYear() - parseDate(member.birthDate).getFullYear()} jaar</small></div></div>`).join('')}
-            ${memberLoads.filter(group => group.tasks.length).map(({ member, tasks }) => `<section class="day-task-group"><h3>${escapeHtml(member.name)}</h3>${tasks.map(task => `<div class="task-row ${isDone(task, date) ? 'done' : ''}"><input class="check" type="checkbox" data-action="complete" data-id="${escapeHtml(task.id)}" aria-label="${escapeHtml(task.title)} afronden" ${isDone(task, date) ? 'checked' : ''}><div class="task-info"><strong>${escapeHtml(task.title)}${task.important ? '<span class="important-icon" title="Belangrijke taak" aria-label="Belangrijke taak"><svg viewBox="0 0 16 16" focusable="false"><circle cx="8" cy="8" r="7"/><path class="important-icon-mark" d="M8 3.8v5.1M8 11.5v.1"/></svg></span>' : ''}</strong><small>${frequencyLabel(task)}</small>${isLate(task, date) ? '<small class="late-label">Te laat uitgevoerd</small>' : ''}</div>${taskMenu(task)}</div>`).join('')}</section>`).join('')}
+            ${memberLoads.filter(group => group.tasks.length).map(({ member, tasks }) => `<section class="day-task-group"><h3>${escapeHtml(member.name)}</h3>${renderTaskRows(tasks, date)}</section>`).join('')}
+            ${freeTasks.length ? `<section class="day-task-group"><h3>Vrij op te nemen taken</h3>${renderTaskRows(freeTasks, date)}</section>` : ''}
             ${!todayTasks.length && !birthdays.length ? `<div class="empty"><span class="empty-icon">☼</span><strong>Een lekker lege planning</strong>Plan een taak in en hij verschijnt hier.</div>` : ''}
           </div>
         </div>
@@ -480,7 +512,7 @@ function renderDashboard() {
       <section><div class="section-heading"><div><h2>Ons gezin</h2><p>Samen staan we sterker.</p></div><a class="text-button" href="#gezin">Bekijken →</a></div>
         <div class="panel family-panel">${state.members.length ? state.members.map((member, index) => `<div class="family-row">${avatar(member, index)}<div><strong>${escapeHtml(member.name)}</strong><small>${escapeHtml(memberDetails(member))}${member.email ? ` · ${escapeHtml(member.email)}` : ''}</small></div></div>`).join('') : '<div class="empty">Voeg een gezinslid toe om te beginnen.</div>'}</div>
         ${memberLoads.length ? `<div class="load-distributions">${renderLoadDistribution('Verdeling per gezinslid · dag', dailyLoads)}${renderLoadDistribution('Verdeling per gezinslid · week', weeklyLoads)}</div>` : ''}
-        <div class="tip"><span class="tip-icon">✧</span><div><strong>Goed om te weten</strong><p>De taken uit jullie lijst staan al klaar. Wijs ze toe en kies wanneer ze terugkomen.</p><a class="text-button" href="#taken" style="padding-left:0">Bekijk alle taken →</a></div></div>
+        <div class="tip"><span class="tip-icon">✧</span><div><strong>Goed om te weten</strong><p>De taken uit jullie lijst staan al klaar. Wijs ze toe of maak ze vrij op te nemen en kies wanneer ze terugkomen.</p><a class="text-button" href="#taken" style="padding-left:0">Bekijk alle taken →</a></div></div>
       </section>
       <section class="dashboard-notes"><div class="section-heading"><div><h2>Notities</h2><p>Deel een mededeling met het gezin.</p></div><div class="note-section-actions"><a class="text-button" href="#notitiearchief">Archief beheren →</a><button type="button" class="button" data-action="new-note"><span class="plus">+</span> Notitie toevoegen</button></div></div>
         <div class="panel notes-panel">
@@ -677,7 +709,7 @@ function renderHelp() {
         <p>Op <a href="#overzicht">Overzicht</a> zie je de weekplanning, taken en verjaardagen. Kies een dag in de agenda of gebruik de pijlen om naar een andere week te gaan. De taken van de gekozen dag staan gegroepeerd per verantwoordelijke. Vink een taak af wanneer die klaar is.</p>
         <p>Naast de weekplanning zie je de gezinsleden; daaronder staan gedeelde notities als post-its. Kies <strong>Notitie toevoegen</strong> om in een venster een titel en beschrijving in te vullen. De auteur wordt automatisch ingevuld. Zet eventueel <strong>Markeer als belangrijk</strong> aan; dit staat standaard uit. Belangrijke notities krijgen een uitroepteken en staan bovenaan.</p>
         <p>Open het driepuntjesmenu op een post-it om die te bewerken of te archiveren. Bij bewerken door een ander gezinslid worden diens naam en bewerktijd vermeld. Gearchiveerde notities verdwijnen van het overzicht. Via <a href="#notitiearchief">Notitiearchief</a> kun je ze herstellen of definitief verwijderen.</p>
-        <p>Op <a href="#taken">Alle taken</a> kun je een taak openen om de planning te wijzigen. Kies per dag, week, maand of eenmalige datum wie de taak uitvoert. Standaard wijs je de taak aan één gezinslid toe; zet <strong>Taak door meerdere gezinsleden laten uitvoeren</strong> aan om meerdere personen te selecteren. Markeer in het taakformulier belangrijke taken; die herken je aan het label <strong>Belangrijk</strong>. Gebruik de zoekbalk en filters om taken terug te vinden.</p>
+        <p>Op <a href="#taken">Alle taken</a> kun je een taak openen om de planning te wijzigen. Kies per dag, week, maand of eenmalige datum wie de taak uitvoert. Standaard wijs je de taak aan één gezinslid toe; zet <strong>Taak door meerdere gezinsleden laten uitvoeren</strong> aan om meerdere personen te selecteren. Zet <strong>Vrij op te nemen taak</strong> aan om de taak zonder toewijzing onder die aparte titel in de planning te tonen. Een terugkerende vrij op te nemen taak schuift dagelijks door zolang die openstaat; er verschijnt pas een nieuw exemplaar op de volgende reguliere frequentiedag nadat de open taak is afgevinkt. Markeer in het taakformulier belangrijke taken; die herken je aan het label <strong>Belangrijk</strong>. Gebruik de zoekbalk en filters om taken terug te vinden.</p>
         <p>Vink je een taak na de geplande dag af, dan krijgt die het label <strong>Te laat uitgevoerd</strong>. Bij elk gezinslid kun je via <strong>Statistieken bekijken</strong> zien hoeveel taken die persoon te laat ingepland had; dit wordt niet gekoppeld aan het account dat de taak heeft afgevinkt.</p>
       </section>
       <section class="panel help-panel"><h2>Gezinsleden</h2>
@@ -767,9 +799,11 @@ function validateBackup(backup) {
   const validSchedule = schedule => {
     if (!object(schedule) || (!Object.hasOwn(FREQUENCIES, schedule.frequency) && schedule.frequency !== 'occasional') || !optionalString(schedule.memberId) ||
       (schedule.memberId && !validAssignment(schedule.memberId)) ||
+      (schedule.freeToTake !== undefined && typeof schedule.freeToTake !== 'boolean') ||
+      (schedule.freeSince != null && (!validBackupDate(schedule.freeSince) || schedule.freeSince > dateKey(new Date()))) ||
       (schedule.allowMultipleMembers !== undefined && typeof schedule.allowMultipleMembers !== 'boolean') ||
       (schedule.memberIds != null && (!Array.isArray(schedule.memberIds) ||
-        new Set(schedule.memberIds).size !== schedule.memberIds.length || !schedule.memberIds.every(id))) ||
+        !validAssignments(schedule.memberIds))) ||
       (schedule.days != null && (!Array.isArray(schedule.days) || !schedule.days.every(day => Number.isInteger(day) && day >= 1 && day <= 7))) ||
       (schedule.week != null && !['all', 'even', 'odd'].includes(schedule.week)) ||
       (schedule.weekday != null && (!Number.isInteger(schedule.weekday) || schedule.weekday < 1 || schedule.weekday > 7)) ||
@@ -788,7 +822,8 @@ function validateBackup(backup) {
       (task.important !== undefined && typeof task.important !== 'boolean') ||
       (task.schedules != null && (!Array.isArray(task.schedules) || !task.schedules.length ||
         !task.schedules.every(part => validSchedule(part) && typeof part.title === 'string' && part.title.trim())))) {
-      throw new Error('Een taak bevat ongeldige gegevens of een ongeldig schema.');
+      const taskLabel = typeof task?.title === 'string' && task.title.trim() ? ` "${task.title}"` : '';
+      throw new Error(`Taak${taskLabel} bevat ongeldige gegevens of een ongeldig schema.`);
     }
     taskIds.add(task.id);
   }
@@ -889,9 +924,15 @@ function assignmentChoices(name, selectedIds, allowMultipleMembers) {
   return `<div class="member-assignment-list">${state.members.length ? state.members.map(member => `<label><input type="checkbox" name="${name}" value="${escapeHtml(member.id)}" ${selected.has(member.id) ? 'checked' : ''}><span>${escapeHtml(member.name)}</span></label>`).join('') : '<span class="field-help">Voeg eerst een gezinslid toe.</span>'}</div>`;
 }
 
-function scheduleFields(task, allowMultipleMembers = false) {
+function scheduleFields(task, allowMultipleMembers = false, freeToTake = false) {
   const memberWord = allowMultipleMembers ? 'Gezinsleden' : 'Gezinslid';
   const selectionHelp = allowMultipleMembers ? 'Selecteer iedereen die de taak uitvoert' : 'Kies wie de taak uitvoert';
+  if (freeToTake) {
+    if (task.frequency === 'daily') return '<div class="field full"><span class="field-help">Deze taak verschijnt dagelijks bij de vrij op te nemen taken en schuift door tot iemand hem afvinkt.</span></div>';
+    if (task.frequency === 'weekly') return `<div class="field full"><label for="weekday">Dag van de week</label><select id="weekday" name="weekday">${DAYS.map((day, index) => `<option value="${index + 1}" ${task.weekday === index + 1 ? 'selected' : ''}>${day}</option>`).join('')}</select><span class="field-help">De taak verschijnt wekelijks op deze dag en schuift daarna dagelijks door tot iemand hem afvinkt.</span></div>`;
+    if (task.frequency === 'monthly') return `<div class="field full"><label for="monthDay">Dag van de maand</label><input id="monthDay" name="monthDay" type="number" min="1" max="31" value="${task.monthDay}" required><span class="field-help">Bestaat deze dag niet in een maand, dan wordt de taak die maand overgeslagen. Een open taak schuift dagelijks door tot iemand hem afvinkt.</span></div>`;
+    return `<div class="field full"><label for="date">Dag en maand</label><input id="date" name="date" type="date" value="${escapeHtml(task.date)}"><span class="field-help">De taak verschijnt jaarlijks op deze dag en maand; het gekozen jaar wordt genegeerd. Een open taak schuift dagelijks door tot iemand hem afvinkt.</span></div>`;
+  }
   if (task.frequency === 'daily') return `<div class="field full"><span class="field-label">${memberWord} per dag</span><span class="field-help">${selectionHelp}. Laat een dag leeg om die over te slaan.</span><div class="assignment-grid">${DAYS.map((day, index) => `<div class="field"><span class="field-label">${day}</span>${assignmentChoices(`day-${index + 1}`, task.dailyAssignments[index + 1], allowMultipleMembers)}</div>`).join('')}</div></div>`;
   if (task.frequency === 'weekly') return `<div class="field full"><label for="weekday">Dag van de week</label><select id="weekday" name="weekday">${DAYS.map((day, index) => `<option value="${index + 1}" ${task.weekday === index + 1 ? 'selected' : ''}>${day}</option>`).join('')}</select><span class="field-help">${selectionHelp} per soort week. Laat een week leeg om die over te slaan.</span></div><div class="field"><span class="field-label">Even weken</span>${assignmentChoices('week-even', task.weeklyAssignments.even, allowMultipleMembers)}</div><div class="field"><span class="field-label">Oneven weken</span>${assignmentChoices('week-odd', task.weeklyAssignments.odd, allowMultipleMembers)}</div>`;
   const memberField = `<div class="field full"><span class="field-label">${memberWord}</span>${assignmentChoices('memberIds', task.memberIds || (task.memberId ? [task.memberId] : []), allowMultipleMembers)}<span class="field-help">${selectionHelp}</span></div>`;
@@ -899,49 +940,68 @@ function scheduleFields(task, allowMultipleMembers = false) {
   return `${memberField}<div class="field full"><label for="date">Dag en maand (optioneel)</label><input id="date" name="date" type="date" value="${escapeHtml(task.date)}"><span class="field-help">De taak wordt jaarlijks op deze dag en maand ingepland; het gekozen jaar wordt genegeerd. Zonder datum blijft de taak in de takenlijst staan.</span></div>`;
 }
 
-function readSchedule(task, data, allowMultipleMembers) {
+function readSchedule(task, data, allowMultipleMembers, freeToTake = false) {
   const assignmentIds = name => {
-    const ids = [...new Set(data.getAll(name).map(String))];
+    const ids = [...new Set(data.getAll(name).map(String).filter(id => id !== ''))];
     return allowMultipleMembers ? ids : ids.slice(0, 1);
   };
   if (task.frequency === 'daily') {
-    task.dailyAssignments = Object.fromEntries(DAYS.map((_, index) => [index + 1, assignmentIds(`day-${index + 1}`)]));
+    if (!freeToTake) task.dailyAssignments = Object.fromEntries(DAYS.map((_, index) => [index + 1, assignmentIds(`day-${index + 1}`)]));
   } else if (task.frequency === 'weekly') {
     task.weekday = Number(data.get('weekday'));
-    task.weeklyAssignments = {
+    if (!freeToTake) task.weeklyAssignments = {
       even: assignmentIds('week-even'),
       odd: assignmentIds('week-odd')
     };
   } else {
-    task.memberIds = assignmentIds('memberIds');
-    task.memberId = task.memberIds[0] || '';
+    if (!freeToTake) {
+      task.memberIds = assignmentIds('memberIds');
+      task.memberId = task.memberIds[0] || '';
+    }
     if (task.frequency === 'monthly') task.monthDay = Number(data.get('monthDay')) || 1;
     if (task.frequency === 'yearly') task.date = String(data.get('date') || '');
+  }
+}
+
+function clearTaskAssignments(task) {
+  for (const schedule of task.schedules ? [task, ...task.schedules] : [task]) {
+    schedule.memberIds = [];
+    schedule.memberId = '';
+    schedule.dailyAssignments = Object.fromEntries(DAYS.map((_, index) => [index + 1, []]));
+    schedule.weeklyAssignments = { even: [], odd: [] };
   }
 }
 
 function openTask(id) {
   const existing = state.tasks.find(task => task.id === id);
   const task = existing ? normalizeTask(structuredClone(existing)) : normalizeTask({ title: '', frequency: 'daily', group: '', memberId: '', days: [], week: 'all', weekday: 1, monthDay: 1, date: '' });
+  const initiallyFreeToTake = task.freeToTake;
   let scheduleIndex = 0;
   let activeSchedule = task.schedules ? task.schedules[0] : task;
   document.querySelector('#modal-content').innerHTML = `<form id="task-form" class="modal-inner"><div class="modal-head"><div><h2 id="modal-title">${existing ? 'Taak bewerken' : 'Nieuwe taak'}</h2><p>Maak het samen een beetje makkelijker.</p></div><button type="button" class="close" data-action="close-modal" aria-label="Sluiten">×</button></div>
     <div class="form-grid"><div class="field full"><label for="title">Naam van de taak</label><input id="title" name="title" value="${escapeHtml(task.title)}" required maxlength="200" placeholder="Bijvoorbeeld: tafel afruimen"></div>
-    <div class="task-options-row"><div class="field"><label for="frequency">Frequentie</label><select id="frequency" name="frequency">${Object.entries(FREQUENCIES).map(([value, label]) => `<option value="${value}" ${activeSchedule.frequency === value ? 'selected' : ''}>${label}</option>`).join('')}</select></div><div class="task-flag-options"><label class="important-checkbox"><input type="checkbox" name="important" ${task.important ? 'checked' : ''}> Markeer als belangrijk</label><label class="important-checkbox"><input type="checkbox" name="allowMultipleMembers" ${task.allowMultipleMembers ? 'checked' : ''}> Taak door meerdere gezinsleden laten uitvoeren</label></div></div>
+    <div class="task-options-row"><div class="field"><label for="frequency">Frequentie</label><select id="frequency" name="frequency">${Object.entries(FREQUENCIES).map(([value, label]) => `<option value="${value}" ${activeSchedule.frequency === value ? 'selected' : ''}>${label}</option>`).join('')}</select></div><div class="task-flag-options"><label class="important-checkbox"><input type="checkbox" name="important" ${task.important ? 'checked' : ''}> Markeer als belangrijk</label><label class="important-checkbox"><input type="checkbox" name="freeToTake" ${task.freeToTake ? 'checked' : ''}> Vrij op te nemen taak</label><label id="multiple-members-option" class="important-checkbox" style="${task.freeToTake ? 'display:none' : ''}"><input type="checkbox" name="allowMultipleMembers" ${task.allowMultipleMembers ? 'checked' : ''}> Taak door meerdere gezinsleden laten uitvoeren</label></div></div>
     ${task.schedules ? `<div class="field full"><label for="schedule-index">Schema bewerken</label><select id="schedule-index">${task.schedules.map((part, index) => `<option value="${index}">${index + 1}. ${escapeHtml(part.title)} (${FREQUENCIES[part.frequency]})</option>`).join('')}</select><span class="field-help">Bij overlap heeft het eerste passende schema voorrang. Wijzigingen aan alle schema's worden samen opgeslagen.</span></div>` : ''}
-      <div id="schedule-fields" class="field full" style="display:contents">${scheduleFields(activeSchedule, task.allowMultipleMembers)}</div></div>
+      <div id="schedule-fields" class="field full" style="display:contents">${scheduleFields(activeSchedule, task.allowMultipleMembers, task.freeToTake)}</div></div>
     <div class="modal-actions">${existing ? '<button type="button" class="button danger" data-action="delete-task">Verwijderen</button>' : ''}<button type="button" class="button secondary" data-action="close-modal">Annuleren</button><button type="submit" class="button">Opslaan</button></div></form>`;
   const form = document.querySelector('#task-form');
     const renderActiveSchedule = () => {
-      document.querySelector('#schedule-fields').innerHTML = scheduleFields(activeSchedule, task.allowMultipleMembers);
+      document.querySelector('#schedule-fields').innerHTML = scheduleFields(activeSchedule, task.allowMultipleMembers, task.freeToTake);
+      document.querySelector('#multiple-members-option').style.display = task.freeToTake ? 'none' : '';
     };
     form.elements.frequency.addEventListener('change', () => {
-      readSchedule(activeSchedule, new FormData(form), task.allowMultipleMembers);
+      readSchedule(activeSchedule, new FormData(form), task.allowMultipleMembers, task.freeToTake);
       activeSchedule.frequency = form.elements.frequency.value;
       renderActiveSchedule();
     });
+    form.elements.freeToTake.addEventListener('change', () => {
+      readSchedule(activeSchedule, new FormData(form), task.allowMultipleMembers, task.freeToTake);
+      task.freeToTake = form.elements.freeToTake.checked;
+      if (task.freeToTake) clearTaskAssignments(task);
+      renderActiveSchedule();
+    });
     form.elements.allowMultipleMembers.addEventListener('change', () => {
-      readSchedule(activeSchedule, new FormData(form), task.allowMultipleMembers);
+      readSchedule(activeSchedule, new FormData(form), task.allowMultipleMembers, task.freeToTake);
       task.allowMultipleMembers = form.elements.allowMultipleMembers.checked;
       if (!task.allowMultipleMembers) {
         for (const schedule of schedulesFor(task)) {
@@ -960,7 +1020,7 @@ function openTask(id) {
   form.querySelector('#schedule-index')?.addEventListener('change', event => {
     const monthDay = form.querySelector('#monthDay');
     if (monthDay && !monthDay.reportValidity()) { event.target.value = String(scheduleIndex); return; }
-    readSchedule(activeSchedule, new FormData(form), task.allowMultipleMembers);
+    readSchedule(activeSchedule, new FormData(form), task.allowMultipleMembers, task.freeToTake);
     scheduleIndex = Number(event.target.value);
     activeSchedule = task.schedules[scheduleIndex];
     form.elements.frequency.value = activeSchedule.frequency;
@@ -973,9 +1033,17 @@ function openTask(id) {
     if (title === null) return;
     if (!title) { form.elements.title.setCustomValidity('Vul een naam in.'); form.elements.title.reportValidity(); return; }
     task.allowMultipleMembers = form.elements.allowMultipleMembers.checked;
-    readSchedule(activeSchedule, data, task.allowMultipleMembers);
+    readSchedule(activeSchedule, data, task.allowMultipleMembers, task.freeToTake);
     const updated = { ...task, id: existing?.id || crypto.randomUUID(), title, important: data.has('important'),
       ...(!existing ? localCreationMetadata() : {}) };
+    updated.freeToTake = data.has('freeToTake');
+    if (updated.freeToTake) {
+      clearTaskAssignments(updated);
+      updated.freeSince = initiallyFreeToTake
+        ? task.freeSince || task.createdAt || dateKey(new Date())
+        : dateKey(new Date());
+    }
+    else delete updated.freeSince;
     if (existing) state.tasks[state.tasks.indexOf(existing)] = updated;
     else state.tasks.push(updated);
     if (await save()) { document.querySelector('#modal').close(); render(); showToast('Taak opgeslagen'); }

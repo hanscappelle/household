@@ -483,7 +483,7 @@ router.put('/api/state', authenticate, async (req, res) => {
   res.json({ revision: revision + 1 });
 });
 
-for (const file of ['index.html', 'style.css', 'seed.js', 'app.js']) {
+for (const file of ['index.html', 'style.css', 'seed.js', 'task-scheduling.js', 'app.js']) {
   router.get(file === 'index.html' ? ['/', '/index.html'] : `/${file}`, (req, res) => res.sendFile(path.join(__dirname, file)));
 }
 router.use((error, req, res, next) => {

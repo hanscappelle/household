@@ -138,3 +138,13 @@ test('oude enkele toewijzingen en nieuwe meervoudige toewijzingen worden genorma
   const defaultTask = normalizeTask({ frequency: 'daily' });
   assert.equal(defaultTask.allowMultipleMembers, false);
 });
+
+test('kind kan wijzigingen opslaan wanneer oude taken lege selecties bevatten', () => {
+  const previous = structuredClone(original);
+  previous.tasks[0].memberIds = [''];
+  previous.tasks[0].dailyAssignments = { 1: [''] };
+  const submitted = structuredClone(previous);
+  submitted.tasks = submitted.tasks.map(normalizeTask);
+  submitted.completed['t1|2026-11-16'] = true;
+  assert.equal(childChangesAllowed(previous, submitted, defaults), true);
+});

@@ -63,6 +63,11 @@ een taak aan één gezinslid toe. Zet in het taakvenster **Taak door meerdere
 gezinsleden laten uitvoeren** aan om meerdere personen te selecteren; de taak
 verschijnt dan bij ieder van hen. Een terugkerende taak telt voor elke dag
 waarop die is ingepland.
+Zet bij een taak **Vrij op te nemen taak** aan om die zonder toewijzing onder
+**Vrij op te nemen taken** in de dagplanning te tonen. Een open taak schuift
+dagelijks door. Als de volgende reguliere frequentiedag aanbreekt terwijl de
+taak nog openstaat, blijft hetzelfde exemplaar staan; na afvinken verschijnt
+het volgende exemplaar pas op de eerstvolgende reguliere frequentiedag.
 Onder **Ons gezin** staat ook de aanmaakdatum van elk gezinslid. Via
 **Statistieken bekijken** zie je hoeveel taakmomenten er vanaf die datum tot
 en met vandaag volgens de huidige planning aan die persoon waren toegewezen,
