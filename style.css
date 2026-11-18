@@ -173,6 +173,7 @@ h1{font-size:36px;letter-spacing:-.7px;line-height:1.15}
 .month-day{width:100%;height:100%;min-height:55px;border:0;background:transparent;color:inherit;cursor:pointer}
 .month-day:hover{background:var(--palette-soft)}
 .month-day.selected{background:var(--palette-soft);outline:2px solid var(--palette-accent);outline-offset:-2px}
+.month-day.today .month-day-number{display:grid;place-items:center;width:24px;height:24px;margin:auto;border-radius:50%;background:var(--palette-accent);color:#fff}
 .month-day-number{display:block;font-size:12px;font-weight:700}
 .month-appointment-count{display:inline-block;margin-top:3px;padding:2px 6px;border-radius:8px;background:var(--palette-soft);color:var(--palette-mark);font-size:10px;font-weight:700}
 [data-theme="dark"] .appointment-month-table td{border-color:var(--dark-divider)}

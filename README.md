@@ -92,6 +92,15 @@ afspraken bekijken, maar niet beheren. Bij het verwijderen van een gezinslid
 blijven afspraken bij de overige geselecteerde gezinsleden staan, of onder
 **Voor iedereen** als er niemand meer is geselecteerd. Afspraken worden ook
 in back-ups opgenomen; oudere back-ups zonder afspraken blijven bruikbaar.
+Een afspraak kan wekelijks, elke twee weken, maandelijks of jaarlijks herhalen,
+telkens vanaf de gekozen begindatum en eventueel tot
+en met een gekozen einddatum voor de start van de laatste herhaling. Als een
+maand of jaar de oorspronkelijke dag niet heeft, wordt die herhaling
+overgeslagen. In de lijst met aankomende afspraken staat de eerstvolgende
+afspraak per reeks. Kies bij bewerken of verwijderen voor één afspraak of de
+hele reeks. Uitzonderingen blijven bestaan als de reeks wordt aangepast; een
+reeks met uitzonderingen kan niet worden omgezet naar een eenmalige afspraak.
+De huidige dag is gemarkeerd in de maandkalender.
 Onder **Ons gezin** staat ook de aanmaakdatum van elk gezinslid. Via
 **Statistieken bekijken** zie je hoeveel taakmomenten er vanaf die datum tot
 en met vandaag volgens de huidige planning aan die persoon waren toegewezen,

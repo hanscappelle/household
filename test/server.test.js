@@ -114,7 +114,8 @@ test(`accounts en opslag op ${basePath || '/'}`, { skip: !configured, timeout: 3
   };
   changed.groceries.push({ id: 'test', name: 'Melk', done: false, urgent: false });
   changed.appointments.push({ id: 'a1', title: 'Afspraak', memberIds: ['member-1', 'member-2'], allDay: true,
-    startDate: '2026-11-18', endDate: '2026-11-18', startTime: '', endTime: '' });
+    startDate: '2026-11-18', endDate: '2026-11-18', startTime: '', endTime: '',
+    recurrence: { frequency: 'biweekly', until: '', exceptions: { '2026-12-02': null } } });
   changed.notes = [
     { id: 'note-test', title: 'Testnotitie', description: 'Een beschrijving', author: 'Niet vertrouwen', archived: false, important: true },
     { id: 'note-default', title: 'Standaardnotitie', description: 'Niet belangrijk', author: 'Niet vertrouwen', archived: false }

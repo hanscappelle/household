@@ -111,10 +111,21 @@ function appointmentMemberIds(appointment) {
 }
 
 function removeAppointmentMember(appointment, memberId) {
-  if (!appointmentMemberIds(appointment).includes(memberId)) return appointment;
-  return Object.hasOwn(appointment, 'memberIds')
-    ? { ...appointment, memberIds: appointment.memberIds.filter(id => id !== memberId) }
-    : { ...appointment, memberId: '' };
+  const remove = item => !appointmentMemberIds(item).includes(memberId) ? item
+    : Object.hasOwn(item, 'memberIds')
+      ? { ...item, memberIds: item.memberIds.filter(id => id !== memberId) }
+      : { ...item, memberId: '' };
+  const result = remove(appointment);
+  if (!appointment.recurrence?.exceptions) return result;
+  return { ...result, recurrence: { ...appointment.recurrence, exceptions: Object.fromEntries(
+    Object.entries(appointment.recurrence.exceptions).map(([date, item]) => [date, item ? remove(item) : null])
+  ) } };
+}
+
+function appointmentDateValid(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value) || Number(value.slice(0, 4)) < 100) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
 function validAppointments(appointments, members) {
@@ -122,15 +133,11 @@ function validAppointments(appointments, members) {
       members.some(member => !member || typeof member !== 'object')) return false;
   const memberIds = new Set(members.map(member => member.id));
   const ids = new Set();
-  const validDate = value => {
-    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value) || Number(value.slice(0, 4)) < 100) return false;
-    const date = new Date(`${value}T00:00:00Z`);
-    return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
-  };
+  const validDate = appointmentDateValid;
   const validTime = value => typeof value === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value);
-  return appointments.every(item => {
+  const validItem = item => {
     if (!item || typeof item !== 'object' || Array.isArray(item) ||
-        typeof item.id !== 'string' || !item.id.trim() || item.id.includes('|') || ids.has(item.id) ||
+        typeof item.id !== 'string' || !item.id.trim() || item.id.includes('|') ||
         typeof item.title !== 'string' || !item.title.trim() || item.title.length > 120 ||
         typeof item.allDay !== 'boolean' || !validDate(item.startDate) || !validDate(item.endDate) ||
         (Object.hasOwn(item, 'memberIds')
@@ -141,9 +148,66 @@ function validAppointments(appointments, members) {
         (item.allDay ? item.startTime !== '' || item.endTime !== '' || item.endDate < item.startDate :
           !validTime(item.startTime) || !validTime(item.endTime) ||
           `${item.endDate}T${item.endTime}` <= `${item.startDate}T${item.startTime}`)) return false;
+    return true;
+  };
+  return appointments.every(item => {
+    if (!validItem(item) || ids.has(item.id)) return false;
+    if (item.recurrence !== undefined) {
+      const rule = item.recurrence;
+      if (!rule || typeof rule !== 'object' || Array.isArray(rule) ||
+          !['weekly', 'biweekly', 'monthly', 'yearly'].includes(rule.frequency) ||
+          typeof rule.until !== 'string' || (rule.until !== '' && (!validDate(rule.until) || rule.until < item.startDate)) ||
+          !rule.exceptions || typeof rule.exceptions !== 'object' || Array.isArray(rule.exceptions) ||
+          !Object.entries(rule.exceptions).every(([date, exception]) => validDate(date) &&
+            (exception === null || validItem(exception) && exception.id === item.id && exception.recurrence === undefined))) return false;
+    }
     ids.add(item.id);
     return true;
   });
+}
+
+function appointmentOccurrences(appointment, from, to) {
+  if (!appointment.recurrence) return appointment.startDate <= to &&
+    (appointmentOnDate(appointment, from) || appointment.startDate >= from) ? [appointment] : [];
+  const rule = appointment.recurrence;
+  const dayMs = 86400000;
+  const asDate = key => new Date(`${key}T00:00:00Z`);
+  const dateString = date => date.toISOString().slice(0, 10);
+  const start = asDate(appointment.startDate);
+  const duration = (asDate(appointment.endDate) - start) / dayMs;
+  const earliest = new Date(asDate(from).getTime() - duration * dayMs);
+  const limit = asDate(to);
+  const results = [];
+  const addOccurrence = occurrenceStart => {
+    const key = dateString(occurrenceStart);
+    if (key < appointment.startDate || rule.until && key > rule.until) return;
+    if (Object.hasOwn(rule.exceptions, key)) return;
+    const end = new Date(occurrenceStart.getTime() + duration * dayMs);
+    if (end.getUTCFullYear() > 9999) return;
+    const occurrence = { ...appointment, startDate: key, endDate: dateString(end), occurrenceDate: key };
+    if (occurrence.startDate <= to && (appointmentOnDate(occurrence, from) || occurrence.startDate >= from)) results.push(occurrence);
+  };
+  if (rule.frequency === 'weekly' || rule.frequency === 'biweekly') {
+    const interval = (rule.frequency === 'weekly' ? 7 : 14) * dayMs;
+    const periods = Math.max(0, Math.ceil((earliest - start) / interval));
+    for (let day = new Date(start.getTime() + periods * interval); day <= limit; day = new Date(day.getTime() + interval)) addOccurrence(day);
+  } else {
+    const interval = rule.frequency === 'yearly' ? 12 : 1;
+    const difference = (earliest.getUTCFullYear() - start.getUTCFullYear()) * 12 + earliest.getUTCMonth() - start.getUTCMonth();
+    let index = Math.max(0, Math.floor(difference / interval));
+    for (;; index++) {
+      const month = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + index * interval, 1));
+      if (month > limit || month.getUTCFullYear() > 9999) break;
+      const day = new Date(Date.UTC(month.getUTCFullYear(), month.getUTCMonth(), start.getUTCDate()));
+      if (day.getUTCMonth() === month.getUTCMonth()) addOccurrence(day);
+    }
+  }
+  for (const [key, exception] of Object.entries(rule.exceptions)) {
+    if (exception && exception.startDate <= to && (appointmentOnDate(exception, from) || exception.startDate >= from)) {
+      results.push({ ...exception, occurrenceDate: key });
+    }
+  }
+  return results;
 }
 
 function appointmentOnDate(appointment, date) {
@@ -213,5 +277,5 @@ function mergeHouseholdState(base, local, remote) {
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { SEED_MEMBERS, SEED_TASKS, SEED_MEAL_IDEAS, normalizeTask, validTaskAssignments, validAppointments, appointmentMemberIds, removeAppointmentMember, appointmentOnDate, mergeHouseholdState };
+  module.exports = { SEED_MEMBERS, SEED_TASKS, SEED_MEAL_IDEAS, normalizeTask, validTaskAssignments, validAppointments, appointmentMemberIds, removeAppointmentMember, appointmentOnDate, appointmentOccurrences, mergeHouseholdState };
 }

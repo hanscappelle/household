@@ -4,7 +4,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
 const vm = require('node:vm');
-const { validAppointments, appointmentMemberIds, removeAppointmentMember, appointmentOnDate, mergeHouseholdState } = require('../seed');
+const { validAppointments, appointmentMemberIds, removeAppointmentMember, appointmentOnDate, appointmentOccurrences, mergeHouseholdState } = require('../seed');
 const { childChangesAllowed } = require('../child-permissions');
 
 const members = [{ id: 'm1', name: 'Mama' }, { id: 'm2', name: 'Papa' }];
@@ -51,6 +51,49 @@ test('shows every affected day and excludes a timed end at midnight', () => {
   assert.deepEqual(['2026-11-17', '2026-11-18', '2026-11-19', '2026-11-20'].map(day => appointmentOnDate(timed, day)), [false, true, true, false]);
   assert.deepEqual(['2026-11-17', '2026-11-18', '2026-11-19', '2026-11-20', '2026-11-21'].map(day => appointmentOnDate(allDay, day)), [false, true, true, true, false]);
   assert.equal(appointmentOnDate({ ...timed, endTime: '00:01' }, '2026-11-20'), true);
+});
+
+test('recurrences respect frequency, inclusive end, missing dates and multi-day overlaps', () => {
+  const weekly = { ...allDay, recurrence: { frequency: 'weekly', until: '2026-12-02', exceptions: {} } };
+  assert.equal(validAppointments([weekly], members), true);
+  assert.deepEqual(appointmentOccurrences(weekly, '2026-11-18', '2026-12-31').map(item => item.startDate), ['2026-11-18', '2026-11-25', '2026-12-02']);
+  assert.deepEqual(appointmentOccurrences(weekly, '2026-11-26', '2026-11-26').map(item => item.startDate), ['2026-11-25']);
+  const monthly = { ...allDay, startDate: '2026-01-31', endDate: '2026-01-31', recurrence: { frequency: 'monthly', until: '', exceptions: {} } };
+  assert.deepEqual(appointmentOccurrences(monthly, '2026-02-01', '2026-05-31').map(item => item.startDate), ['2026-03-31', '2026-05-31']);
+  const yearly = { ...monthly, startDate: '2024-02-29', endDate: '2024-02-29', recurrence: { frequency: 'yearly', until: '', exceptions: {} } };
+  assert.deepEqual(appointmentOccurrences(yearly, '2025-01-01', '2028-12-31').map(item => item.startDate), ['2028-02-29']);
+  const bad = [
+    { frequency: 'daily', until: '', exceptions: {} },
+    { frequency: 'weekly', until: '2026-11-17', exceptions: {} },
+    { frequency: 'weekly', until: '', exceptions: { '2026-02-30': null } },
+    { frequency: 'weekly', until: '', exceptions: { '2026-11-25': { ...allDay, memberId: 'unknown' } } }
+  ];
+  for (const recurrence of bad) assert.equal(validAppointments([{ ...allDay, recurrence }], members), false);
+});
+
+test('biweekly recurrences start on the chosen date and handle limits, overlaps and exceptions', () => {
+  const recurring = { ...allDay, startDate: '2026-12-23', endDate: '2026-12-25',
+    recurrence: { frequency: 'biweekly', until: '2027-01-20', exceptions: {} } };
+  assert.equal(validAppointments([recurring], members), true);
+  assert.deepEqual(appointmentOccurrences(recurring, '2026-12-01', '2027-02-01').map(item => item.startDate),
+    ['2026-12-23', '2027-01-06', '2027-01-20']);
+  assert.deepEqual(appointmentOccurrences(recurring, '2027-01-07', '2027-01-07').map(item => item.occurrenceDate), ['2027-01-06']);
+  assert.deepEqual(appointmentOccurrences(recurring, '2026-12-30', '2026-12-30'), []);
+  recurring.recurrence.exceptions['2027-01-06'] = null;
+  assert.deepEqual(appointmentOccurrences(recurring, '2027-01-01', '2027-01-31').map(item => item.startDate), ['2027-01-20']);
+  recurring.recurrence.until = '';
+  assert.deepEqual(appointmentOccurrences(recurring, '2027-02-03', '2027-02-03').map(item => item.startDate), ['2027-02-03']);
+});
+
+test('exceptions move or remove an occurrence without changing the series or other members', () => {
+  const moved = { ...multi, startDate: '2026-12-01', endDate: '2026-12-02', endTime: '00:01' };
+  const recurring = { ...multi, recurrence: { frequency: 'weekly', until: '', exceptions: { '2026-11-25': moved, '2026-12-02': null } } };
+  assert.equal(validAppointments([recurring], members), true);
+  assert.deepEqual(appointmentOccurrences(recurring, '2026-11-25', '2026-11-25'), []);
+  assert.deepEqual(appointmentOccurrences(recurring, '2026-12-01', '2026-12-01').map(item => item.occurrenceDate), ['2026-11-25']);
+  assert.deepEqual(appointmentOccurrences(recurring, '2026-12-02', '2026-12-02').map(item => item.occurrenceDate), ['2026-11-25']);
+  assert.deepEqual(removeAppointmentMember(recurring, 'm1').recurrence.exceptions['2026-11-25'].memberIds, ['m2']);
+  assert.deepEqual(recurring.recurrence.exceptions['2026-11-25'].memberIds, ['m1', 'm2']);
 });
 
 test('merges independent appointments and rejects member deletion versus concurrent appointment changes', () => {
@@ -107,7 +150,7 @@ test('appointment list shows every selected name and labels unassigned appointme
 
 test('current month lists upcoming and ongoing appointments; other months show overlapping appointments', () => {
   const source = readFileSync(require.resolve('../app'), 'utf8');
-  const context = vm.createContext({ appointmentOnDate });
+  const context = vm.createContext({ appointmentOnDate, appointmentOccurrences });
   vm.runInContext(
     source.slice(source.indexOf('function dateKey('), source.indexOf('function addDays(')) +
     source.slice(source.indexOf('function appointmentsForMonth('), source.indexOf('function renderAppointments(')),
@@ -135,6 +178,23 @@ test('current month lists upcoming and ongoing appointments; other months show o
   assert.deepEqual(ids(context.appointmentsForMonth(items, new Date(2026, 10, 1), now, '2026-11-18')), ['ended', 'ongoing', 'today']);
   assert.deepEqual(ids(context.appointmentsForMonth(items, new Date(2026, 10, 1), now, '2026-11-02')), ['past']);
   assert.deepEqual(ids(context.appointmentsForMonth(items, new Date(2026, 10, 1), now, '2026-11-28')), []);
+  const series = { ...allDay, id: 'series', recurrence: { frequency: 'weekly', until: '', exceptions: { '2026-11-18': null } } };
+  const upcoming = context.appointmentsForMonth([series], new Date(2026, 10, 1), now);
+  assert.equal(upcoming.length, 1);
+  assert.equal(upcoming[0].startDate, '2026-11-25');
+  assert.equal(context.appointmentsForMonth([series], new Date(2026, 10, 1), now, '2026-11-18').length, 0);
+  assert.equal(context.appointmentsForMonth([series], new Date(2026, 11, 1), now).length, 5);
+  const biweekly = { ...allDay, recurrence: { frequency: 'biweekly', until: '', exceptions: {} } };
+  assert.deepEqual(Array.from(context.appointmentsForMonth([biweekly], new Date(2026, 11, 1), now), item => item.startDate),
+    ['2026-12-02', '2026-12-16', '2026-12-30']);
+  assert.equal(context.appointmentsForMonth([biweekly], new Date(2026, 10, 1), now)[0].startDate, '2026-11-18');
+  const lasting = { ...allDay, startDate: '2026-11-16', endDate: '2026-11-19',
+    recurrence: { frequency: 'weekly', until: '2026-11-16', exceptions: {} } };
+  assert.equal(context.appointmentsForMonth([lasting], new Date(2026, 10, 1), now).length, 1);
+  const futureException = { ...allDay, startDate: '2027-01-01', endDate: '2027-01-01' };
+  const endedSeries = { ...allDay, startDate: '2026-01-01', endDate: '2026-01-01',
+    recurrence: { frequency: 'weekly', until: '2026-02-01', exceptions: { '2026-01-08': futureException } } };
+  assert.equal(context.appointmentsForMonth([endedSeries], new Date(2026, 10, 1), now)[0].startDate, '2027-01-01');
 });
 
 test('month calendar shows every day with appointment counts and navigates across years', () => {
@@ -145,7 +205,7 @@ test('month calendar shows every day with appointment counts and navigates acros
     state: { appointments: [timed, allDay, multi] },
     appointmentMonth: new Date(2026, 10, 1), appointmentCalendarDate: '',
     DAYS: ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'],
-    appointmentOnDate,
+    appointmentOnDate, appointmentOccurrences,
     render: () => { renders++; },
     document: { querySelector: selector => ({ focus() { focused = selector; } }) }
   });
@@ -166,7 +226,10 @@ test('month calendar shows every day with appointment counts and navigates acros
   assert.match(html, /data-date="2026-11-18"[^>]*><span class="month-day-number">18<\/span><span class="month-appointment-count" aria-hidden="true">3<\/span>/);
   assert.match(html, /<tbody><tr>(?:<td><\/td>){6}<td><button[^>]*data-date="2026-11-01"/);
   context.appointmentCalendarDate = '2026-11-18';
-  assert.match(context.renderAppointmentCalendar(), /class="month-day selected"[^>]*data-date="2026-11-18"[^>]*aria-pressed="true"/);
+  assert.match(context.renderAppointmentCalendar(), /class="month-day selected[^"]*"[^>]*data-date="2026-11-18"[^>]*aria-pressed="true"/);
+  const current = new Date();
+  context.appointmentMonth = new Date(current.getFullYear(), current.getMonth(), 1);
+  assert.match(context.renderAppointmentCalendar(), /class="month-day [^"]*today"[^>]*aria-current="date"/);
   context.appointmentMonth = new Date(2026, 11, 1);
   context.changeAppointmentMonth(1);
   assert.equal(context.appointmentCalendarDate, '');
@@ -188,7 +251,7 @@ test('dashboard places shared appointments before shared tasks and personal appo
     state: { members, appointments: [timed, allDay, multi], customization: { welcomeTitle: 'Welkom', welcomeText: 'Hallo' }, notes: [] },
     selectedDate: '2026-11-18',
     DAYS: ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'],
-    appointmentOnDate, appointmentMemberIds,
+    appointmentOnDate, appointmentOccurrences, appointmentMemberIds,
     isChild: () => false,
     tasksOn: () => [{ id: 'free', freeToTake: true }, { id: 'personal', memberId: 'm1' }],
     membersOn: task => task.memberId ? members : [],
@@ -246,7 +309,8 @@ test('appointment form creates, edits and deletes while toggling all-day fields'
         title: control(item?.title || 'Nieuwe afspraak'), memberId: control(item?.memberId || ''),
         allDay: allDayControl, startDate: control(item?.startDate || '2026-11-18'),
         endDate: control(item?.endDate || '2026-11-18'),
-        startTime: control(item?.startTime || '09:00'), endTime: control(item?.endTime || '10:00')
+        startTime: control(item?.startTime || '09:00'), endTime: control(item?.endTime || '10:00'),
+        repeat: control(item?.recurrence?.frequency || ''), repeatUntil: control(item?.recurrence?.until || '')
       },
       querySelectorAll: selector => selector === '.appointment-time'
         ? form.fields : form.selectedMembers.map(value => ({ value })),
@@ -257,7 +321,7 @@ test('appointment form creates, edits and deletes while toggling all-day fields'
   };
   const context = vm.createContext({
     state: { members, appointments: [] }, selectedDate: '2026-11-18',
-    validAppointments, appointmentMemberIds, crypto: { randomUUID: () => 'new-id' }, confirm: () => true,
+    validAppointments, appointmentMemberIds, appointmentOccurrences, crypto: { randomUUID: () => 'new-id' }, confirm: () => true,
     assignmentChoices: (name, selected) => `<div data-name="${name}">${selected.join(',')}</div>`,
     save: async next => { saves.push(structuredClone(next)); return true; },
     render() {}, showToast() {}, form: makeForm(),
@@ -319,4 +383,31 @@ test('appointment form creates, edits and deletes while toggling all-day fields'
   context.form.selectedMembers = [];
   await context.form.listeners.submit({ preventDefault() {} });
   assert.deepEqual(saves[4].appointments[0].memberIds, []);
+  context.form = makeForm();
+  context.openAppointment();
+  assert.match(content.innerHTML, /value="biweekly"[^>]*>Elke twee weken<\/option>/);
+  context.form.elements.repeat.value = 'biweekly';
+  context.form.elements.repeatUntil.value = '2026-12-31';
+  await context.form.listeners.submit({ preventDefault() {} });
+  const series = context.state.appointments.find(item => item.id === 'new-id');
+  assert.equal(series.recurrence.frequency, 'biweekly');
+  context.openAppointment(series.id, '2026-12-02');
+  assert.match(content.innerHTML, /Deze afspraak/);
+  assert.match(content.innerHTML, /Hele reeks/);
+  const instance = appointmentOccurrences(series, '2026-12-02', '2026-12-02')[0];
+  context.form = makeForm(instance);
+  context.openAppointment(series.id, '2026-12-02', 'occurrence');
+  context.form.elements.title.value = 'Aangepaste afspraak';
+  await context.form.listeners.submit({ preventDefault() {} });
+  assert.equal(context.state.appointments.find(item => item.id === series.id).recurrence.exceptions['2026-12-02'].title, 'Aangepaste afspraak');
+  context.form = makeForm(context.state.appointments.find(item => item.id === series.id));
+  context.openAppointment(series.id, '2026-12-02', 'series');
+  assert.match(content.innerHTML, /value="biweekly" selected/);
+  context.form.elements.title.value = 'Reeks aangepast';
+  await context.form.listeners.submit({ preventDefault() {} });
+  assert.equal(context.state.appointments.find(item => item.id === series.id).recurrence.exceptions['2026-12-02'].title, 'Aangepaste afspraak');
+  context.form = makeForm(instance);
+  context.openAppointment(series.id, '2026-12-02', 'occurrence');
+  await context.form.removeListeners.click();
+  assert.equal(context.state.appointments.find(item => item.id === series.id).recurrence.exceptions['2026-12-02'], null);
 });

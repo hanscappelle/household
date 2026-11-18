@@ -107,6 +107,13 @@ test('appointment backups accept legacy data and reject invalid references or ra
   delete legacy.data.appointments[0].memberId;
   legacy.data.appointments[0].memberIds = ['m1', 'm2'];
   assert.equal(context.validateBackup(legacy).appointments[0].memberIds.length, 2);
+  legacy.data.appointments[0].recurrence = { frequency: 'weekly', until: '', exceptions: { '2026-11-25': null } };
+  assert.equal(context.validateBackup(legacy).appointments[0].recurrence.exceptions['2026-11-25'], null);
+  legacy.data.appointments[0].recurrence.frequency = 'biweekly';
+  assert.equal(context.validateBackup(legacy).appointments[0].recurrence.frequency, 'biweekly');
+  legacy.data.appointments[0].recurrence.frequency = 'daily';
+  assert.throws(() => context.validateBackup(legacy), /afspraken bevatten ongeldige gegevens/);
+  delete legacy.data.appointments[0].recurrence;
   legacy.data.appointments[0].memberIds = ['m1', 'm1'];
   assert.throws(() => context.validateBackup(legacy), /afspraken bevatten ongeldige gegevens/);
   delete legacy.data.appointments[0].memberIds;

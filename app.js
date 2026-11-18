@@ -542,14 +542,15 @@ function appointmentLabel(appointment) {
 }
 
 function appointmentsOn(date) {
-  return state.appointments.filter(item => appointmentOnDate(item, dateKey(date)))
+  const key = dateKey(date);
+  return state.appointments.flatMap(item => appointmentOccurrences(item, key, key))
     .sort((a, b) => Number(b.allDay) - Number(a.allDay) ||
       `${a.startDate}T${a.startTime}`.localeCompare(`${b.startDate}T${b.startTime}`) ||
       a.title.localeCompare(b.title, 'nl'));
 }
 
 function renderAppointmentRows(appointments) {
-  return appointments.map(item => `<div class="task-row appointment-row"><span class="appointment-icon" role="img" aria-label="Afspraak"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18"/></svg></span><span class="task-info"><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(appointmentLabel(item))}</small></span>${isChild() ? '' : `<button type="button" class="text-button" data-action="edit-appointment" data-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(item.title)} bewerken">Bewerken</button>`}</div>`).join('');
+  return appointments.map(item => `<div class="task-row appointment-row"><span class="appointment-icon" role="img" aria-label="Afspraak"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18"/></svg></span><span class="task-info"><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(appointmentLabel(item))}${item.occurrenceDate ? ' · Herhalende afspraak' : ''}</small></span>${isChild() ? '' : `<button type="button" class="text-button" data-action="edit-appointment" data-id="${escapeHtml(item.id)}"${item.occurrenceDate ? ` data-occurrence-date="${escapeHtml(item.occurrenceDate)}"` : ''} aria-label="${escapeHtml(item.title)} bewerken">Bewerken</button>`}</div>`).join('');
 }
 
 function confirmTaskCompletion(task, date, memberId) {
@@ -891,18 +892,39 @@ function openNote(id) {
 }
 
 function appointmentsForMonth(appointments, month, now, selectedDay = '') {
-  if (selectedDay) return appointments.filter(item => appointmentOnDate(item, selectedDay));
+  if (selectedDay) return appointments.flatMap(item => appointmentOccurrences(item, selectedDay, selectedDay));
   const monthKey = dateKey(month).slice(0, 7);
   const today = dateKey(now);
   if (monthKey === today.slice(0, 7)) {
     const time = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-    return appointments.filter(item => item.endDate > today ||
-      item.endDate === today && (item.allDay || item.endTime > time));
+    const active = item => item.endDate > today || item.endDate === today && (item.allDay || item.endTime > time);
+    return appointments.flatMap(item => {
+      if (!item.recurrence) return active(item) ? [item] : [];
+      const exceptions = Object.entries(item.recurrence.exceptions).flatMap(([key, value]) =>
+        value && active(value) ? [{ ...value, occurrenceDate: key }] : []);
+      exceptions.sort((a, b) => `${a.startDate}T${a.startTime}`.localeCompare(`${b.startDate}T${b.startTime}`));
+      const todayOccurrences = appointmentOccurrences(item, today, today).filter(active)
+        .sort((a, b) => `${a.startDate}T${a.startTime}`.localeCompare(`${b.startDate}T${b.startTime}`));
+      if (todayOccurrences.length) return [todayOccurrences[0]];
+      const lastRegularStart = item.recurrence.until || '9999-12-31';
+      const stop = exceptions[0]?.startDate && exceptions[0].startDate < lastRegularStart
+        ? exceptions[0].startDate : lastRegularStart;
+      let from = today;
+      while (from <= stop) {
+        const year = Number(from.slice(0, 4));
+        const to = `${year}-12-31` < stop ? `${year}-12-31` : stop;
+        const found = appointmentOccurrences(item, from, to).filter(active)
+          .sort((a, b) => `${a.startDate}T${a.startTime}`.localeCompare(`${b.startDate}T${b.startTime}`));
+        if (found.length) return [found[0]];
+        if (year >= 9999) break;
+        from = `${String(year + 1).padStart(4, '0')}-01-01`;
+      }
+      return exceptions.length ? [exceptions[0]] : [];
+    });
   }
   const firstDay = dateKey(month);
   const lastDay = dateKey(new Date(month.getFullYear(), month.getMonth() + 1, 0));
-  return appointments.filter(item => item.startDate <= lastDay &&
-    (item.endDate > firstDay || item.endDate === firstDay && (item.allDay || item.endTime !== '00:00')));
+  return appointments.flatMap(item => appointmentOccurrences(item, firstDay, lastDay));
 }
 
 function renderAppointments() {
@@ -910,7 +932,8 @@ function renderAppointments() {
   const isCurrentMonth = dateKey(appointmentMonth).slice(0, 7) === dateKey(now).slice(0, 7);
   const appointments = [...state.appointments].sort((a, b) =>
     `${a.startDate}T${a.startTime}`.localeCompare(`${b.startDate}T${b.startTime}`) || a.title.localeCompare(b.title, 'nl'));
-  const visibleAppointments = appointmentsForMonth(appointments, appointmentMonth, now, appointmentCalendarDate);
+  const visibleAppointments = appointmentsForMonth(appointments, appointmentMonth, now, appointmentCalendarDate)
+    .sort((a, b) => `${a.startDate}T${a.startTime}`.localeCompare(`${b.startDate}T${b.startTime}`) || a.title.localeCompare(b.title, 'nl'));
   const listTitle = appointmentCalendarDate
     ? `Afspraken op ${formatDate(parseDate(appointmentCalendarDate), { day: 'numeric', month: 'long', year: 'numeric' })}`
     : isCurrentMonth ? 'Aankomende afspraken' : `Afspraken in ${formatDate(appointmentMonth, { month: 'long', year: 'numeric' })}`;
@@ -935,9 +958,10 @@ function renderAppointmentCalendar() {
     if (day < 1 || day > daysInMonth) return '<td></td>';
     const date = new Date(year, month, day);
     const key = dateKey(date);
-    const count = state.appointments.filter(item => appointmentOnDate(item, key)).length;
-    const label = `${formatDate(date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}: ${count} ${count === 1 ? 'afspraak' : 'afspraken'}`;
-    return `<td><button type="button" class="month-day ${key === appointmentCalendarDate ? 'selected' : ''}" data-action="select-appointment-day" data-date="${key}" aria-label="${escapeHtml(label)}" aria-pressed="${key === appointmentCalendarDate}"><span class="month-day-number">${day}</span>${count ? `<span class="month-appointment-count" aria-hidden="true">${count}</span>` : ''}</button></td>`;
+    const count = state.appointments.flatMap(item => appointmentOccurrences(item, key, key)).length;
+    const isToday = key === dateKey(new Date());
+    const label = `${formatDate(date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}${isToday ? ' (vandaag)' : ''}: ${count} ${count === 1 ? 'afspraak' : 'afspraken'}`;
+    return `<td><button type="button" class="month-day ${key === appointmentCalendarDate ? 'selected' : ''} ${isToday ? 'today' : ''}" data-action="select-appointment-day" data-date="${key}" aria-label="${escapeHtml(label)}"${isToday ? ' aria-current="date"' : ''} aria-pressed="${key === appointmentCalendarDate}"><span class="month-day-number">${day}</span>${count ? `<span class="month-appointment-count" aria-hidden="true">${count}</span>` : ''}</button></td>`;
   });
   const weeks = Array.from({ length: cellCount / 7 }, (_, index) => `<tr>${cells.slice(index * 7, index * 7 + 7).join('')}</tr>`).join('');
   const monthLabel = formatDate(firstDay, { month: 'long', year: 'numeric' });
@@ -956,9 +980,19 @@ function changeAppointmentMonth(amount) {
   document.querySelector(`[data-action="${amount < 0 ? 'previous' : 'next'}-appointment-month"]`).focus();
 }
 
-function openAppointment(id) {
-  const existing = state.appointments.find(item => item.id === id);
-  if (id && !existing) { showToast('De afspraak bestaat niet meer.'); return; }
+function openAppointment(id, occurrenceDate, scope) {
+  const series = state.appointments.find(item => item.id === id);
+  if (id && !series) { showToast('De afspraak bestaat niet meer.'); return; }
+  if (series?.recurrence && occurrenceDate && !scope) {
+    document.querySelector('#modal-content').innerHTML = `<div class="modal-inner"><div class="modal-head"><div><h2 id="modal-title">Herhalende afspraak</h2><p>Kies wat je wilt bewerken of verwijderen.</p></div><button type="button" class="close" data-action="close-modal" aria-label="Sluiten">×</button></div><div class="modal-actions"><button type="button" class="button secondary" data-action="edit-appointment-occurrence" data-id="${escapeHtml(id)}" data-occurrence-date="${escapeHtml(occurrenceDate)}">Deze afspraak</button><button type="button" class="button" data-action="edit-appointment-series" data-id="${escapeHtml(id)}" data-occurrence-date="${escapeHtml(occurrenceDate)}">Hele reeks</button></div></div>`;
+    document.querySelector('#modal').showModal();
+    return;
+  }
+  const single = scope === 'occurrence' && series?.recurrence;
+  const existing = single
+    ? series.recurrence.exceptions[occurrenceDate] || appointmentOccurrences(series, occurrenceDate, occurrenceDate).find(item => item.occurrenceDate === occurrenceDate)
+    : series;
+  if (single && !existing) { showToast('De afspraak bestaat niet meer.'); return; }
   const startDate = existing?.startDate || selectedDate;
   document.querySelector('#modal-content').innerHTML = `<form id="appointment-form" class="modal-inner">
     <div class="modal-head"><div><h2 id="modal-title">${existing ? 'Afspraak bewerken' : 'Afspraak toevoegen'}</h2><p>Plan een afspraak voor jezelf of het gezin.</p></div><button type="button" class="close" data-action="close-modal" aria-label="Sluiten">×</button></div>
@@ -970,6 +1004,7 @@ function openAppointment(id) {
       <div class="field"><label for="appointment-end-date">Einddatum</label><input id="appointment-end-date" name="endDate" type="date" required value="${escapeHtml(existing?.endDate || startDate)}"></div>
       <div class="field appointment-time"><label for="appointment-start-time">Begintijd</label><input id="appointment-start-time" name="startTime" type="time" value="${escapeHtml(existing?.startTime || '09:00')}"></div>
       <div class="field appointment-time"><label for="appointment-end-time">Eindtijd</label><input id="appointment-end-time" name="endTime" type="time" value="${escapeHtml(existing?.endTime || '10:00')}"></div>
+      ${single ? '' : `<div class="field"><label for="appointment-repeat">Herhalen</label><select id="appointment-repeat" name="repeat"><option value="">Niet herhalen</option>${[['weekly', 'Wekelijks'], ['biweekly', 'Elke twee weken'], ['monthly', 'Maandelijks'], ['yearly', 'Jaarlijks']].map(([value, label]) => `<option value="${value}" ${existing?.recurrence?.frequency === value ? 'selected' : ''}>${label}</option>`).join('')}</select></div><div class="field"><label for="appointment-repeat-until">Herhalen tot en met (optioneel)</label><input id="appointment-repeat-until" name="repeatUntil" type="date" value="${escapeHtml(existing?.recurrence?.until || '')}"><span class="field-help">Laat leeg voor een onbeperkte reeks.</span></div>`}
     </div><p class="field-help">Bij een hele dag telt de einddatum mee. Een afspraak met tijd eindigt op het opgegeven tijdstip.</p>
     <div class="modal-actions">${existing ? '<button type="button" class="button danger" data-action="delete-appointment">Verwijderen</button>' : ''}<button type="button" class="button secondary" data-action="close-modal">Annuleren</button><button type="submit" class="button">Opslaan</button></div></form>`;
   const form = document.querySelector('#appointment-form');
@@ -991,13 +1026,26 @@ function openAppointment(id) {
       endTime: form.elements.allDay.checked ? '' : form.elements.endTime.value
     };
     delete appointment.memberId;
-    if (!validAppointments([appointment], state.members)) {
-      form.elements.endDate.setCustomValidity('Controleer de datums en tijden: het einde moet na het begin liggen.');
-      form.elements.endDate.reportValidity();
+    delete appointment.occurrenceDate;
+    delete appointment.recurrence;
+    if (!single && form.elements.repeat.value) {
+      appointment.recurrence = { frequency: form.elements.repeat.value, until: form.elements.repeatUntil.value,
+        exceptions: series?.recurrence?.exceptions || {} };
+    } else if (!single && series?.recurrence && Object.keys(series.recurrence.exceptions).length) {
+      form.elements.repeat.setCustomValidity('Herhalen kan niet worden uitgeschakeld zolang de reeks uitzonderingen bevat.');
+      form.elements.repeat.reportValidity();
       return;
     }
-    const nextState = { ...state, appointments: existing
-      ? state.appointments.map(item => item.id === existing.id ? appointment : item)
+    if (!validAppointments([appointment], state.members)) {
+      const field = !single && appointment.recurrence && appointment.recurrence.until && appointment.recurrence.until < appointment.startDate
+        ? form.elements.repeatUntil : form.elements.endDate;
+      field.setCustomValidity(field === form.elements.endDate ? 'Controleer de datums en tijden: het einde moet na het begin liggen.' : 'De einddatum van de herhaling moet op of na de begindatum liggen.');
+      field.reportValidity();
+      return;
+    }
+    const updated = single ? { ...series, recurrence: { ...series.recurrence, exceptions: { ...series.recurrence.exceptions, [occurrenceDate]: appointment } } } : appointment;
+    const nextState = { ...state, appointments: series
+      ? state.appointments.map(item => item.id === series.id ? updated : item)
       : [...state.appointments, appointment] };
     if (await save(nextState)) { state = nextState; document.querySelector('#modal').close(); render(); showToast('Afspraak opgeslagen'); }
   });
@@ -1007,15 +1055,18 @@ function openAppointment(id) {
       form.elements.endDate.value = form.elements.startDate.value;
     }
     form.elements.endDate.setCustomValidity('');
+    if (!single) { form.elements.repeat.setCustomValidity(''); form.elements.repeatUntil.setCustomValidity(''); }
   };
   form.addEventListener('input', event => { form.elements.title.setCustomValidity(''); updateEndDate(event); });
   form.addEventListener('change', updateEndDate);
   form.querySelector('[data-action="delete-appointment"]')?.addEventListener('click', async () => {
-    if (!confirm(`Afspraak "${existing.title}" verwijderen?`)) return;
-    const nextState = { ...state, appointments: state.appointments.filter(item => item.id !== existing.id) };
+    if (!confirm(single ? `Deze afspraak "${existing.title}" verwijderen?` : series?.recurrence ? `De hele reeks "${existing.title}" inclusief uitzonderingen verwijderen?` : `Afspraak "${existing.title}" verwijderen?`)) return;
+    const nextState = { ...state, appointments: single
+      ? state.appointments.map(item => item.id === series.id ? { ...series, recurrence: { ...series.recurrence, exceptions: { ...series.recurrence.exceptions, [occurrenceDate]: null } } } : item)
+      : state.appointments.filter(item => item.id !== series.id) };
     if (await save(nextState)) { state = nextState; document.querySelector('#modal').close(); render(); showToast('Afspraak verwijderd'); }
   });
-  document.querySelector('#modal').showModal();
+  if (!document.querySelector('#modal').open) document.querySelector('#modal').showModal();
 }
 
 function renderTasks() {
@@ -1134,6 +1185,7 @@ function renderHelp() {
       <section class="panel help-panel"><h2>Afspraken (beta)</h2>
         <p>Ouders kunnen via <a href="#afspraken">Afspraken</a> afspraken toevoegen, bewerken en verwijderen. Kies een begin- en einddatum en tijd, of selecteer <strong>Hele dag</strong>. Bij hele dagen telt de einddatum mee. Selecteer eventueel één of meer gezinsleden; anders staat de afspraak bovenaan de weekplanner onder <strong>Voor iedereen</strong>. Afspraken staan op elke betrokken dag boven de taken van elk geselecteerd gezinslid. Kindaccounts kunnen afspraken bekijken.</p>
         <p>De maandkalender toont het aantal afspraken per dag. Onder de huidige maand staan aankomende afspraken op datum; blader naar een andere maand of kies een dag om de afspraken daarvan te bekijken, ook als ze al voorbij zijn. Wis de dagselectie om weer de maandlijst te tonen.</p>
+        <p>Afspraken kunnen wekelijks, elke twee weken, maandelijks of jaarlijks herhalen, met een optionele einddatum. Als een datum niet bestaat in een maand of jaar wordt die herhaling overgeslagen. De aankomende lijst toont de eerstvolgende afspraak per reeks. Bij bewerken kies je tussen één afspraak of de hele reeks; uitzonderingen blijven bij het aanpassen van de reeks bestaan. Een reeks met uitzonderingen kan niet worden omgezet naar een eenmalige afspraak.</p>
       </section>
       <section class="panel help-panel"><h2>Gezinsleden</h2>
         <p>Voeg op <a href="#gezin">Ons gezin</a> gezinsleden toe en bewerk hun naam, geboortedatum en optioneel e-mailadres. Een geboortedatum wordt gebruikt om de leeftijd te tonen en verjaardagen op het overzicht te markeren.</p>
@@ -1619,7 +1671,7 @@ document.addEventListener('click', async event => {
     return;
   }
   const action = button.dataset.action;
-  if (isChild() && ['new-task', 'edit-task', 'new-appointment', 'edit-appointment', 'new-member', 'edit-member', 'export-backup', 'import-backup', 'reset-customization', 'toggle-grocery-urgent', 'delete-grocery', 'delete-meal-idea', 'edit-note', 'archive-note', 'restore-note', 'delete-note'].includes(action)) return;
+  if (isChild() && ['new-task', 'edit-task', 'new-appointment', 'edit-appointment', 'edit-appointment-occurrence', 'edit-appointment-series', 'new-member', 'edit-member', 'export-backup', 'import-backup', 'reset-customization', 'toggle-grocery-urgent', 'delete-grocery', 'delete-meal-idea', 'edit-note', 'archive-note', 'restore-note', 'delete-note'].includes(action)) return;
   if (action === 'toggle-note-menu') {
     const shouldOpen = button.getAttribute('aria-expanded') !== 'true';
     closeNoteMenus();
@@ -1635,7 +1687,8 @@ document.addEventListener('click', async event => {
   if (action === 'new-task') openTask();
   if (action === 'edit-task') openTask(button.dataset.id);
   if (action === 'new-appointment') openAppointment();
-  if (action === 'edit-appointment') openAppointment(button.dataset.id);
+  if (action === 'edit-appointment') openAppointment(button.dataset.id, button.dataset.occurrenceDate);
+  if (action === 'edit-appointment-occurrence' || action === 'edit-appointment-series') openAppointment(button.dataset.id, button.dataset.occurrenceDate, action === 'edit-appointment-occurrence' ? 'occurrence' : 'series');
   if (action === 'previous-appointment-month' || action === 'next-appointment-month') {
     changeAppointmentMonth(action === 'previous-appointment-month' ? -1 : 1);
   }
