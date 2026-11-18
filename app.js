@@ -974,6 +974,9 @@ function renderHelp() {
       <section class="panel help-panel"><h2>Wijzigingen op meerdere apparaten</h2>
         <p>Wijzigingen worden op de server opgeslagen en zijn beschikbaar voor alle gezinsaccounts. Een ander geopend tabblad wordt niet automatisch bijgewerkt. Bij het opslaan probeert de app afzonderlijke wijzigingen automatisch samen te voegen. Als dezelfde gegevens gewijzigd zijn of samenvoegen niet veilig is, meldt de app een conflict. Herlaad dan om de meest recente gegevens te bekijken.</p>
       </section>
+      <section class="panel help-panel"><h2>Problemen melden en ideeën delen</h2>
+        <p>Heb je een probleem gevonden of een idee voor een nieuwe functie? <a href="https://github.com/hanscappelle/household/issues/new" target="_blank" rel="noopener noreferrer">Maak een issue aan op GitHub</a>.</p>
+      </section>
     </div>`;
 }
 

@@ -4,6 +4,8 @@ Een dashboard voor huishoudelijke taken en de planning per gezinslid.
 Een huishouden deelt één dataset in een MySQL/MariaDB-database; elk gezinslid
 kan met een eigen account inloggen.
 
+Live versie: <https://betyre.alwaysdata.net/household/>
+
 ## Lokaal starten
 
 Benodigd: Node.js 20.6 of nieuwer, npm en een draaiende MySQL- of
