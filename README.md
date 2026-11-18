@@ -71,6 +71,13 @@ dagelijks door. Als de volgende reguliere frequentiedag aanbreekt terwijl de
 taak nog openstaat, blijft hetzelfde exemplaar staan; na afvinken verschijnt
 het volgende exemplaar pas op de eerstvolgende reguliere frequentiedag.
 Via **Afspraken** (beta) kun je afspraken toevoegen, wijzigen en verwijderen.
+Een maandkalender boven de lijst toont het aantal afspraken per dag; met de
+pijlen blader je naar andere maanden. Een afspraak telt één keer per dag,
+ook als meerdere gezinsleden eraan zijn gekoppeld. Onder de huidige maand staan
+alle afspraken die nog niet zijn afgelopen. Blader naar een andere maand om
+de afspraken in die maand te zien, ook als ze al voorbij zijn. Kies een dag
+om alleen de afspraken van die dag te tonen, ook voor eerdere dagen in de
+huidige maand. De lijst is gesorteerd op begindatum en begintijd.
 Een afspraak heeft een begin- en einddatum en een begin- en eindtijd, of duurt
 een hele dag. Bij afspraken voor hele dagen telt ook de einddatum mee; bij
 afspraken met tijd is het eindtijdstip exclusief. Bij het wijzigen van de

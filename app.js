@@ -51,6 +51,9 @@ let colorPalette = 'forest';
 let saving = false;
 let needsRecovery = false;
 let selectedDate = dateKey(new Date());
+let appointmentMonth = parseDate(selectedDate);
+appointmentMonth.setDate(1);
+let appointmentCalendarDate = '';
 let taskSearch = '';
 let frequencyFilter = 'all';
 let memberFilter = 'all';
@@ -768,7 +771,7 @@ function renderDashboard() {
   const week = isoWeek(date);
   const range = `${formatDate(start, { day: 'numeric', month: 'short' })} – ${formatDate(weekDates[6], { day: 'numeric', month: 'short', year: 'numeric' })}`;
   return `
-    <div class="page-heading"><div><h1>${escapeHtml(state.customization.welcomeTitle)} <span style="color:#9cbd9f">✳</span></h1><p>${escapeHtml(state.customization.welcomeText)}</p></div>${isChild() ? '' : '<button class="button" data-action="new-task"><span class="plus">+</span> Taak toevoegen</button>'}</div>
+    <div class="page-heading dashboard-heading"><div><h1>${escapeHtml(state.customization.welcomeTitle)} <span style="color:#9cbd9f">✳</span></h1><p>${escapeHtml(state.customization.welcomeText)}</p></div>${isChild() ? '' : '<div class="dashboard-heading-actions"><button type="button" class="button" data-action="new-task"><span class="plus">+</span> Taak toevoegen</button><button type="button" class="button" data-action="new-appointment"><span class="plus">+</span> Afspraak toevoegen</button></div>'}</div>
     <section class="hero">
       <button type="button" class="hero-copy hero-today" data-action="today" aria-label="Weekplanner op vandaag zetten"><div class="eyebrow">SAMEN VOOR EEN FIJN THUIS</div><h2>Een opgeruimd huis,<br><em>een beetje meer rust.</em></h2><p>Alle taken en plannen voor jullie gezin, overzichtelijk op één plek.</p></button>
       <span class="hero-badge">♡ &nbsp; SAMEN DOEN</span>
@@ -887,14 +890,70 @@ function openNote(id) {
   document.querySelector('#modal').showModal();
 }
 
+function appointmentsForMonth(appointments, month, now, selectedDay = '') {
+  if (selectedDay) return appointments.filter(item => appointmentOnDate(item, selectedDay));
+  const monthKey = dateKey(month).slice(0, 7);
+  const today = dateKey(now);
+  if (monthKey === today.slice(0, 7)) {
+    const time = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    return appointments.filter(item => item.endDate > today ||
+      item.endDate === today && (item.allDay || item.endTime > time));
+  }
+  const firstDay = dateKey(month);
+  const lastDay = dateKey(new Date(month.getFullYear(), month.getMonth() + 1, 0));
+  return appointments.filter(item => item.startDate <= lastDay &&
+    (item.endDate > firstDay || item.endDate === firstDay && (item.allDay || item.endTime !== '00:00')));
+}
+
 function renderAppointments() {
+  const now = new Date();
+  const isCurrentMonth = dateKey(appointmentMonth).slice(0, 7) === dateKey(now).slice(0, 7);
   const appointments = [...state.appointments].sort((a, b) =>
     `${a.startDate}T${a.startTime}`.localeCompare(`${b.startDate}T${b.startTime}`) || a.title.localeCompare(b.title, 'nl'));
+  const visibleAppointments = appointmentsForMonth(appointments, appointmentMonth, now, appointmentCalendarDate);
+  const listTitle = appointmentCalendarDate
+    ? `Afspraken op ${formatDate(parseDate(appointmentCalendarDate), { day: 'numeric', month: 'long', year: 'numeric' })}`
+    : isCurrentMonth ? 'Aankomende afspraken' : `Afspraken in ${formatDate(appointmentMonth, { month: 'long', year: 'numeric' })}`;
   return `<div class="page-heading"><div><h1>Afspraken <span class="nav-beta">BETA</span></h1><p>Alle afspraken van het gezin op één plek.</p></div>${isChild() ? '' : '<button type="button" class="button" data-action="new-appointment"><span class="plus">+</span> Afspraak toevoegen</button>'}</div>
-    <div class="panel appointments-panel">${appointments.length ? appointments.map(item => {
+    ${renderAppointmentCalendar()}
+    <div class="section-heading"><h2>${escapeHtml(listTitle)}</h2>${appointmentCalendarDate ? '<button type="button" class="text-button" data-action="clear-appointment-day">Dagselectie wissen</button>' : ''}</div>
+    <div class="panel appointments-panel">${visibleAppointments.length ? visibleAppointments.map(item => {
       const names = state.members.filter(person => appointmentMemberIds(item).includes(person.id)).map(person => person.name);
       return `<div class="appointment-list-item">${renderAppointmentRows([item])}<small>${escapeHtml(names.join(', ') || 'Voor iedereen')}</small></div>`;
-    }).join('') : '<div class="empty">Nog geen afspraken ingepland.</div>'}</div>`;
+    }).join('') : `<div class="empty">${appointmentCalendarDate ? 'Geen afspraken op deze dag.' : isCurrentMonth ? 'Geen aankomende afspraken.' : 'Geen afspraken in deze maand.'}</div>`}</div>`;
+}
+
+function renderAppointmentCalendar() {
+  const year = appointmentMonth.getFullYear();
+  const month = appointmentMonth.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const offset = (firstDay.getDay() + 6) % 7;
+  const cellCount = Math.ceil((offset + daysInMonth) / 7) * 7;
+  const cells = Array.from({ length: cellCount }, (_, index) => {
+    const day = index - offset + 1;
+    if (day < 1 || day > daysInMonth) return '<td></td>';
+    const date = new Date(year, month, day);
+    const key = dateKey(date);
+    const count = state.appointments.filter(item => appointmentOnDate(item, key)).length;
+    const label = `${formatDate(date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}: ${count} ${count === 1 ? 'afspraak' : 'afspraken'}`;
+    return `<td><button type="button" class="month-day ${key === appointmentCalendarDate ? 'selected' : ''}" data-action="select-appointment-day" data-date="${key}" aria-label="${escapeHtml(label)}" aria-pressed="${key === appointmentCalendarDate}"><span class="month-day-number">${day}</span>${count ? `<span class="month-appointment-count" aria-hidden="true">${count}</span>` : ''}</button></td>`;
+  });
+  const weeks = Array.from({ length: cellCount / 7 }, (_, index) => `<tr>${cells.slice(index * 7, index * 7 + 7).join('')}</tr>`).join('');
+  const monthLabel = formatDate(firstDay, { month: 'long', year: 'numeric' });
+  return `<section class="panel appointment-calendar" aria-labelledby="appointment-month-title">
+    <div class="calendar-head"><div><strong id="appointment-month-title">${escapeHtml(monthLabel)}</strong><small>Aantal afspraken per dag · Kies een dag voor de afspraken</small></div>
+      <div class="calendar-controls"><button type="button" class="icon-button" data-action="previous-appointment-month" aria-label="Vorige maand">‹</button><button type="button" class="icon-button" data-action="next-appointment-month" aria-label="Volgende maand">›</button></div>
+    </div>
+    <table class="appointment-month-table" aria-labelledby="appointment-month-title"><thead><tr>${DAYS.map(day => `<th scope="col">${day}</th>`).join('')}</tr></thead><tbody>${weeks}</tbody></table>
+  </section>`;
+}
+
+function changeAppointmentMonth(amount) {
+  appointmentMonth = new Date(appointmentMonth.getFullYear(), appointmentMonth.getMonth() + amount, 1);
+  appointmentCalendarDate = '';
+  render();
+  document.querySelector(`[data-action="${amount < 0 ? 'previous' : 'next'}-appointment-month"]`).focus();
 }
 
 function openAppointment(id) {
@@ -1074,6 +1133,7 @@ function renderHelp() {
       </section>
       <section class="panel help-panel"><h2>Afspraken (beta)</h2>
         <p>Ouders kunnen via <a href="#afspraken">Afspraken</a> afspraken toevoegen, bewerken en verwijderen. Kies een begin- en einddatum en tijd, of selecteer <strong>Hele dag</strong>. Bij hele dagen telt de einddatum mee. Selecteer eventueel één of meer gezinsleden; anders staat de afspraak bovenaan de weekplanner onder <strong>Voor iedereen</strong>. Afspraken staan op elke betrokken dag boven de taken van elk geselecteerd gezinslid. Kindaccounts kunnen afspraken bekijken.</p>
+        <p>De maandkalender toont het aantal afspraken per dag. Onder de huidige maand staan aankomende afspraken op datum; blader naar een andere maand of kies een dag om de afspraken daarvan te bekijken, ook als ze al voorbij zijn. Wis de dagselectie om weer de maandlijst te tonen.</p>
       </section>
       <section class="panel help-panel"><h2>Gezinsleden</h2>
         <p>Voeg op <a href="#gezin">Ons gezin</a> gezinsleden toe en bewerk hun naam, geboortedatum en optioneel e-mailadres. Een geboortedatum wordt gebruikt om de leeftijd te tonen en verjaardagen op het overzicht te markeren.</p>
@@ -1576,6 +1636,20 @@ document.addEventListener('click', async event => {
   if (action === 'edit-task') openTask(button.dataset.id);
   if (action === 'new-appointment') openAppointment();
   if (action === 'edit-appointment') openAppointment(button.dataset.id);
+  if (action === 'previous-appointment-month' || action === 'next-appointment-month') {
+    changeAppointmentMonth(action === 'previous-appointment-month' ? -1 : 1);
+  }
+  if (action === 'select-appointment-day') {
+    appointmentCalendarDate = button.dataset.date;
+    render();
+    document.querySelector(`[data-action="select-appointment-day"][data-date="${appointmentCalendarDate}"]`).focus();
+  }
+  if (action === 'clear-appointment-day') {
+    const date = appointmentCalendarDate;
+    appointmentCalendarDate = '';
+    render();
+    document.querySelector(`[data-action="select-appointment-day"][data-date="${date}"]`).focus();
+  }
   if (action === 'mark-not-late') {
     await markCompletionNotLate({
       taskId: button.dataset.id,

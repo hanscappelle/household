@@ -85,17 +85,101 @@ test('appointment list shows every selected name and labels unassigned appointme
   const source = readFileSync(require.resolve('../app'), 'utf8');
   const context = vm.createContext({
     state: { members, appointments: [multi, allDay, timed] }, appointmentMemberIds,
-    isChild: () => false, renderAppointmentRows: items => `<strong>${items[0].title}</strong>`
+    isChild: () => false, renderAppointmentCalendar: () => '<div>Maandkalender</div>',
+    appointmentMonth: new Date(), appointmentCalendarDate: '',
+    appointmentsForMonth: items => items,
+    renderAppointmentRows: items => `<strong>${items[0].title}</strong>`
   });
   vm.runInContext(
     source.slice(source.indexOf('function escapeHtml('), source.indexOf('function linkifyNoteDescription(')) +
-    source.slice(source.indexOf('function renderAppointments('), source.indexOf('function openAppointment(')),
+    source.slice(source.indexOf('function dateKey('), source.indexOf('function membersForAssignment(')) +
+    source.slice(source.indexOf('function renderAppointments('), source.indexOf('function renderAppointmentCalendar(')),
     context
   );
   const html = context.renderAppointments();
+  assert.ok(html.indexOf('Maandkalender') < html.indexOf('<strong>Samen</strong>'));
   assert.match(html, /<strong>Samen<\/strong><small>Mama, Papa<\/small>/);
   assert.match(html, /<strong>Vrije afspraak<\/strong><small>Voor iedereen<\/small>/);
   assert.match(html, /<strong>Afspraak<\/strong><small>Mama<\/small>/);
+  assert.ok(html.indexOf('<strong>Vrije afspraak</strong>') < html.indexOf('<strong>Afspraak</strong>'));
+  assert.ok(html.indexOf('<strong>Afspraak</strong>') < html.indexOf('<strong>Samen</strong>'));
+});
+
+test('current month lists upcoming and ongoing appointments; other months show overlapping appointments', () => {
+  const source = readFileSync(require.resolve('../app'), 'utf8');
+  const context = vm.createContext({ appointmentOnDate });
+  vm.runInContext(
+    source.slice(source.indexOf('function dateKey('), source.indexOf('function addDays(')) +
+    source.slice(source.indexOf('function appointmentsForMonth('), source.indexOf('function renderAppointments(')),
+    context
+  );
+  const items = [
+    { ...allDay, id: 'past', startDate: '2026-11-01', endDate: '2026-11-17' },
+    { ...timed, id: 'ended', startDate: '2026-11-18', startTime: '09:00', endDate: '2026-11-18', endTime: '10:00' },
+    { ...timed, id: 'ongoing', startDate: '2026-11-18', startTime: '09:00', endDate: '2026-11-18', endTime: '10:01' },
+    { ...allDay, id: 'today', startDate: '2026-11-18', endDate: '2026-11-18' },
+    { ...timed, id: 'future', startDate: '2026-12-01', endDate: '2026-12-02' },
+    { ...timed, id: 'midnight', startDate: '2026-10-31', endDate: '2026-11-01', endTime: '00:00' },
+    { ...allDay, id: 'spans', startDate: '2026-10-31', endDate: '2026-11-01' }
+  ];
+  const now = new Date(2026, 10, 18, 10, 0, 30);
+  const ids = result => Array.from(result, item => item.id);
+  assert.deepEqual(ids(context.appointmentsForMonth(items, new Date(2026, 10, 1), now)), ['ongoing', 'today', 'future']);
+  assert.deepEqual(ids(context.appointmentsForMonth(items, new Date(2026, 9, 1), now)), ['midnight', 'spans']);
+  assert.deepEqual(ids(context.appointmentsForMonth(items, new Date(2026, 11, 1), now)), ['future']);
+  assert.deepEqual(ids(context.appointmentsForMonth(items, new Date(2026, 8, 1), now)), []);
+  const beforeNovember = new Date(2026, 9, 15);
+  const november = ids(context.appointmentsForMonth(items, new Date(2026, 10, 1), beforeNovember));
+  assert.ok(november.includes('spans'));
+  assert.ok(!november.includes('midnight'));
+  assert.deepEqual(ids(context.appointmentsForMonth(items, new Date(2026, 10, 1), now, '2026-11-18')), ['ended', 'ongoing', 'today']);
+  assert.deepEqual(ids(context.appointmentsForMonth(items, new Date(2026, 10, 1), now, '2026-11-02')), ['past']);
+  assert.deepEqual(ids(context.appointmentsForMonth(items, new Date(2026, 10, 1), now, '2026-11-28')), []);
+});
+
+test('month calendar shows every day with appointment counts and navigates across years', () => {
+  const source = readFileSync(require.resolve('../app'), 'utf8');
+  let renders = 0;
+  let focused = '';
+  const context = vm.createContext({
+    state: { appointments: [timed, allDay, multi] },
+    appointmentMonth: new Date(2026, 10, 1), appointmentCalendarDate: '',
+    DAYS: ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'],
+    appointmentOnDate,
+    render: () => { renders++; },
+    document: { querySelector: selector => ({ focus() { focused = selector; } }) }
+  });
+  vm.runInContext(
+    source.slice(source.indexOf('function escapeHtml('), source.indexOf('function linkifyNoteDescription(')) +
+    source.slice(source.indexOf('function dateKey('), source.indexOf('function membersForAssignment(')) +
+    source.slice(source.indexOf('function renderAppointmentCalendar('), source.indexOf('function openAppointment(')),
+    context
+  );
+  const html = context.renderAppointmentCalendar();
+  assert.match(html, /november 2026/);
+  assert.equal((html.match(/data-date=/g) || []).length, 30);
+  assert.match(html, /data-date="2026-11-18"[^>]*aria-label="[^"]*: 3 afspraken"/);
+  assert.match(html, /data-date="2026-11-19"[^>]*aria-label="[^"]*: 3 afspraken"/);
+  assert.match(html, /data-date="2026-11-20"[^>]*aria-label="[^"]*: 1 afspraak"/);
+  assert.match(html, /data-date="2026-11-21"[^>]*aria-label="[^"]*: 0 afspraken"/);
+  assert.match(html, /data-date="2026-11-21"[^>]*><span class="month-day-number">21<\/span><\/button>/);
+  assert.match(html, /data-date="2026-11-18"[^>]*><span class="month-day-number">18<\/span><span class="month-appointment-count" aria-hidden="true">3<\/span>/);
+  assert.match(html, /<tbody><tr>(?:<td><\/td>){6}<td><button[^>]*data-date="2026-11-01"/);
+  context.appointmentCalendarDate = '2026-11-18';
+  assert.match(context.renderAppointmentCalendar(), /class="month-day selected"[^>]*data-date="2026-11-18"[^>]*aria-pressed="true"/);
+  context.appointmentMonth = new Date(2026, 11, 1);
+  context.changeAppointmentMonth(1);
+  assert.equal(context.appointmentCalendarDate, '');
+  assert.equal(context.appointmentMonth.getFullYear(), 2027);
+  assert.equal(context.appointmentMonth.getMonth(), 0);
+  assert.match(focused, /next-appointment-month/);
+  context.changeAppointmentMonth(-1);
+  assert.equal(context.appointmentMonth.getFullYear(), 2026);
+  assert.equal(context.appointmentMonth.getMonth(), 11);
+  assert.match(focused, /previous-appointment-month/);
+  assert.equal(renders, 2);
+  context.appointmentMonth = new Date(2028, 1, 1);
+  assert.equal((context.renderAppointmentCalendar().match(/data-date=/g) || []).length, 29);
 });
 
 test('dashboard places shared appointments before shared tasks and personal appointments before personal tasks', () => {
@@ -121,6 +205,12 @@ test('dashboard places shared appointments before shared tasks and personal appo
     context
   );
   const html = context.renderDashboard();
+  const heading = html.slice(0, html.indexOf('<section class="hero">'));
+  assert.match(heading, /data-action="new-task"/);
+  assert.match(heading, /data-action="new-appointment"/);
+  context.isChild = () => true;
+  const childHeading = context.renderDashboard().split('<section class="hero">')[0];
+  assert.doesNotMatch(childHeading, /data-action="new-(task|appointment)"/);
   const sharedHeading = html.indexOf('<span>Voor iedereen</span>');
   const sharedAppointment = html.indexOf('<strong>Vrije afspraak</strong>');
   const sharedTask = html.indexOf('task-free');
