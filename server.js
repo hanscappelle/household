@@ -6,7 +6,7 @@ const mysql = require('mysql2/promise');
 const { randomBytes, scrypt: scryptCallback, timingSafeEqual, createHash } = require('node:crypto');
 const { promisify, isDeepStrictEqual } = require('node:util');
 const path = require('node:path');
-const { SEED_MEMBERS, SEED_TASKS, SEED_MEAL_IDEAS } = require('./seed');
+const { SEED_MEMBERS, SEED_TASKS, SEED_MEAL_IDEAS, validAppointments } = require('./seed');
 const { registerCreatedItems } = require('./creation-metadata');
 const { childChangesAllowed } = require('./child-permissions');
 
@@ -137,7 +137,7 @@ const defaultCustomization = {
 };
 const initialState = () => ({
   members: SEED_MEMBERS.map(member => ({ ...member, createdAt: new Date().toISOString().slice(0, 10) })),
-  tasks: SEED_TASKS, completed: {}, groceries: [], notes: [], mealIdeas: SEED_MEAL_IDEAS,
+  tasks: SEED_TASKS, completed: {}, groceries: [], notes: [], mealIdeas: SEED_MEAL_IDEAS, appointments: [],
   customization: { ...defaultCustomization }
 });
 
@@ -444,7 +444,11 @@ router.put('/api/state', authenticate, async (req, res) => {
   const [currentRows] = await pool.execute('SELECT data FROM households WHERE id = ? AND revision = ?', [req.user.household_id, revision]);
   if (!currentRows.length) return res.status(409).json({ error: 'De gegevens zijn ondertussen op een ander apparaat gewijzigd.' });
   const currentData = JSON.parse(currentRows[0].data);
-  if (req.user.household_role === 'child' && !childChangesAllowed(currentData, data, defaultCustomization)) {
+  const appointments = data.appointments === undefined ? currentData.appointments || [] : data.appointments;
+  if (!validAppointments(appointments, data.members)) {
+    return res.status(400).json({ error: 'De afspraken bevatten ongeldige gegevens of onbekende gezinsleden.' });
+  }
+  if (req.user.household_role === 'child' && !childChangesAllowed(currentData, { ...data, appointments }, defaultCustomization)) {
     return res.status(403).json({ error: 'Je hebt geen toestemming voor deze wijziging.' });
   }
   const previousNotes = currentData.notes || [];
@@ -487,7 +491,7 @@ router.put('/api/state', authenticate, async (req, res) => {
     }
     return [key, { completedAt: value.completedAt, completedByUserId: req.user.id }];
   }));
-  let nextData = { ...data, completed, notes };
+  let nextData = { ...data, completed, notes, appointments };
   for (const collection of ['tasks', 'groceries', 'mealIdeas', 'notes']) {
     nextData[collection] = registerCreatedItems(currentData[collection], nextData[collection], req.user.id, createdAt);
   }

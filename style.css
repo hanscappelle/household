@@ -159,6 +159,17 @@ h1{font-size:36px;letter-spacing:-.7px;line-height:1.15}
 .important-checkbox{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:#6e8072}
 .important-checkbox input{width:16px;height:16px;margin:0;accent-color:#c4933f}
 .task-info small{display:block;margin-top:4px;color:#a0ada2;font-size:10px}
+.appointment-icon{width:19px;height:19px;flex-shrink:0;color:var(--palette-mark)}
+.appointment-icon svg{width:100%;height:100%}
+.appointment-members{border:0;padding:0;margin:0;min-width:0}
+.appointment-members legend{margin-bottom:7px}
+.day-appointment-marker{font-size:12px;line-height:1;color:inherit}
+.appointments-panel{padding:10px 19px}
+.appointment-list-item{border-bottom:1px solid #f0f2ef;padding-bottom:10px}
+.appointment-list-item:last-child{border-bottom:0}
+.appointment-list-item .appointment-row{border:0}
+.appointment-list-item>small{display:block;margin-left:30px;color:#718676;font-size:11px}
+[data-theme="dark"] .appointment-list-item{border-color:var(--dark-divider)}
 .task-info small.late-label{color:#b26642;font-weight:700}
 .task-row.done strong{text-decoration:line-through;color:#aeb8af}
 .task-speak{display:grid;place-items:center;width:44px;height:44px;flex-shrink:0;border:0;border-radius:8px;background:var(--palette-soft);color:var(--palette-mark)}
@@ -295,6 +306,7 @@ dialog::backdrop{background:rgba(34,50,38,.42)}
 .field{display:grid;gap:7px}.field.full{grid-column:1/-1}
 .field label,.field-label{font-size:11px;font-weight:700;color:#6e8072}
 .field input,.field select{width:100%}
+.field .important-checkbox input{width:16px}
 .field-help{font-size:10px;color:#9aa79d;line-height:1.5}
 .assignment-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .member-assignment-list{display:grid;gap:6px}

@@ -529,6 +529,26 @@ function renderTaskRows(tasks, date, memberId) {
   }).join('');
 }
 
+function appointmentLabel(appointment) {
+  const start = formatDate(parseDate(appointment.startDate), { day: 'numeric', month: 'long', year: 'numeric' });
+  const end = formatDate(parseDate(appointment.endDate), { day: 'numeric', month: 'long', year: 'numeric' });
+  if (appointment.allDay) return `${start}${appointment.startDate === appointment.endDate ? '' : ` – ${end}`} · Hele dag`;
+  return appointment.startDate === appointment.endDate
+    ? `${start} · ${appointment.startTime} – ${appointment.endTime}`
+    : `${start} ${appointment.startTime} – ${end} ${appointment.endTime}`;
+}
+
+function appointmentsOn(date) {
+  return state.appointments.filter(item => appointmentOnDate(item, dateKey(date)))
+    .sort((a, b) => Number(b.allDay) - Number(a.allDay) ||
+      `${a.startDate}T${a.startTime}`.localeCompare(`${b.startDate}T${b.startTime}`) ||
+      a.title.localeCompare(b.title, 'nl'));
+}
+
+function renderAppointmentRows(appointments) {
+  return appointments.map(item => `<div class="task-row appointment-row"><span class="appointment-icon" role="img" aria-label="Afspraak"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18"/></svg></span><span class="task-info"><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(appointmentLabel(item))}</small></span>${isChild() ? '' : `<button type="button" class="text-button" data-action="edit-appointment" data-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(item.title)} bewerken">Bewerken</button>`}</div>`).join('');
+}
+
 function confirmTaskCompletion(task, date, memberId) {
   pendingTaskCompletion = { taskId: task.id, date: dateKey(date), memberId };
   const currentlyDone = memberId ? isDone(task, date, memberId) : isDone(task, date);
@@ -733,6 +753,7 @@ function renderDashboard() {
   const plannedTasksToday = tasksOn(today);
   const doneToday = plannedTasksToday.filter(task => isDone(task, today)).length;
   const birthdays = birthdaysOn(date);
+  const dayAppointments = appointmentsOn(date);
   const memberLoads = state.members.map((member, index) => ({
     member,
     index,
@@ -764,14 +785,15 @@ function renderDashboard() {
           <div class="weekdays">${weekDates.map(day => {
             const dayBirthdays = birthdaysOn(day);
             const count = tasksOn(day).length;
-            const label = `${formatDate(day, { weekday: 'long', day: 'numeric', month: 'long' })} · ${count} ${count === 1 ? 'taak' : 'taken'}${dayBirthdays.length ? ` · ${dayBirthdays.length} ${dayBirthdays.length === 1 ? 'verjaardag' : 'verjaardagen'}` : ''}`;
-            return `<button class="day ${dateKey(day) === selectedDate ? 'selected' : ''}" data-action="select-day" data-date="${dateKey(day)}" aria-label="${escapeHtml(label)}" aria-pressed="${dateKey(day) === selectedDate}"><span class="day-name">${DAYS[(day.getDay() + 6) % 7]}</span><span class="day-number">${day.getDate()}</span><span class="day-markers" aria-hidden="true">${count ? `<span class="day-dot"></span><span class="day-task-count">${count}</span>` : ''}${dayBirthdays.length ? '<span class="birthday-marker">🎂</span>' : ''}</span></button>`;
+            const appointmentCount = appointmentsOn(day).length;
+            const label = `${formatDate(day, { weekday: 'long', day: 'numeric', month: 'long' })} · ${count} ${count === 1 ? 'taak' : 'taken'}${appointmentCount ? ` · ${appointmentCount} ${appointmentCount === 1 ? 'afspraak' : 'afspraken'}` : ''}${dayBirthdays.length ? ` · ${dayBirthdays.length} ${dayBirthdays.length === 1 ? 'verjaardag' : 'verjaardagen'}` : ''}`;
+            return `<button class="day ${dateKey(day) === selectedDate ? 'selected' : ''}" data-action="select-day" data-date="${dateKey(day)}" aria-label="${escapeHtml(label)}" aria-pressed="${dateKey(day) === selectedDate}"><span class="day-name">${DAYS[(day.getDay() + 6) % 7]}</span><span class="day-number">${day.getDate()}</span><span class="day-markers" aria-hidden="true">${count ? `<span class="day-dot"></span><span class="day-task-count">${count}</span>` : ''}${appointmentCount ? '<span class="day-appointment-marker">▦</span>' : ''}${dayBirthdays.length ? '<span class="birthday-marker">🎂</span>' : ''}</span></button>`;
           }).join('')}</div>
           <div class="day-detail"><div class="day-detail-head"><strong>${escapeHtml(formatDate(date, { weekday: 'long', day: 'numeric', month: 'long' }))}</strong><span>${todayTasks.length} ${todayTasks.length === 1 ? 'taak' : 'taken'}</span></div>
             ${birthdays.map(member => `<div class="birthday-row"><span class="birthday-icon" aria-hidden="true">🎂</span><div><strong>Verjaardag van ${escapeHtml(member.name)}</strong><small>${date.getFullYear() - parseDate(member.birthDate).getFullYear()} jaar</small></div></div>`).join('')}
-            ${memberLoads.filter(group => group.tasks.length).map(({ member, index, tasks }) => `<section class="day-task-group"><div class="day-task-member"><h3 class="day-task-member-heading"><span aria-hidden="true">${avatar(member, index)}</span><span>${escapeHtml(member.name)}</span></h3>${speakButton('speak-member', member.id, member.name, 'Naam voorlezen')}</div>${renderTaskRows(tasks, date, member.id)}</section>`).join('')}
-            ${freeTasks.length ? `<section class="day-task-group"><h3 class="free-task-heading"><span class="avatar free-task-avatar" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3.5 19v-1.5a5.5 5.5 0 0 1 11 0V19z"/><path d="M16 5.3a3 3 0 0 1 0 5.4M17 13a5 5 0 0 1 3.5 4.8V19h-4"/></svg></span><span>Voor iedereen</span></h3>${renderTaskRows(freeTasks, date)}</section>` : ''}
-            ${!todayTasks.length && !birthdays.length ? `<div class="empty"><span class="empty-icon">☼</span><strong>Een lekker lege planning</strong>Plan een taak in en hij verschijnt hier.</div>` : ''}
+            ${freeTasks.length || dayAppointments.some(item => !appointmentMemberIds(item).length) ? `<section class="day-task-group"><h3 class="free-task-heading"><span class="avatar free-task-avatar" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3.5 19v-1.5a5.5 5.5 0 0 1 11 0V19z"/><path d="M16 5.3a3 3 0 0 1 0 5.4M17 13a5 5 0 0 1 3.5 4.8V19h-4"/></svg></span><span>Voor iedereen</span></h3>${renderAppointmentRows(dayAppointments.filter(item => !appointmentMemberIds(item).length))}${renderTaskRows(freeTasks, date)}</section>` : ''}
+            ${memberLoads.filter(group => group.tasks.length || dayAppointments.some(item => appointmentMemberIds(item).includes(group.member.id))).map(({ member, index, tasks }) => `<section class="day-task-group"><div class="day-task-member"><h3 class="day-task-member-heading"><span aria-hidden="true">${avatar(member, index)}</span><span>${escapeHtml(member.name)}</span></h3>${speakButton('speak-member', member.id, member.name, 'Naam voorlezen')}</div>${renderAppointmentRows(dayAppointments.filter(item => appointmentMemberIds(item).includes(member.id)))}${renderTaskRows(tasks, date, member.id)}</section>`).join('')}
+            ${!todayTasks.length && !birthdays.length && !dayAppointments.length ? `<div class="empty"><span class="empty-icon">☼</span><strong>Een lekker lege planning</strong>Plan een taak of afspraak in en die verschijnt hier.</div>` : ''}
           </div>
         </div>
       </section>
@@ -861,6 +883,78 @@ function openNote(id) {
       render();
       showToast('Notitie opgeslagen');
     }
+  });
+  document.querySelector('#modal').showModal();
+}
+
+function renderAppointments() {
+  const appointments = [...state.appointments].sort((a, b) =>
+    `${a.startDate}T${a.startTime}`.localeCompare(`${b.startDate}T${b.startTime}`) || a.title.localeCompare(b.title, 'nl'));
+  return `<div class="page-heading"><div><h1>Afspraken <span class="nav-beta">BETA</span></h1><p>Alle afspraken van het gezin op één plek.</p></div>${isChild() ? '' : '<button type="button" class="button" data-action="new-appointment"><span class="plus">+</span> Afspraak toevoegen</button>'}</div>
+    <div class="panel appointments-panel">${appointments.length ? appointments.map(item => {
+      const names = state.members.filter(person => appointmentMemberIds(item).includes(person.id)).map(person => person.name);
+      return `<div class="appointment-list-item">${renderAppointmentRows([item])}<small>${escapeHtml(names.join(', ') || 'Voor iedereen')}</small></div>`;
+    }).join('') : '<div class="empty">Nog geen afspraken ingepland.</div>'}</div>`;
+}
+
+function openAppointment(id) {
+  const existing = state.appointments.find(item => item.id === id);
+  if (id && !existing) { showToast('De afspraak bestaat niet meer.'); return; }
+  const startDate = existing?.startDate || selectedDate;
+  document.querySelector('#modal-content').innerHTML = `<form id="appointment-form" class="modal-inner">
+    <div class="modal-head"><div><h2 id="modal-title">${existing ? 'Afspraak bewerken' : 'Afspraak toevoegen'}</h2><p>Plan een afspraak voor jezelf of het gezin.</p></div><button type="button" class="close" data-action="close-modal" aria-label="Sluiten">×</button></div>
+    <div class="form-grid">
+      <div class="field full"><label for="appointment-title">Titel</label><input id="appointment-title" name="title" required maxlength="120" value="${escapeHtml(existing?.title || '')}"></div>
+      <fieldset class="field full appointment-members"><legend class="field-label">Gezinsleden</legend>${assignmentChoices('appointmentMemberIds', existing ? appointmentMemberIds(existing) : [], true)}<span class="field-help">Selecteer één of meer gezinsleden. Zonder selectie staat de afspraak bij Voor iedereen.</span></fieldset>
+      <div class="field full"><label class="important-checkbox"><input type="checkbox" name="allDay" ${existing?.allDay ? 'checked' : ''}> Hele dag</label></div>
+      <div class="field"><label for="appointment-start-date">Begindatum</label><input id="appointment-start-date" name="startDate" type="date" required value="${escapeHtml(startDate)}"></div>
+      <div class="field"><label for="appointment-end-date">Einddatum</label><input id="appointment-end-date" name="endDate" type="date" required value="${escapeHtml(existing?.endDate || startDate)}"></div>
+      <div class="field appointment-time"><label for="appointment-start-time">Begintijd</label><input id="appointment-start-time" name="startTime" type="time" value="${escapeHtml(existing?.startTime || '09:00')}"></div>
+      <div class="field appointment-time"><label for="appointment-end-time">Eindtijd</label><input id="appointment-end-time" name="endTime" type="time" value="${escapeHtml(existing?.endTime || '10:00')}"></div>
+    </div><p class="field-help">Bij een hele dag telt de einddatum mee. Een afspraak met tijd eindigt op het opgegeven tijdstip.</p>
+    <div class="modal-actions">${existing ? '<button type="button" class="button danger" data-action="delete-appointment">Verwijderen</button>' : ''}<button type="button" class="button secondary" data-action="close-modal">Annuleren</button><button type="submit" class="button">Opslaan</button></div></form>`;
+  const form = document.querySelector('#appointment-form');
+  const updateTimes = () => {
+    form.querySelectorAll('.appointment-time').forEach(field => { field.hidden = form.elements.allDay.checked; });
+    form.elements.startTime.required = form.elements.endTime.required = !form.elements.allDay.checked;
+  };
+  updateTimes();
+  form.elements.allDay.addEventListener('change', updateTimes);
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    const title = form.elements.title.value.trim();
+    if (!title) { form.elements.title.setCustomValidity('Vul een titel in.'); form.elements.title.reportValidity(); return; }
+    const appointment = {
+      ...existing, id: existing?.id || crypto.randomUUID(), title,
+      memberIds: [...form.querySelectorAll('input[name="appointmentMemberIds"]:checked')].map(input => input.value), allDay: form.elements.allDay.checked,
+      startDate: form.elements.startDate.value, endDate: form.elements.endDate.value,
+      startTime: form.elements.allDay.checked ? '' : form.elements.startTime.value,
+      endTime: form.elements.allDay.checked ? '' : form.elements.endTime.value
+    };
+    delete appointment.memberId;
+    if (!validAppointments([appointment], state.members)) {
+      form.elements.endDate.setCustomValidity('Controleer de datums en tijden: het einde moet na het begin liggen.');
+      form.elements.endDate.reportValidity();
+      return;
+    }
+    const nextState = { ...state, appointments: existing
+      ? state.appointments.map(item => item.id === existing.id ? appointment : item)
+      : [...state.appointments, appointment] };
+    if (await save(nextState)) { state = nextState; document.querySelector('#modal').close(); render(); showToast('Afspraak opgeslagen'); }
+  });
+  const updateEndDate = event => {
+    if (event.target === form.elements.startDate && form.elements.startDate.value &&
+        form.elements.endDate.value && form.elements.endDate.value < form.elements.startDate.value) {
+      form.elements.endDate.value = form.elements.startDate.value;
+    }
+    form.elements.endDate.setCustomValidity('');
+  };
+  form.addEventListener('input', event => { form.elements.title.setCustomValidity(''); updateEndDate(event); });
+  form.addEventListener('change', updateEndDate);
+  form.querySelector('[data-action="delete-appointment"]')?.addEventListener('click', async () => {
+    if (!confirm(`Afspraak "${existing.title}" verwijderen?`)) return;
+    const nextState = { ...state, appointments: state.appointments.filter(item => item.id !== existing.id) };
+    if (await save(nextState)) { state = nextState; document.querySelector('#modal').close(); render(); showToast('Afspraak verwijderd'); }
   });
   document.querySelector('#modal').showModal();
 }
@@ -958,7 +1052,7 @@ function renderBackup() {
       </div>
       <div class="modal-actions"><button type="button" class="button secondary" data-action="reset-customization">Standaardteksten herstellen</button><button type="submit" class="button">Teksten opslaan</button></div>
     </form>
-    ${demoMode ? '<div class="panel backup-panel"><h2>Back-up</h2><p>Back-ups downloaden en terugzetten zijn beschikbaar met een account, niet in de demo.</p></div>' : `<div class="panel backup-panel"><h2>Back-up downloaden</h2><p>Download een JSON-bestand met gezinsleden, taken, planningen, afvinkjes, boodschappen, kookinspiratie en notities. Bewaar dit bestand op een veilige plek: het bevat persoonlijke gegevens.</p><button class="button" data-action="export-backup">Back-up downloaden</button></div>
+    ${demoMode ? '<div class="panel backup-panel"><h2>Back-up</h2><p>Back-ups downloaden en terugzetten zijn beschikbaar met een account, niet in de demo.</p></div>' : `<div class="panel backup-panel"><h2>Back-up downloaden</h2><p>Download een JSON-bestand met gezinsleden, taken, afspraken, planningen, afvinkjes, boodschappen, kookinspiratie en notities. Bewaar dit bestand op een veilige plek: het bevat persoonlijke gegevens.</p><button class="button" data-action="export-backup">Back-up downloaden</button></div>
     <div class="panel backup-panel"><h2>Back-up terugzetten</h2><p>Een back-up terugzetten vervangt de huidige gegevens van je account. Download eventueel eerst een back-up van de huidige gegevens.</p><label for="backup-file" class="field-label">JSON-bestand kiezen</label><input id="backup-file" type="file" accept=".json,application/json"><button class="button secondary" data-action="import-backup">Back-up terugzetten</button></div>`}`}`;
 }
 
@@ -975,8 +1069,11 @@ function renderHelp() {
         <p>Op <a href="#overzicht">Overzicht</a> zie je de weekplanning, taken en verjaardagen. Kies een dag in de agenda of gebruik de pijlen om naar een andere week te gaan. De taken van de gekozen dag staan gegroepeerd per verantwoordelijke. Vink een taak af wanneer die klaar is.</p>
         <p>Naast de weekplanning zie je de gezinsleden; daaronder staan gedeelde notities als post-its. Kies <strong>Notitie toevoegen</strong> om in een venster een titel en beschrijving in te vullen. De auteur wordt automatisch ingevuld. Zet eventueel <strong>Markeer als belangrijk</strong> aan; dit staat standaard uit. Belangrijke notities krijgen een uitroepteken en staan bovenaan.</p>
         <p>Open het driepuntjesmenu op een post-it om die te bewerken of te archiveren. Bij bewerken door een ander gezinslid worden diens naam en bewerktijd vermeld. Gearchiveerde notities verdwijnen van het overzicht. Via <a href="#notitiearchief">Notitiearchief</a> kun je ze herstellen of definitief verwijderen.</p>
-        <p>Op <a href="#taken">Alle taken</a> kun je een taak openen om de planning te wijzigen. Kies per dag, week, maand of eenmalige datum wie de taak uitvoert. Standaard wijs je de taak aan één gezinslid toe; zet <strong>Gedeelde taak</strong> aan om meerdere personen te selecteren. Zet <strong>Vrij in te plannen</strong> aan om een taak zonder vaste dag te plannen; de taak blijft deze periode in de planning staan tot ze is afgerond. Je kunt dit combineren met <strong>Voor iedereen</strong>. De taak verschijnt dan onderaan de planning, zonder verantwoordelijke. Na afronden verschijnt ze weer in de volgende periode. Zonder die combinatie verschijnt de taak op de reguliere frequentiedag en schuift ze dagelijks door zolang die openstaat. Markeer in het taakformulier belangrijke taken; die herken je aan het label <strong>Belangrijk</strong>. Gebruik de zoekbalk en filters om taken terug te vinden.</p>
+        <p>Op <a href="#taken">Alle taken</a> kun je een taak openen om de planning te wijzigen. Kies per dag, week, maand of eenmalige datum wie de taak uitvoert. Standaard wijs je de taak aan één gezinslid toe; zet <strong>Gedeelde taak</strong> aan om meerdere personen te selecteren. Zet <strong>Vrij in te plannen</strong> aan om een taak zonder vaste dag te plannen; de taak blijft deze periode in de planning staan tot ze is afgerond. Je kunt dit combineren met <strong>Voor iedereen</strong>. De taak verschijnt dan bovenaan de planning, zonder verantwoordelijke. Na afronden verschijnt ze weer in de volgende periode. Zonder die combinatie verschijnt de taak op de reguliere frequentiedag en schuift ze dagelijks door zolang die openstaat. Markeer in het taakformulier belangrijke taken; die herken je aan het label <strong>Belangrijk</strong>. Gebruik de zoekbalk en filters om taken terug te vinden.</p>
         <p>Vink je een taak na de geplande dag af, dan krijgt die het label <strong>Te laat uitgevoerd</strong>. Bij elk gezinslid kun je via <strong>Statistieken bekijken</strong> zien hoeveel taken die persoon te laat ingepland had; dit wordt niet gekoppeld aan het account dat de taak heeft afgevinkt.</p>
+      </section>
+      <section class="panel help-panel"><h2>Afspraken (beta)</h2>
+        <p>Ouders kunnen via <a href="#afspraken">Afspraken</a> afspraken toevoegen, bewerken en verwijderen. Kies een begin- en einddatum en tijd, of selecteer <strong>Hele dag</strong>. Bij hele dagen telt de einddatum mee. Selecteer eventueel één of meer gezinsleden; anders staat de afspraak bovenaan de weekplanner onder <strong>Voor iedereen</strong>. Afspraken staan op elke betrokken dag boven de taken van elk geselecteerd gezinslid. Kindaccounts kunnen afspraken bekijken.</p>
       </section>
       <section class="panel help-panel"><h2>Gezinsleden</h2>
         <p>Voeg op <a href="#gezin">Ons gezin</a> gezinsleden toe en bewerk hun naam, geboortedatum en optioneel e-mailadres. Een geboortedatum wordt gebruikt om de leeftijd te tonen en verjaardagen op het overzicht te markeren.</p>
@@ -1020,8 +1117,8 @@ function render() {
       if (!(error instanceof URIError)) throw error;
     }
   }
-  const view = statisticsMember ? 'statistieken' : ['overzicht', 'taken', 'gezin', 'instellingen', 'help', 'boodschappen', 'kookinspiratie', 'notitiearchief'].includes(requestedView) ? requestedView : 'overzicht';
-  document.querySelector('#content').innerHTML = view === 'taken' ? renderTasks() : view === 'gezin' ? renderFamily() : view === 'statistieken' ? renderMemberStatistics(statisticsMember) : view === 'instellingen' ? renderBackup() : view === 'help' ? renderHelp() : view === 'boodschappen' ? renderGroceries() : view === 'kookinspiratie' ? renderMealIdeas() : view === 'notitiearchief' ? renderNoteArchive() : renderDashboard();
+  const view = statisticsMember ? 'statistieken' : ['overzicht', 'taken', 'afspraken', 'gezin', 'instellingen', 'help', 'boodschappen', 'kookinspiratie', 'notitiearchief'].includes(requestedView) ? requestedView : 'overzicht';
+  document.querySelector('#content').innerHTML = view === 'taken' ? renderTasks() : view === 'afspraken' ? renderAppointments() : view === 'gezin' ? renderFamily() : view === 'statistieken' ? renderMemberStatistics(statisticsMember) : view === 'instellingen' ? renderBackup() : view === 'help' ? renderHelp() : view === 'boodschappen' ? renderGroceries() : view === 'kookinspiratie' ? renderMealIdeas() : view === 'notitiearchief' ? renderNoteArchive() : renderDashboard();
   document.querySelector('#brand-title').textContent = state.customization.websiteTitle;
   document.querySelector('#brand-subtitle').textContent = state.customization.brandSubtitle;
   document.querySelector('.brand').setAttribute('aria-label', `${state.customization.websiteTitle}, naar overzicht`);
@@ -1030,7 +1127,7 @@ function render() {
   document.querySelector('#sidebar-custom-title').textContent = state.customization.sidebarTitle;
   document.querySelector('#sidebar-custom-text').textContent = state.customization.sidebarText;
   document.querySelectorAll('.navigation a').forEach(link => link.classList.toggle('active', link.dataset.view === (view === 'statistieken' ? 'gezin' : view)));
-  document.querySelector('#breadcrumb-current').textContent = view === 'gezin' ? 'ONS GEZIN' : view === 'statistieken' ? 'ONS GEZIN / STATISTIEKEN' : view === 'taken' ? 'ALLE TAKEN' : view === 'instellingen' ? 'INSTELLINGEN' : view === 'help' ? 'HELP' : view === 'boodschappen' ? 'BOODSCHAPPEN' : view === 'kookinspiratie' ? 'KOOKINSPIRATIE' : view === 'notitiearchief' ? 'NOTITIEARCHIEF' : 'OVERZICHT';
+  document.querySelector('#breadcrumb-current').textContent = view === 'gezin' ? 'ONS GEZIN' : view === 'statistieken' ? 'ONS GEZIN / STATISTIEKEN' : view === 'taken' ? 'ALLE TAKEN' : view === 'afspraken' ? 'AFSPRAKEN' : view === 'instellingen' ? 'INSTELLINGEN' : view === 'help' ? 'HELP' : view === 'boodschappen' ? 'BOODSCHAPPEN' : view === 'kookinspiratie' ? 'KOOKINSPIRATIE' : view === 'notitiearchief' ? 'NOTITIEARCHIEF' : 'OVERZICHT';
   document.querySelector('#nav-count').textContent = state.tasks.length;
   document.querySelector('#today-label').textContent = formatDate(new Date(), { weekday: 'long', day: 'numeric', month: 'long' });
 }
@@ -1149,7 +1246,8 @@ function validateBackup(backup) {
     }
   }
   if (data.mealIdeas !== undefined) validateMealIdeas(data.mealIdeas, data.members);
-  return { ...data, customization: { ...CUSTOM_TEXT_DEFAULTS, ...data.customization }, groceries: data.groceries ?? [], notes: (data.notes ?? []).map(note => ({ ...note, important: note.important === true })), mealIdeas: data.mealIdeas === undefined ? [] : data.mealIdeas, tasks: data.tasks.map(task => {
+  if (!validAppointments(data.appointments === undefined ? [] : data.appointments, data.members)) throw new Error('De afspraken bevatten ongeldige gegevens of onbekende gezinsleden.');
+  return { ...data, appointments: data.appointments ?? [], customization: { ...CUSTOM_TEXT_DEFAULTS, ...data.customization }, groceries: data.groceries ?? [], notes: (data.notes ?? []).map(note => ({ ...note, important: note.important === true })), mealIdeas: data.mealIdeas === undefined ? [] : data.mealIdeas, tasks: data.tasks.map(task => {
     const normalized = normalizeTask(task);
     if (normalized.schedules) normalized.schedules = normalized.schedules.map(normalizeTask);
     return normalized;
@@ -1413,6 +1511,7 @@ function openMember(id) {
       ...state,
       members: state.members.filter(member => member.id !== existing.id),
       tasks: structuredClone(state.tasks),
+      appointments: state.appointments.map(item => removeAppointmentMember(item, existing.id)),
       mealIdeas: state.mealIdeas.map(idea => ({ ...idea, wishedBy: idea.wishedBy.filter(id => id !== existing.id) }))
     };
     nextState.tasks.forEach(task => {
@@ -1460,7 +1559,7 @@ document.addEventListener('click', async event => {
     return;
   }
   const action = button.dataset.action;
-  if (isChild() && ['new-task', 'edit-task', 'new-member', 'edit-member', 'export-backup', 'import-backup', 'reset-customization', 'toggle-grocery-urgent', 'delete-grocery', 'delete-meal-idea', 'edit-note', 'archive-note', 'restore-note', 'delete-note'].includes(action)) return;
+  if (isChild() && ['new-task', 'edit-task', 'new-appointment', 'edit-appointment', 'new-member', 'edit-member', 'export-backup', 'import-backup', 'reset-customization', 'toggle-grocery-urgent', 'delete-grocery', 'delete-meal-idea', 'edit-note', 'archive-note', 'restore-note', 'delete-note'].includes(action)) return;
   if (action === 'toggle-note-menu') {
     const shouldOpen = button.getAttribute('aria-expanded') !== 'true';
     closeNoteMenus();
@@ -1475,6 +1574,8 @@ document.addEventListener('click', async event => {
   if (action === 'new-note') openNewNote();
   if (action === 'new-task') openTask();
   if (action === 'edit-task') openTask(button.dataset.id);
+  if (action === 'new-appointment') openAppointment();
+  if (action === 'edit-appointment') openAppointment(button.dataset.id);
   if (action === 'mark-not-late') {
     await markCompletionNotLate({
       taskId: button.dataset.id,

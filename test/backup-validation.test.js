@@ -4,7 +4,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
 const vm = require('node:vm');
-const { normalizeTask, validTaskAssignments } = require('../seed');
+const { normalizeTask, validTaskAssignments, validAppointments } = require('../seed');
 const { mergeHouseholdState } = require('../state-merge');
 const { registerCreatedItems } = require('../creation-metadata');
 
@@ -16,7 +16,8 @@ const context = vm.createContext({
   DAYS: ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'],
   FREQUENCIES: { daily: 'Dagelijks', weekly: 'Wekelijks', monthly: 'Maandelijks', yearly: 'Jaarlijks' },
   normalizeTask,
-  validTaskAssignments
+  validTaskAssignments,
+  validAppointments
 });
 vm.runInContext(
   app.slice(app.indexOf('function validateMealIdeas('), app.indexOf('let state = null;')) +
@@ -95,6 +96,25 @@ test('two stale clients can save edits to different tasks using an older server 
 function backup(task) {
   return { format: 'ons-huishouden-backup', version: 1, data: { members: [], tasks: [task], completed: {} } };
 }
+
+test('appointment backups accept legacy data and reject invalid references or ranges', () => {
+  const legacy = backup({ id: 't1', title: 'Taak', frequency: 'daily' });
+  assert.equal(context.validateBackup(legacy).appointments.length, 0);
+  legacy.data.appointments = [{ id: 'a1', title: 'Afspraak', memberId: '', allDay: true,
+    startDate: '2026-11-18', endDate: '2026-11-18', startTime: '', endTime: '' }];
+  assert.equal(context.validateBackup(legacy).appointments.length, 1);
+  legacy.data.members.push({ id: 'm1', name: 'Een' }, { id: 'm2', name: 'Twee' });
+  delete legacy.data.appointments[0].memberId;
+  legacy.data.appointments[0].memberIds = ['m1', 'm2'];
+  assert.equal(context.validateBackup(legacy).appointments[0].memberIds.length, 2);
+  legacy.data.appointments[0].memberIds = ['m1', 'm1'];
+  assert.throws(() => context.validateBackup(legacy), /afspraken bevatten ongeldige gegevens/);
+  delete legacy.data.appointments[0].memberIds;
+  legacy.data.appointments[0].memberId = 'onbekend';
+  assert.throws(() => context.validateBackup(legacy), /afspraken bevatten ongeldige gegevens/);
+  legacy.data.appointments = null;
+  assert.throws(() => context.validateBackup(legacy), /afspraken bevatten ongeldige gegevens/);
+});
 
 test('saved empty member selections load and normalize without becoming assignments', () => {
   const task = {

@@ -106,6 +106,52 @@ function validTaskAssignments(value) {
     : value === '' || validId(value);
 }
 
+function appointmentMemberIds(appointment) {
+  return appointment.memberIds ?? (appointment.memberId ? [appointment.memberId] : []);
+}
+
+function removeAppointmentMember(appointment, memberId) {
+  if (!appointmentMemberIds(appointment).includes(memberId)) return appointment;
+  return Object.hasOwn(appointment, 'memberIds')
+    ? { ...appointment, memberIds: appointment.memberIds.filter(id => id !== memberId) }
+    : { ...appointment, memberId: '' };
+}
+
+function validAppointments(appointments, members) {
+  if (!Array.isArray(appointments) || !Array.isArray(members) ||
+      members.some(member => !member || typeof member !== 'object')) return false;
+  const memberIds = new Set(members.map(member => member.id));
+  const ids = new Set();
+  const validDate = value => {
+    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value) || Number(value.slice(0, 4)) < 100) return false;
+    const date = new Date(`${value}T00:00:00Z`);
+    return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+  };
+  const validTime = value => typeof value === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value);
+  return appointments.every(item => {
+    if (!item || typeof item !== 'object' || Array.isArray(item) ||
+        typeof item.id !== 'string' || !item.id.trim() || item.id.includes('|') || ids.has(item.id) ||
+        typeof item.title !== 'string' || !item.title.trim() || item.title.length > 120 ||
+        typeof item.allDay !== 'boolean' || !validDate(item.startDate) || !validDate(item.endDate) ||
+        (Object.hasOwn(item, 'memberIds')
+          ? Object.hasOwn(item, 'memberId') || !Array.isArray(item.memberIds) ||
+            new Set(item.memberIds).size !== item.memberIds.length ||
+            !item.memberIds.every(id => typeof id === 'string' && id.trim() && !id.includes('|') && memberIds.has(id))
+          : typeof item.memberId !== 'string' || (item.memberId !== '' && !memberIds.has(item.memberId))) ||
+        (item.allDay ? item.startTime !== '' || item.endTime !== '' || item.endDate < item.startDate :
+          !validTime(item.startTime) || !validTime(item.endTime) ||
+          `${item.endDate}T${item.endTime}` <= `${item.startDate}T${item.startTime}`)) return false;
+    ids.add(item.id);
+    return true;
+  });
+}
+
+function appointmentOnDate(appointment, date) {
+  return appointment.startDate <= date && (appointment.allDay
+    ? appointment.endDate >= date
+    : appointment.endDate > date || appointment.endDate === date && appointment.endTime !== '00:00');
+}
+
 // seed.js is also served by older server versions that do not know state-merge.js.
 function mergeHouseholdState(base, local, remote) {
   const conflict = () => { throw new Error('Dezelfde gegevens zijn op meerdere apparaten gewijzigd.'); };
@@ -151,14 +197,14 @@ function mergeHouseholdState(base, local, remote) {
   };
 
   const removedMembers = (before, after) => before.members.some(member => !after.members.some(item => item.id === member.id));
-  if ((removedMembers(base, local) && !equal(base.tasks, remote.tasks)) ||
-      (removedMembers(base, remote) && !equal(base.tasks, local.tasks))) conflict();
+  if ((removedMembers(base, local) && (!equal(base.tasks, remote.tasks) || !equal(base.appointments || [], remote.appointments || []))) ||
+      (removedMembers(base, remote) && (!equal(base.tasks, local.tasks) || !equal(base.appointments || [], local.appointments || [])))) conflict();
 
-  const collections = new Set(['members', 'tasks', 'groceries', 'mealIdeas', 'notes']);
+  const collections = new Set(['members', 'tasks', 'groceries', 'mealIdeas', 'notes', 'appointments']);
   const result = {};
   for (const key of new Set([...Object.keys(base), ...Object.keys(local), ...Object.keys(remote)])) {
     let value;
-    if (collections.has(key)) value = mergeList(base[key], local[key], remote[key]);
+    if (collections.has(key)) value = mergeList(base[key] ?? [], local[key] ?? [], remote[key] ?? []);
     else if (key === 'completed' || key === 'customization') value = mergeMap(base[key], local[key], remote[key]);
     else value = mergeValue(base[key], local[key], remote[key]);
     if (value !== undefined) Object.defineProperty(result, key, { value, enumerable: true, writable: true, configurable: true });
@@ -167,5 +213,5 @@ function mergeHouseholdState(base, local, remote) {
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { SEED_MEMBERS, SEED_TASKS, SEED_MEAL_IDEAS, normalizeTask, validTaskAssignments, mergeHouseholdState };
+  module.exports = { SEED_MEMBERS, SEED_TASKS, SEED_MEAL_IDEAS, normalizeTask, validTaskAssignments, validAppointments, appointmentMemberIds, removeAppointmentMember, appointmentOnDate, mergeHouseholdState };
 }

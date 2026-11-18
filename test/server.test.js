@@ -93,6 +93,12 @@ test(`accounts en opslag op ${basePath || '/'}`, { skip: !configured, timeout: 3
   assert.equal((await request('/api/state', {
     method: 'PUT', cookie: first.cookie, body: { data: invalidNoteImportance, revision: state.json.revision }
   })).status, 400);
+  const invalidAppointment = structuredClone(state.json.data);
+  invalidAppointment.appointments = [{ id: 'a1', title: 'Afspraak', memberId: 'unknown', allDay: true,
+    startDate: '2026-11-18', endDate: '2026-11-18', startTime: '', endTime: '' }];
+  assert.equal((await request('/api/state', {
+    method: 'PUT', cookie: first.cookie, body: { data: invalidAppointment, revision: state.json.revision }
+  })).status, 400);
   assert.equal((await request('/api/invitations', {
     method: 'POST', cookie: first.cookie, body: { email: emails[2], role: 'parent', memberId: 'not-a-family-member' }
   })).status, 400);
@@ -107,6 +113,8 @@ test(`accounts en opslag op ${basePath || '/'}`, { skip: !configured, timeout: 3
     completedByUserId: 'spoofed-user'
   };
   changed.groceries.push({ id: 'test', name: 'Melk', done: false, urgent: false });
+  changed.appointments.push({ id: 'a1', title: 'Afspraak', memberIds: ['member-1', 'member-2'], allDay: true,
+    startDate: '2026-11-18', endDate: '2026-11-18', startTime: '', endTime: '' });
   changed.notes = [
     { id: 'note-test', title: 'Testnotitie', description: 'Een beschrijving', author: 'Niet vertrouwen', archived: false, important: true },
     { id: 'note-default', title: 'Standaardnotitie', description: 'Niet belangrijk', author: 'Niet vertrouwen', archived: false }
@@ -115,6 +123,7 @@ test(`accounts en opslag op ${basePath || '/'}`, { skip: !configured, timeout: 3
   assert.equal(saved.status, 200);
   assert.deepEqual(saved.json.data, (await request('/api/state', { cookie: first.cookie })).json.data);
   assert.equal(saved.json.revision, state.json.revision + 1);
+  assert.deepEqual(saved.json.data.appointments, changed.appointments);
   assert.equal((await request('/api/state', { method: 'PUT', cookie: first.cookie, body: { data: changed, revision: state.json.revision } })).status, 409);
   assert.deepEqual((await request('/api/state', { cookie: first.cookie })).json.data.groceries, changed.groceries);
   assert.equal((await request('/api/state', { cookie: first.cookie })).json.data.customization.websiteTitle, 'De familie test');

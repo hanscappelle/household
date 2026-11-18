@@ -63,8 +63,9 @@ function childChangesAllowed(previous, submitted, defaultCustomization) {
   if (!allowedList(previous.members, submitted.members, [],
     member => typeof member.name === 'string' && Boolean(member.name.trim()) && member.name.length <= 80,
     () => false)) return false;
-  const protectedKeys = ['members', 'tasks', 'completed', 'groceries', 'mealIdeas', 'notes', 'customization'];
+  const protectedKeys = ['members', 'tasks', 'completed', 'groceries', 'mealIdeas', 'notes', 'appointments', 'customization'];
   if (!isDeepStrictEqual(without(previous, protectedKeys), without(submitted, protectedKeys))) return false;
+  if (!isDeepStrictEqual(previous.appointments || [], submitted.appointments || [])) return false;
   if (!isDeepStrictEqual(previous.tasks.map(normalizedTask), submitted.tasks.map(normalizedTask))) return false;
   if (!isDeepStrictEqual(
     { ...defaultCustomization, ...previous.customization },

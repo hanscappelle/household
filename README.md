@@ -70,6 +70,21 @@ Zet bij een taak **Vrij op te nemen taak** aan om die zonder toewijzing onder
 dagelijks door. Als de volgende reguliere frequentiedag aanbreekt terwijl de
 taak nog openstaat, blijft hetzelfde exemplaar staan; na afvinken verschijnt
 het volgende exemplaar pas op de eerstvolgende reguliere frequentiedag.
+Via **Afspraken** (beta) kun je afspraken toevoegen, wijzigen en verwijderen.
+Een afspraak heeft een begin- en einddatum en een begin- en eindtijd, of duurt
+een hele dag. Bij afspraken voor hele dagen telt ook de einddatum mee; bij
+afspraken met tijd is het eindtijdstip exclusief. Bij het wijzigen van de
+begindatum schuift een eerdere einddatum automatisch mee naar de begindatum;
+een latere einddatum blijft staan. Meerdaagse afspraken staan op elke betrokken
+dag in de weekplanner. Koppel een afspraak eventueel aan één
+of meer gezinsleden: ze staat dan boven de taken van elk geselecteerd gezinslid.
+Afspraken zonder gezinslid staan
+samen met de vrij op te nemen taken bovenaan onder **Voor iedereen**. Afspraken
+zijn geen taken en tellen niet mee in taakstatistieken. Kindaccounts kunnen
+afspraken bekijken, maar niet beheren. Bij het verwijderen van een gezinslid
+blijven afspraken bij de overige geselecteerde gezinsleden staan, of onder
+**Voor iedereen** als er niemand meer is geselecteerd. Afspraken worden ook
+in back-ups opgenomen; oudere back-ups zonder afspraken blijven bruikbaar.
 Onder **Ons gezin** staat ook de aanmaakdatum van elk gezinslid. Via
 **Statistieken bekijken** zie je hoeveel taakmomenten er vanaf die datum tot
 en met vandaag volgens de huidige planning aan die persoon waren toegewezen,
