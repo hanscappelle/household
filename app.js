@@ -183,6 +183,26 @@ function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
 }
 
+function linkifyNoteDescription(value) {
+  const parts = String(value ?? '').split(/(https?:\/\/[^\s<>"']+|www\.[^\s<>"']+)/gi);
+  return parts.map((part, index) => {
+    if (index % 2 === 0) return escapeHtml(part).replace(/\n/g, '<br>');
+
+    let url = part;
+    while (/[.,!?;:]$/.test(url)) url = url.slice(0, -1);
+    while (/[)\]}]$/.test(url)) {
+      const closing = url.at(-1);
+      const opening = closing === ')' ? '(' : closing === ']' ? '[' : '{';
+      if ([...url].filter(character => character === closing).length <= [...url].filter(character => character === opening).length) break;
+      url = url.slice(0, -1);
+    }
+
+    if (!url) return escapeHtml(part);
+    const href = /^www\./i.test(url) ? `https://${url}` : url;
+    return `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(url)}</a>${escapeHtml(part.slice(url.length))}`;
+  }).join('');
+}
+
 function capitalizeFirst(value) {
   const characters = Array.from(value.trim());
   if (!characters.length) return '';
@@ -780,7 +800,7 @@ function renderNoteCards(notes, type) {
     const actions = type === 'active'
       ? `<button type="button" data-action="edit-note" data-id="${noteId}">Bewerken</button><button type="button" data-action="archive-note" data-id="${noteId}">Archiveren</button>`
       : `<button type="button" data-action="restore-note" data-id="${noteId}">Herstellen</button><button type="button" data-action="delete-note" data-id="${noteId}">Definitief verwijderen</button>`;
-    return `<article class="note-card ${note.important ? 'important-note' : ''}"><div class="note-card-heading"><h3>${note.important ? '<span class="note-important-mark" aria-label="Belangrijke notitie" title="Belangrijke notitie">!</span>' : ''}${escapeHtml(note.title)}</h3><div class="note-card-actions">${type === 'active' ? speakButton('speak-note', note.id, note.title, 'Notitie voorlezen') : ''}${isChild() ? '' : `<div class="note-menu-wrap"><button type="button" class="note-menu-trigger" data-action="toggle-note-menu" aria-label="Acties voor ${escapeHtml(note.title)}" aria-expanded="false">⋯</button><div class="note-actions-menu" hidden>${actions}</div></div>`}</div></div><p>${escapeHtml(note.description).replace(/\n/g, '<br>')}</p><small>Door ${escapeHtml(note.author)}${note.editedBy ? ` · Bewerkt door ${escapeHtml(note.editedBy)}${note.editedAt ? ` op ${escapeHtml(new Date(note.editedAt).toLocaleString('nl-BE'))}` : ''}` : ''}</small></article>`;
+    return `<article class="note-card ${note.important ? 'important-note' : ''}"><div class="note-card-heading"><h3>${note.important ? '<span class="note-important-mark" aria-label="Belangrijke notitie" title="Belangrijke notitie">!</span>' : ''}${escapeHtml(note.title)}</h3><div class="note-card-actions">${type === 'active' ? speakButton('speak-note', note.id, note.title, 'Notitie voorlezen') : ''}${isChild() ? '' : `<div class="note-menu-wrap"><button type="button" class="note-menu-trigger" data-action="toggle-note-menu" aria-label="Acties voor ${escapeHtml(note.title)}" aria-expanded="false">⋯</button><div class="note-actions-menu" hidden>${actions}</div></div>`}</div></div><p>${linkifyNoteDescription(note.description)}</p><small>Door ${escapeHtml(note.author)}${note.editedBy ? ` · Bewerkt door ${escapeHtml(note.editedBy)}${note.editedAt ? ` op ${escapeHtml(new Date(note.editedAt).toLocaleString('nl-BE'))}` : ''}` : ''}</small></article>`;
   }).join('');
 }
 

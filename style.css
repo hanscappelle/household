@@ -185,6 +185,8 @@ h1{font-size:36px;letter-spacing:-.7px;line-height:1.15}
 .note-card-heading h3{font-size:14px;overflow-wrap:anywhere}
 .note-card-heading>div{display:flex;gap:8px;flex-shrink:0}
 .note-card>p{margin-top:9px;font-size:12px;line-height:1.6;overflow-wrap:anywhere}
+.note-card>p a{color:var(--green);text-decoration:underline;text-underline-offset:2px}
+.note-card>p a:focus-visible{outline:2px solid var(--green);outline-offset:2px}
 .note-card>small{display:block;margin-top:9px;color:#87988a;font-size:10px}
 .note-card .text-button{white-space:nowrap}
 .list-toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:20px 0}
