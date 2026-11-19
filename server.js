@@ -133,7 +133,8 @@ const defaultCustomization = {
   welcomeTitle: 'Fijn dat je er bent',
   welcomeText: 'Samen maken we van ons huis een fijne plek.',
   sidebarTitle: 'Een fijn thuis, doen we samen.',
-  sidebarText: 'Een beetje overzicht maakt ruimte voor de leuke dingen.'
+  sidebarText: 'Een beetje overzicht maakt ruimte voor de leuke dingen.',
+  speakButtonsForAdults: false
 };
 const initialState = () => ({
   members: SEED_MEMBERS.map(member => ({ ...member, createdAt: new Date().toISOString().slice(0, 10) })),
@@ -497,6 +498,7 @@ router.put('/api/state', authenticate, async (req, res) => {
   }
   if (data.customization !== undefined) {
     if (!data.customization || typeof data.customization !== 'object' || Array.isArray(data.customization) ||
+        (data.customization.speakButtonsForAdults !== undefined && typeof data.customization.speakButtonsForAdults !== 'boolean') ||
         Object.entries(customizationLimits).some(([key, limit]) =>
           typeof data.customization[key] !== 'string' || !data.customization[key].trim() || data.customization[key].length > limit)) {
       return res.status(400).json({ error: 'De persoonlijke teksten bevatten ongeldige gegevens.' });

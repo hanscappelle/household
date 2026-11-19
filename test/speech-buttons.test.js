@@ -6,7 +6,7 @@ const { readFileSync } = require('node:fs');
 const vm = require('node:vm');
 
 const app = readFileSync(require.resolve('../app'), 'utf8');
-const context = vm.createContext({ role: 'owner' });
+const context = vm.createContext({ role: 'owner', state: { customization: { speakButtonsForAdults: false } } });
 vm.runInContext(
   "const isChild = () => role === 'child';\n" +
   app.slice(app.indexOf('function escapeHtml('), app.indexOf('function capitalizeFirst(')) +
@@ -26,6 +26,18 @@ test('speech buttons are shown only for child accounts across all supported acti
     assert.match(button, /data-speech-text="Voor te lezen"/);
     assert.match(button, /aria-label="Tekst voorlezen"/);
     assert.match(button, /<span>Luister<\/span>/);
+  }
+});
+
+test('adult speech buttons are enabled by the household setting while child buttons remain enabled by default', () => {
+  for (const action of ['speak-task', 'speak-member', 'speak-meal', 'speak-note']) {
+    context.role = 'owner';
+    assert.equal(context.speakButton(action, 'id', 'Tekst', 'Voorlezen'), '');
+    context.state.customization.speakButtonsForAdults = true;
+    assert.match(context.speakButton(action, 'id', 'Tekst', 'Voorlezen'), /data-action=/);
+    context.state.customization.speakButtonsForAdults = false;
+    context.role = 'child';
+    assert.match(context.speakButton(action, 'id', 'Tekst', 'Voorlezen'), /data-action=/);
   }
 });
 

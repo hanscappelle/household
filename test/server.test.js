@@ -83,6 +83,11 @@ test(`accounts en opslag op ${basePath || '/'}`, { skip: !configured, timeout: 3
   assert.equal((await request('/api/state', {
     method: 'PUT', cookie: first.cookie, body: { data: invalidCustomization, revision: state.json.revision }
   })).status, 400);
+  const invalidAdultSpeechSetting = structuredClone(state.json.data);
+  invalidAdultSpeechSetting.customization.speakButtonsForAdults = 'true';
+  assert.equal((await request('/api/state', {
+    method: 'PUT', cookie: first.cookie, body: { data: invalidAdultSpeechSetting, revision: state.json.revision }
+  })).status, 400);
   const invalidNotes = structuredClone(state.json.data);
   invalidNotes.notes = [{ id: 'invalid-note', title: '', description: 'Beschrijving', author: 'Gebruiker', archived: false }];
   assert.equal((await request('/api/state', {
@@ -105,6 +110,7 @@ test(`accounts en opslag op ${basePath || '/'}`, { skip: !configured, timeout: 3
   const changed = structuredClone(state.json.data);
   changed.customization.websiteTitle = 'De familie test';
   changed.customization.brandSubtitle = 'SAMEN STERK';
+  changed.customization.speakButtonsForAdults = true;
   changed.tasks[0].important = true;
   const completedAt = new Date().toISOString().slice(0, 10);
   const dueDate = new Date(Date.now() - 86400000).toISOString().slice(0, 10);

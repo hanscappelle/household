@@ -97,6 +97,15 @@ function backup(task) {
   return { format: 'ons-huishouden-backup', version: 1, data: { members: [], tasks: [task], completed: {} } };
 }
 
+test('adult speech buttons default to off and require a boolean setting', () => {
+  const legacy = backup({ id: 't1', title: 'Taak', frequency: 'daily' });
+  assert.equal(context.validateBackup(legacy).customization.speakButtonsForAdults, false);
+  legacy.data.customization = { speakButtonsForAdults: true };
+  assert.equal(context.validateBackup(legacy).customization.speakButtonsForAdults, true);
+  legacy.data.customization.speakButtonsForAdults = 'true';
+  assert.throws(() => context.validateBackup(legacy), /spreekknoppen bevat ongeldige gegevens/);
+});
+
 test('appointment backups accept legacy data and reject invalid references or ranges', () => {
   const legacy = backup({ id: 't1', title: 'Taak', frequency: 'daily' });
   assert.equal(context.validateBackup(legacy).appointments.length, 0);

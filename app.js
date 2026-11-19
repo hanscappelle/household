@@ -495,7 +495,7 @@ function renderLoadDistribution(title, loads) {
 }
 
 function speakButton(action, id, text, title, speechText, visibleLabel = '') {
-  if (!isChild()) return '';
+  if (!isChild() && state.customization.speakButtonsForAdults !== true) return '';
   const speechData = speechText ? ` data-speech-text="${escapeHtml(speechText)}"` : '';
   return `<button type="button" class="task-speak" data-action="${escapeHtml(action)}" data-id="${escapeHtml(id)}"${speechData} aria-label="${escapeHtml(text)} voorlezen" title="${escapeHtml(title)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/></svg>${visibleLabel ? `<span>${escapeHtml(visibleLabel)}</span>` : ''}</button>`;
 }
@@ -1168,7 +1168,9 @@ function renderBackup() {
         <div class="field"><label for="custom-sidebar-title">Kleine boodschap: titel</label><input id="custom-sidebar-title" name="sidebarTitle" required maxlength="${CUSTOM_TEXT_LIMITS.sidebarTitle}" value="${escapeHtml(state.customization.sidebarTitle)}"></div>
         <div class="field"><label for="custom-sidebar-text">Kleine boodschap: tekst</label><input id="custom-sidebar-text" name="sidebarText" required maxlength="${CUSTOM_TEXT_LIMITS.sidebarText}" value="${escapeHtml(state.customization.sidebarText)}"></div>
       </div>
-      <div class="modal-actions"><button type="button" class="button secondary" data-action="reset-customization">Standaardteksten herstellen</button><button type="submit" class="button">Teksten opslaan</button></div>
+      <label class="important-checkbox"><input type="checkbox" name="speakButtonsForAdults" ${state.customization.speakButtonsForAdults === true ? 'checked' : ''}> Spreekknoppen ook tonen voor volwassenen</label>
+      <div class="field-help">Kindaccounts houden hun spreekknoppen. Deze instelling geldt voor ouders en andere volwassen accounts in het gezin.</div>
+      <div class="modal-actions"><button type="button" class="button secondary" data-action="reset-customization">Standaardteksten herstellen</button><button type="submit" class="button">Instellingen opslaan</button></div>
     </form>
     ${demoMode ? '<div class="panel backup-panel"><h2>Back-up</h2><p>Back-ups downloaden en terugzetten zijn beschikbaar met een account, niet in de demo.</p></div>' : `<div class="panel backup-panel"><h2>Back-up downloaden</h2><p>Download een JSON-bestand met gezinsleden, taken, afspraken, planningen, afvinkjes, boodschappen, kookinspiratie en notities. Bewaar dit bestand op een veilige plek: het bevat persoonlijke gegevens.</p><button class="button" data-action="export-backup">Back-up downloaden</button></div>
     <div class="panel backup-panel"><h2>Back-up terugzetten</h2><p>Een back-up terugzetten vervangt de huidige gegevens van je account. Download eventueel eerst een back-up van de huidige gegevens.</p><label for="backup-file" class="field-label">JSON-bestand kiezen</label><input id="backup-file" type="file" accept=".json,application/json"><button class="button secondary" data-action="import-backup">Back-up terugzetten</button></div>`}`}`;
@@ -1204,7 +1206,7 @@ function renderHelp() {
         <p>Op <a href="#kookinspiratie">Kookinspiratie</a> bewaar je gerechten en vink je per gezinslid aan wie er zin in heeft. De lijst sorteert gerechten met de meeste wensen bovenaan. Gebruik **Recept zoeken** bij een gerecht om online recepten ervoor te vinden.</p>
       </section>
       <section class="panel help-panel"><h2>Instellingen en gegevens bewaren</h2>
-        <p>Ouders kunnen bij <a href="#instellingen">Instellingen</a> de websitetitel, de ondertekst van het logo en de welkomst- en zijpaneelteksten aanpassen en back-ups beheren. Kindaccounts zien alleen de kleurinstellingen. De teksten zijn zichtbaar voor het hele gezin.</p>
+        <p>Ouders kunnen bij <a href="#instellingen">Instellingen</a> de websitetitel, de ondertekst van het logo en de welkomst- en zijpaneelteksten aanpassen, spreekknoppen voor volwassenen aanzetten en back-ups beheren. Kindaccounts zien alleen de kleurinstellingen. De teksten zijn zichtbaar voor het hele gezin.</p>
         <p>Kies bij Instellingen een van de kleurenpaletten <strong>Bosgroen</strong>, <strong>Oceaanblauw</strong>, <strong>Lavendel</strong> of <strong>Terracotta</strong>. Het kleurenpalet wordt per login bewaard, geldt ook in donkere modus en verandert niets voor andere gezinsleden. De keuze wordt niet opgenomen in een back-up.</p>
         <p>Je kunt daar ook een JSON-back-up downloaden of terugzetten. Terugzetten vervangt de huidige gezinsgegevens; maak eventueel eerst een back-up. Bewaar het bestand veilig, want het bevat persoonlijke gegevens.</p>
       </section>
@@ -1367,7 +1369,10 @@ function validateBackup(backup) {
   }
   if (data.mealIdeas !== undefined) validateMealIdeas(data.mealIdeas, data.members);
   if (!validAppointments(data.appointments === undefined ? [] : data.appointments, data.members)) throw new Error('De afspraken bevatten ongeldige gegevens of onbekende gezinsleden.');
-  return { ...data, appointments: data.appointments ?? [], customization: { ...CUSTOM_TEXT_DEFAULTS, ...data.customization }, groceries: data.groceries ?? [], notes: (data.notes ?? []).map(note => ({ ...note, important: note.important === true })), mealIdeas: data.mealIdeas === undefined ? [] : data.mealIdeas, tasks: data.tasks.map(task => {
+  if (data.customization?.speakButtonsForAdults !== undefined && typeof data.customization.speakButtonsForAdults !== 'boolean') {
+    throw new Error('De instelling voor spreekknoppen bevat ongeldige gegevens.');
+  }
+  return { ...data, appointments: data.appointments ?? [], customization: { speakButtonsForAdults: false, ...CUSTOM_TEXT_DEFAULTS, ...data.customization }, groceries: data.groceries ?? [], notes: (data.notes ?? []).map(note => ({ ...note, important: note.important === true })), mealIdeas: data.mealIdeas === undefined ? [] : data.mealIdeas, tasks: data.tasks.map(task => {
     const normalized = normalizeTask(task);
     if (normalized.schedules) normalized.schedules = normalized.schedules.map(normalizeTask);
     return normalized;
@@ -1731,7 +1736,7 @@ document.addEventListener('click', async event => {
   if (action === 'export-backup') exportBackup();
   if (action === 'import-backup') await importBackup();
   if (action === 'reset-customization') {
-    const nextState = { ...state, customization: { ...CUSTOM_TEXT_DEFAULTS } };
+    const nextState = { ...state, customization: { ...state.customization, ...CUSTOM_TEXT_DEFAULTS } };
     if (await save(nextState)) {
       state = nextState;
       render();
@@ -1972,9 +1977,11 @@ document.addEventListener('submit', async event => {
       if (value === null) return;
       customization[key] = value;
     }
-    const invalidEntry = Object.entries(customization).find(([key, value]) => !value || value.length > CUSTOM_TEXT_LIMITS[key]);
-    if (invalidEntry) {
-      const input = form.elements[invalidEntry[0]];
+    customization.speakButtonsForAdults = form.elements.speakButtonsForAdults.checked;
+    const invalidKey = Object.keys(CUSTOM_TEXT_LIMITS).find(key =>
+      !customization[key] || customization[key].length > CUSTOM_TEXT_LIMITS[key]);
+    if (invalidKey) {
+      const input = form.elements[invalidKey];
       input.setCustomValidity('Vul een tekst in die binnen de aangegeven lengte past.');
       input.reportValidity();
       return;
@@ -1983,7 +1990,7 @@ document.addEventListener('submit', async event => {
     if (await save(nextState)) {
       state = nextState;
       render();
-      showToast('Persoonlijke teksten opgeslagen');
+      showToast('Instellingen opgeslagen');
     }
     return;
   }
