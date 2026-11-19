@@ -48,6 +48,7 @@ const isChild = () => currentRole === 'child';
 let demoMode = false;
 let themeBeforeDemo = 'light';
 let colorPalette = 'forest';
+let textSize = 'normal';
 let saving = false;
 let needsRecovery = false;
 let selectedDate = dateKey(new Date());
@@ -75,6 +76,11 @@ function applyTheme(theme) {
 function applyColorPalette(palette) {
   colorPalette = palette;
   document.documentElement.dataset.palette = palette;
+}
+
+function applyTextSize(size) {
+  textSize = size;
+  document.documentElement.dataset.textSize = size;
 }
 
 function initializeTheme() {
@@ -1177,13 +1183,20 @@ function renderMealIdeas() {
 }
 
 function renderBackup() {
-  return `<div class="page-heading"><div><h1>Instellingen</h1><p>${isChild() ? 'Kies jouw kleurenpalet.' : 'Personaliseer de teksten en beheer de back-up van jullie gezinsgegevens.'}</p></div></div>
+  return `<div class="page-heading"><div><h1>Instellingen</h1><p>${isChild() ? 'Kies jouw weergavevoorkeuren.' : 'Personaliseer de teksten en beheer de back-up van jullie gezinsgegevens.'}</p></div></div>
     <form id="palette-form" class="panel backup-panel palette-panel">
-      <h2>Jouw kleurenpalet</h2>
-      <p>${demoMode ? 'Probeer een kleurenpalet uit voor deze tijdelijke demo.' : 'Deze keuze geldt alleen voor jouw login en verandert de weergave voor de rest van het gezin niet.'}</p>
+      <h2>Jouw weergave</h2>
+      <p>${demoMode ? 'Probeer jouw weergavevoorkeuren uit voor deze tijdelijke demo.' : 'Deze keuzes gelden alleen voor jouw login en veranderen de weergave voor de rest van het gezin niet.'}</p>
+      <h3 class="preference-heading">Tekstgrootte</h3>
+      <div class="text-size-options" role="radiogroup" aria-label="Tekstgrootte">
+        <label class="text-size-option ${textSize === 'normal' ? 'selected' : ''}"><input type="radio" name="textSize" value="normal" ${textSize === 'normal' ? 'checked' : ''}><span>Normaal</span></label>
+        <label class="text-size-option ${textSize === 'large' ? 'selected' : ''}"><input type="radio" name="textSize" value="large" ${textSize === 'large' ? 'checked' : ''}><span class="large-text-preview">Groter</span></label>
+        <label class="text-size-option ${textSize === 'larger' ? 'selected' : ''}"><input type="radio" name="textSize" value="larger" ${textSize === 'larger' ? 'checked' : ''}><span class="larger-text-preview">Nog groter</span></label>
+      </div>
+      <h3 class="preference-heading">Kleurenpalet</h3>
       <div class="palette-options" role="radiogroup" aria-label="Kleurenpalet">${COLOR_PALETTES.map(palette => `<label class="palette-option ${colorPalette === palette.id ? 'selected' : ''}"><input type="radio" name="colorPalette" value="${palette.id}" ${colorPalette === palette.id ? 'checked' : ''}><span class="palette-preview" data-palette="${palette.id}" aria-hidden="true"><i></i><i></i><i></i></span><span class="palette-option-copy"><strong>${palette.label}</strong><small>${palette.description}</small></span></label>`).join('')}</div>
       <div id="palette-error" role="alert"></div>
-      <button class="button" type="submit">Kleurenpalet opslaan</button>
+      <button class="button" type="submit">Weergavevoorkeuren opslaan</button>
     </form>
     ${isChild() ? '' : `<form id="customization-form" class="panel backup-panel">
       <h2>Teksten personaliseren</h2>
@@ -1234,8 +1247,9 @@ function renderHelp() {
         <p>Op <a href="#kookinspiratie">Kookinspiratie</a> bewaar je gerechten en vink je per gezinslid aan wie er zin in heeft. De lijst sorteert gerechten met de meeste wensen bovenaan. Gebruik **Recept zoeken** bij een gerecht om online recepten ervoor te vinden.</p>
       </section>
       <section class="panel help-panel"><h2>Instellingen en gegevens bewaren</h2>
-        <p>Ouders kunnen bij <a href="#instellingen">Instellingen</a> de websitetitel, de ondertekst van het logo en de welkomst- en zijpaneelteksten aanpassen, spreekknoppen voor volwassenen aanzetten en back-ups beheren. Kindaccounts zien alleen de kleurinstellingen. De teksten zijn zichtbaar voor het hele gezin.</p>
+        <p>Bij <a href="#instellingen">Instellingen</a> kan ieder gezinslid het kleurenpalet en de tekstgrootte voor de eigen login kiezen. Ouders kunnen ook de websitetitel, de ondertekst van het logo en de welkomst- en zijpaneelteksten aanpassen, spreekknoppen voor volwassenen aanzetten en back-ups beheren. De teksten zijn zichtbaar voor het hele gezin.</p>
         <p>Kies bij Instellingen een van de kleurenpaletten <strong>Bosgroen</strong>, <strong>Oceaanblauw</strong>, <strong>Lavendel</strong> of <strong>Terracotta</strong>. Het kleurenpalet wordt per login bewaard, geldt ook in donkere modus en verandert niets voor andere gezinsleden. De keuze wordt niet opgenomen in een back-up.</p>
+        <p>Kies bij <strong>Tekstgrootte</strong> voor <strong>Groter</strong> of <strong>Nog groter</strong> om de weergave te vergroten. Deze voorkeur wordt per login bewaard en is op elk apparaat beschikbaar.</p>
         <p>Je kunt daar ook een JSON-back-up downloaden of terugzetten. Terugzetten vervangt de huidige gezinsgegevens; maak eventueel eerst een back-up. Bewaar het bestand veilig, want het bevat persoonlijke gegevens.</p>
       </section>
       <section class="panel help-panel"><h2>Wijzigingen op meerdere apparaten</h2>
@@ -1973,24 +1987,28 @@ document.addEventListener('submit', async event => {
         paletteError.textContent = 'Kies een geldig kleurenpalet.';
         return;
       }
+      const selectedTextSize = form.elements.textSize.value;
       applyColorPalette(selectedPalette);
+      applyTextSize(selectedTextSize);
       render();
-      showToast('Kleurenpalet toegepast voor deze demo');
+      showToast('Weergavevoorkeuren toegepast voor deze demo');
       return;
     }
     form.inert = true;
     try {
+      const selectedTextSize = form.elements.textSize.value;
       const result = await api('api/preferences', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ colorPalette: selectedPalette })
+        body: JSON.stringify({ colorPalette: selectedPalette, textSize: selectedTextSize })
       });
       applyColorPalette(result.colorPalette);
+      applyTextSize(result.textSize);
       render();
-      showToast('Kleurenpalet opgeslagen voor jouw login');
+      showToast('Weergavevoorkeuren opgeslagen voor jouw login');
     } catch (error) {
-      console.error('Kleurenpalet opslaan mislukt:', error);
-      paletteError.textContent = `Kleurenpalet opslaan is niet gelukt: ${error.message}`;
+      console.error('Weergavevoorkeuren opslaan mislukt:', error);
+      paletteError.textContent = `Weergavevoorkeuren opslaan is niet gelukt: ${error.message}`;
       form.inert = false;
     }
     return;
@@ -2092,6 +2110,12 @@ document.addEventListener('change', event => {
     option.classList.toggle('selected', option.querySelector('input').checked);
   });
 });
+document.addEventListener('change', event => {
+  if (event.target.name !== 'textSize') return;
+  document.querySelectorAll('.text-size-option').forEach(option => {
+    option.classList.toggle('selected', option.querySelector('input').checked);
+  });
+});
 
 window.addEventListener('hashchange', render);
 document.querySelector('#theme-toggle').addEventListener('click', () => {
@@ -2140,6 +2164,7 @@ function startDemo() {
   document.querySelector('#logout').textContent = 'Demo afsluiten';
   document.querySelector('#account-name').textContent = '';
   history.replaceState(null, '', `${location.pathname}#overzicht`);
+  applyTextSize('normal');
   render();
 }
 
@@ -2154,6 +2179,7 @@ async function openAccount() {
   currentRole = result.role;
   currentUserId = String(householdInfo.members.find(member => member.email.toLowerCase() === result.email.toLowerCase())?.id || '');
   applyColorPalette(preferences.colorPalette);
+  applyTextSize(preferences.textSize);
   document.querySelector('#auth-screen').hidden = true;
   document.querySelector('#invite-screen').hidden = true;
   document.querySelector('#app').hidden = false;

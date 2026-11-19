@@ -209,17 +209,28 @@ router.post('/api/login', authLimit, async (req, res) => {
 });
 
 router.get('/api/preferences', authenticate, async (req, res) => {
-  const [rows] = await pool.execute('SELECT color_palette FROM users WHERE id = ?', [req.user.id]);
-  res.json({ colorPalette: rows[0].color_palette });
+  const [rows] = await pool.execute('SELECT color_palette, large_text FROM users WHERE id = ?', [req.user.id]);
+  const textSize = ['normal', 'large', 'larger'][rows[0].large_text] || 'normal';
+  res.json({ colorPalette: rows[0].color_palette, textSize, largeText: textSize !== 'normal' });
 });
 
 router.put('/api/preferences', authenticate, async (req, res) => {
   const colorPalette = req.body?.colorPalette;
-  if (!colorPalettes.has(colorPalette)) {
-    return res.status(400).json({ error: 'Kies een geldig kleurenpalet.' });
+  const largeText = req.body?.largeText;
+  const textSize = req.body?.textSize;
+  if (!colorPalettes.has(colorPalette) ||
+      (largeText !== undefined && typeof largeText !== 'boolean') ||
+      (textSize !== undefined && !['normal', 'large', 'larger'].includes(textSize))) {
+    return res.status(400).json({ error: 'Kies geldige weergavevoorkeuren.' });
   }
-  await pool.execute('UPDATE users SET color_palette = ? WHERE id = ?', [colorPalette, req.user.id]);
-  res.json({ colorPalette });
+  if (textSize !== undefined && largeText !== undefined) {
+    return res.status(400).json({ error: 'Geef één keuze voor de tekstgrootte op.' });
+  }
+  const textSizeValue = textSize === undefined ? (largeText === undefined ? null : Number(largeText)) : ['normal', 'large', 'larger'].indexOf(textSize);
+  await pool.execute('UPDATE users SET color_palette = ?, large_text = COALESCE(?, large_text) WHERE id = ?', [colorPalette, textSizeValue, req.user.id]);
+  const [rows] = await pool.execute('SELECT large_text FROM users WHERE id = ?', [req.user.id]);
+  const savedTextSize = ['normal', 'large', 'larger'][rows[0].large_text] || 'normal';
+  res.json({ colorPalette, textSize: savedTextSize, largeText: savedTextSize !== 'normal' });
 });
 
 router.post('/api/password-resets', authenticate, authLimit, async (req, res) => {
@@ -529,11 +540,15 @@ async function start() {
     password_hash CHAR(128) NOT NULL,
     data LONGTEXT NOT NULL,
     revision INT UNSIGNED NOT NULL,
-    color_palette VARCHAR(20) NOT NULL DEFAULT 'forest'
+    color_palette VARCHAR(20) NOT NULL DEFAULT 'forest',
+    large_text TINYINT(1) NOT NULL DEFAULT 0
   ) ENGINE=InnoDB`);
   const [userColumns] = await pool.execute("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'");
   if (!userColumns.some(column => column.COLUMN_NAME === 'color_palette')) {
     await pool.query("ALTER TABLE users ADD COLUMN color_palette VARCHAR(20) NOT NULL DEFAULT 'forest'");
+  }
+  if (!userColumns.some(column => column.COLUMN_NAME === 'large_text')) {
+    await pool.query('ALTER TABLE users ADD COLUMN large_text TINYINT(1) NOT NULL DEFAULT 0');
   }
   await pool.query(`CREATE TABLE IF NOT EXISTS sessions (
     token_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL PRIMARY KEY,

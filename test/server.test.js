@@ -61,19 +61,33 @@ test(`accounts en opslag op ${basePath || '/'}`, { skip: !configured, timeout: 3
   assert.equal((await request('/api/login', { method: 'POST', body: { ...credentials, password: 'een-fout-wachtwoord' } })).status, 401);
   const second = await request('/api/register', { method: 'POST', body: { email: emails[1], password: credentials.password } });
   assert.equal(second.status, 201);
-  assert.equal((await request('/api/preferences', { cookie: first.cookie })).json.colorPalette, 'forest');
-  assert.equal((await request('/api/preferences', { cookie: second.cookie })).json.colorPalette, 'forest');
+  assert.deepEqual((await request('/api/preferences', { cookie: first.cookie })).json, { colorPalette: 'forest', textSize: 'normal', largeText: false });
+  assert.deepEqual((await request('/api/preferences', { cookie: second.cookie })).json, { colorPalette: 'forest', textSize: 'normal', largeText: false });
   const initialHousehold = await request('/api/state', { cookie: first.cookie });
   assert.equal((await request('/api/preferences', {
     method: 'PUT', cookie: first.cookie, body: { colorPalette: 'not-a-palette' }
   })).status, 400);
+  assert.equal((await request('/api/preferences', {
+    method: 'PUT', cookie: first.cookie, body: { colorPalette: 'forest', largeText: 'true' }
+  })).status, 400);
+  assert.equal((await request('/api/preferences', {
+    method: 'PUT', cookie: first.cookie, body: { colorPalette: 'forest', textSize: 'giant' }
+  })).status, 400);
   const firstPalette = await request('/api/preferences', {
-    method: 'PUT', cookie: first.cookie, body: { colorPalette: 'ocean' }
+    method: 'PUT', cookie: first.cookie, body: { colorPalette: 'ocean', textSize: 'large' }
   });
   assert.equal(firstPalette.status, 200);
-  assert.equal(firstPalette.json.colorPalette, 'ocean');
-  assert.equal((await request('/api/preferences', { cookie: first.cookie })).json.colorPalette, 'ocean');
-  assert.equal((await request('/api/preferences', { cookie: second.cookie })).json.colorPalette, 'forest');
+  assert.deepEqual(firstPalette.json, { colorPalette: 'ocean', textSize: 'large', largeText: true });
+  assert.deepEqual((await request('/api/preferences', { cookie: first.cookie })).json, { colorPalette: 'ocean', textSize: 'large', largeText: true });
+  assert.deepEqual((await request('/api/preferences', { cookie: second.cookie })).json, { colorPalette: 'forest', textSize: 'normal', largeText: false });
+  const largerTextUpdate = await request('/api/preferences', {
+    method: 'PUT', cookie: first.cookie, body: { colorPalette: 'ocean', textSize: 'larger' }
+  });
+  assert.deepEqual(largerTextUpdate.json, { colorPalette: 'ocean', textSize: 'larger', largeText: true });
+  const paletteOnlyUpdate = await request('/api/preferences', {
+    method: 'PUT', cookie: first.cookie, body: { colorPalette: 'lavender' }
+  });
+  assert.deepEqual(paletteOnlyUpdate.json, { colorPalette: 'lavender', textSize: 'larger', largeText: true });
   assert.equal((await request('/api/state', { cookie: first.cookie })).json.revision, initialHousehold.json.revision);
   const state = await request('/api/state', { cookie: first.cookie });
   assert.equal(state.status, 200);
@@ -270,7 +284,7 @@ test(`accounts en opslag op ${basePath || '/'}`, { skip: !configured, timeout: 3
   assert.deepEqual((await request('/api/state', { cookie: first.cookie })).json.data.groceries, invitedChanged.groceries);
   const login = await request('/api/login', { method: 'POST', body: credentials });
   assert.equal(login.status, 200);
-  assert.equal((await request('/api/preferences', { cookie: login.cookie })).json.colorPalette, 'ocean');
+  assert.deepEqual((await request('/api/preferences', { cookie: login.cookie })).json, { colorPalette: 'lavender', textSize: 'larger', largeText: true });
   assert.deepEqual((await request('/api/state', { cookie: login.cookie })).json.data.groceries, invitedChanged.groceries);
   assert.equal((await request('/api/logout', { method: 'POST', cookie: login.cookie })).status, 200);
   assert.equal((await request('/api/state', { cookie: login.cookie })).status, 401);
