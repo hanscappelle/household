@@ -10,7 +10,7 @@ const context = vm.createContext({ role: 'owner' });
 vm.runInContext(
   "const isChild = () => role === 'child';\n" +
   app.slice(app.indexOf('function escapeHtml('), app.indexOf('function capitalizeFirst(')) +
-  app.slice(app.indexOf('function speakButton('), app.indexOf('function taskSpeechText(')),
+  app.slice(app.indexOf('function speakButton('), app.indexOf('function mealSpeechText(')),
   context
 );
 
@@ -27,4 +27,19 @@ test('speech buttons are shown only for child accounts across all supported acti
     assert.match(button, /aria-label="Tekst voorlezen"/);
     assert.match(button, /<span>Luister<\/span>/);
   }
+});
+
+test('task speech omits icons from task names without changing the displayed name', () => {
+  const speech = context.taskSpeechText({
+    title: '🧹 Keuken schoonmaken 🧽',
+    important: false
+  }, false);
+  assert.match(speech, /^Keuken schoonmaken\./);
+  assert.doesNotMatch(speech, /🧹|🧽/);
+});
+
+test('task speech uses a readable fallback when the task name contains only icons', () => {
+  const speech = context.taskSpeechText({ title: '🧹🧽', important: true }, false);
+  assert.match(speech, /^Taak\. Belangrijke taak\./);
+  assert.doesNotMatch(speech, /🧹|🧽/);
 });

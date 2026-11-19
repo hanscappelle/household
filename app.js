@@ -500,6 +500,13 @@ function speakButton(action, id, text, title, speechText, visibleLabel = '') {
   return `<button type="button" class="task-speak" data-action="${escapeHtml(action)}" data-id="${escapeHtml(id)}"${speechData} aria-label="${escapeHtml(text)} voorlezen" title="${escapeHtml(title)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/></svg>${visibleLabel ? `<span>${escapeHtml(visibleLabel)}</span>` : ''}</button>`;
 }
 
+function taskSpeechTitle(title) {
+  return String(title ?? '')
+    .replace(/(?:[#*0-9]\uFE0F?\u20E3)|[\p{Extended_Pictographic}\p{Regional_Indicator}\p{Emoji_Modifier}\uFE0E\uFE0F\u20E3\u200D\u{E0020}-\u{E007F}]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function taskSpeechText(task, done, date) {
   let scheduledFor = '';
   if (date && task.freeToTake && task.flexibleSchedule) {
@@ -511,7 +518,8 @@ function taskSpeechText(task, done, date) {
       ? `Deze taak is ingepland voor ${members.join(', ')}.`
       : 'Deze taak is niet aan een gezinslid toegewezen.';
   }
-  return `${task.title}.${task.important ? ' Belangrijke taak.' : ''} ${done ? 'Deze taak is al uitgevoerd.' : 'Deze taak is nog niet uitgevoerd.'} ${scheduledFor}`;
+  const title = taskSpeechTitle(task.title);
+  return `${title || 'Taak'}.${task.important ? ' Belangrijke taak.' : ''} ${done ? 'Deze taak is al uitgevoerd.' : 'Deze taak is nog niet uitgevoerd.'} ${scheduledFor}`;
 }
 
 function mealSpeechText(idea, rank = [...state.mealIdeas]
