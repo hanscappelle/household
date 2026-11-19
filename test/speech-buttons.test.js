@@ -10,12 +10,13 @@ const context = vm.createContext({ role: 'owner', state: { customization: { spea
 vm.runInContext(
   "const isChild = () => role === 'child';\n" +
   app.slice(app.indexOf('function escapeHtml('), app.indexOf('function capitalizeFirst(')) +
-  app.slice(app.indexOf('function speakButton('), app.indexOf('function mealSpeechText(')),
+  app.slice(app.indexOf('function speakButton('), app.indexOf('function mealSpeechText(')) +
+  app.slice(app.indexOf('function appointmentLabel('), app.indexOf('function confirmTaskCompletion(')),
   context
 );
 
 test('speech buttons are shown only for child accounts across all supported actions', () => {
-  for (const action of ['speak-task', 'speak-member', 'speak-meal', 'speak-note']) {
+  for (const action of ['speak-task', 'speak-member', 'speak-meal', 'speak-appointment', 'speak-note']) {
     for (const role of ['owner', 'parent', '']) {
       context.role = role;
       assert.equal(context.speakButton(action, 'id', 'Tekst', 'Voorlezen'), '');
@@ -30,7 +31,7 @@ test('speech buttons are shown only for child accounts across all supported acti
 });
 
 test('adult speech buttons are enabled by the household setting while child buttons remain enabled by default', () => {
-  for (const action of ['speak-task', 'speak-member', 'speak-meal', 'speak-note']) {
+  for (const action of ['speak-task', 'speak-member', 'speak-meal', 'speak-appointment', 'speak-note']) {
     context.role = 'owner';
     assert.equal(context.speakButton(action, 'id', 'Tekst', 'Voorlezen'), '');
     context.state.customization.speakButtonsForAdults = true;
@@ -78,4 +79,22 @@ test('member speech includes the selected day task totals and completed count', 
     context.memberSpeechText(member, [], date),
     'Sanne. Op woensdag 19 november staan 0 taken ingepland, waarvan 0 zijn afgerond.'
   );
+});
+
+test('child appointment rows have a speech button that omits pictograms from the spoken text', () => {
+  context.role = 'child';
+  context.formatDate = () => '19 november 2026';
+  context.parseDate = value => new Date(`${value}T12:00:00`);
+  const html = context.renderAppointmentRows([{
+    id: 'a1',
+    title: '🎂 Verjaardag 🥳',
+    allDay: true,
+    startDate: '2026-11-19',
+    endDate: '2026-11-19'
+  }]);
+
+  assert.match(html, /data-action="speak-appointment"/);
+  assert.match(html, /aria-label="🎂 Verjaardag 🥳 voorlezen"/);
+  assert.match(html, /data-speech-text="Verjaardag\. 19 november 2026 · Hele dag\."/);
+  assert.doesNotMatch(html.match(/data-speech-text="([^"]*)"/)[1], /🎂|🥳/);
 });

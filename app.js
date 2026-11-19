@@ -565,7 +565,13 @@ function appointmentsOn(date) {
 }
 
 function renderAppointmentRows(appointments) {
-  return appointments.map(item => `<div class="task-row appointment-row"><span class="appointment-icon" role="img" aria-label="Afspraak"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18"/></svg></span><span class="task-info"><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(appointmentLabel(item))}${item.occurrenceDate ? ' · Herhalende afspraak' : ''}</small></span>${isChild() ? '' : `<button type="button" class="text-button" data-action="edit-appointment" data-id="${escapeHtml(item.id)}"${item.occurrenceDate ? ` data-occurrence-date="${escapeHtml(item.occurrenceDate)}"` : ''} aria-label="${escapeHtml(item.title)} bewerken">Bewerken</button>`}</div>`).join('');
+  return appointments.map(item => `<div class="task-row appointment-row"><span class="appointment-icon" role="img" aria-label="Afspraak"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18"/></svg></span><span class="task-info"><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(appointmentLabel(item))}${item.occurrenceDate ? ' · Herhalende afspraak' : ''}</small></span>${speakButton('speak-appointment', item.id, item.title, 'Afspraak voorlezen', appointmentSpeechText(item))}${isChild() ? '' : `<button type="button" class="text-button" data-action="edit-appointment" data-id="${escapeHtml(item.id)}"${item.occurrenceDate ? ` data-occurrence-date="${escapeHtml(item.occurrenceDate)}"` : ''} aria-label="${escapeHtml(item.title)} bewerken">Bewerken</button>`}</div>`).join('');
+}
+
+function appointmentSpeechText(appointment) {
+  const title = taskSpeechTitle(appointment.title);
+  const recurrence = appointment.occurrenceDate ? ' Dit is een herhalende afspraak.' : '';
+  return `${title || 'Afspraak'}. ${appointmentLabel(appointment)}.${recurrence}`;
 }
 
 function confirmTaskCompletion(task, date, memberId) {
@@ -685,7 +691,8 @@ function speakText(text) {
 function speakItem(action, id, speechText) {
   const item = (action === 'speak-task' ? state.tasks :
     action === 'speak-member' ? state.members :
-      action === 'speak-meal' ? state.mealIdeas : state.notes)
+      action === 'speak-meal' ? state.mealIdeas :
+        action === 'speak-appointment' ? state.appointments : state.notes)
     .find(entry => entry.id === id);
   if (!item) {
     console.error('De tekst om voor te lezen is niet gevonden.');
@@ -694,7 +701,8 @@ function speakItem(action, id, speechText) {
   }
   speakText(action === 'speak-task' ? speechText || taskSpeechText(item, false) :
     action === 'speak-meal' ? speechText || mealSpeechText(item) :
-      action === 'speak-member' ? speechText || item.name : `${item.title}. ${item.description}`);
+      action === 'speak-member' ? speechText || item.name :
+        action === 'speak-appointment' ? speechText || appointmentSpeechText(item) : `${item.title}. ${item.description}`);
 }
 
 function memberStatistics(member) {
@@ -1702,7 +1710,7 @@ document.addEventListener('click', async event => {
     return;
   }
   closeNoteMenus();
-  if (action === 'speak-task' || action === 'speak-member' || action === 'speak-meal' || action === 'speak-note') speakItem(action, button.dataset.id, button.dataset.speechText);
+  if (action === 'speak-task' || action === 'speak-member' || action === 'speak-meal' || action === 'speak-appointment' || action === 'speak-note') speakItem(action, button.dataset.id, button.dataset.speechText);
   if (action === 'new-note') openNewNote();
   if (action === 'new-task') openTask();
   if (action === 'edit-task') openTask(button.dataset.id);
