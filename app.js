@@ -270,7 +270,7 @@ function schedulesFor(task) {
 }
 
 function frequencyLabel(task) {
-  if (task.flexibleSchedule) {
+  if (task.flexibleSchedule && task.frequency !== 'once') {
     return `${FREQUENCIES[task.frequency]} · Vrij in te plannen${task.freeToTake ? ' · Voor iedereen' : ''}`;
   }
   return task.schedules ? 'Gecombineerd' : FREQUENCIES[task.frequency];
@@ -1491,7 +1491,10 @@ function scheduleFields(task, allowMultipleMembers = false, freeToTake = false, 
   if (task.frequency === 'once') {
     const memberField = freeToTake ? '' :
       `<div class="field full"><span class="field-label">${memberWord}</span>${assignmentChoices('memberIds', task.memberIds || (task.memberId ? [task.memberId] : []), allowMultipleMembers)}<span class="field-help">${selectionHelp}</span></div>`;
-    return `${memberField}<div class="field full"><label for="date">Datum</label><input id="date" name="date" type="date" value="${escapeHtml(task.date)}" required><span class="field-help">Deze taak verschijnt alleen op de gekozen datum en wordt niet herhaald.</span></div>`;
+    const help = freeToTake
+      ? 'Deze taak heeft één geplande datum en wordt niet herhaald. Als ze dan nog openstaat, blijft ze in de planning tot iemand haar afvinkt.'
+      : 'Deze taak verschijnt alleen op de gekozen datum en wordt niet herhaald.';
+    return `${memberField}<div class="field full"><label for="date">Datum</label><input id="date" name="date" type="date" value="${escapeHtml(task.date)}" required><span class="field-help">${help}</span></div>`;
   }
   if (freeToTake) {
     if (flexibleSchedule) {
@@ -1569,9 +1572,16 @@ function openTask(id) {
     <div class="modal-actions">${existing ? '<button type="button" class="button danger" data-action="delete-task">Verwijderen</button>' : ''}<button type="button" class="button secondary" data-action="close-modal">Annuleren</button><button type="submit" class="button">Opslaan</button></div></form>`;
   const form = document.querySelector('#task-form');
     const renderActiveSchedule = () => {
+      const oneTime = activeSchedule.frequency === 'once';
+      form.elements.flexibleSchedule.disabled = oneTime;
+      if (oneTime) {
+        form.elements.flexibleSchedule.checked = false;
+        task.flexibleSchedule = false;
+      }
       document.querySelector('#schedule-fields').innerHTML = scheduleFields(activeSchedule, task.allowMultipleMembers, task.freeToTake, task.flexibleSchedule);
       document.querySelector('#multiple-members-option').style.display = task.freeToTake ? 'none' : '';
     };
+    renderActiveSchedule();
     form.elements.frequency.addEventListener('change', () => {
       readSchedule(activeSchedule, new FormData(form), task.allowMultipleMembers, task.freeToTake, task.flexibleSchedule);
       activeSchedule.frequency = form.elements.frequency.value;
