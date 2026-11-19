@@ -256,7 +256,7 @@ test('dashboard places shared appointments before shared tasks and personal appo
     tasksOn: () => [{ id: 'free', freeToTake: true }, { id: 'personal', memberId: 'm1' }],
     membersOn: task => task.memberId ? members : [],
     birthdaysOn: () => [], isDone: () => false,
-    avatar: () => '', speakButton: () => '', memberDetails: () => '',
+    avatar: () => '', speakButton: () => '', memberSpeechText: () => '', memberDetails: () => '',
     renderTaskRows: tasks => tasks.map(item => `<div>task-${item.id}</div>`).join(''),
     renderLoadDistribution: () => '', renderNoteCards: () => ''
   });

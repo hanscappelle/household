@@ -55,3 +55,27 @@ test('task speech uses a readable fallback when the task name contains only icon
   assert.match(speech, /^Taak\. Belangrijke taak\./);
   assert.doesNotMatch(speech, /🧹|🧽/);
 });
+
+test('member speech includes the selected day task totals and completed count', () => {
+  context.formatDate = () => 'woensdag 19 november';
+  context.isDone = (task, date, memberId) => task.doneFor.includes(memberId);
+  const date = new Date('2026-11-19T12:00:00');
+  const member = { id: 'm1', name: 'Sanne' };
+  const tasks = [
+    { doneFor: ['m1'] },
+    { doneFor: [] },
+    { doneFor: ['m2'] }
+  ];
+  assert.equal(
+    context.memberSpeechText(member, tasks, date),
+    'Sanne. Op woensdag 19 november staan 3 taken ingepland, waarvan 1 is afgerond.'
+  );
+  assert.equal(
+    context.memberSpeechText(member, [{ doneFor: ['m1'] }], date),
+    'Sanne. Op woensdag 19 november staat 1 taak ingepland, waarvan 1 is afgerond.'
+  );
+  assert.equal(
+    context.memberSpeechText(member, [], date),
+    'Sanne. Op woensdag 19 november staan 0 taken ingepland, waarvan 0 zijn afgerond.'
+  );
+});
