@@ -130,7 +130,7 @@ test('appointment list shows every selected name and labels unassigned appointme
     state: { members, appointments: [multi, allDay, timed] }, appointmentMemberIds,
     isChild: () => false, renderAppointmentCalendar: () => '<div>Maandkalender</div>',
     appointmentMonth: new Date(), appointmentCalendarDate: '',
-    appointmentsForMonth: items => items,
+    appointmentsForMonth: items => items, birthdaysOn: () => [],
     renderAppointmentRows: items => `<strong>${items[0].title}</strong>`
   });
   vm.runInContext(
@@ -146,6 +146,61 @@ test('appointment list shows every selected name and labels unassigned appointme
   assert.match(html, /<strong>Afspraak<\/strong><small>Mama<\/small>/);
   assert.ok(html.indexOf('<strong>Vrije afspraak</strong>') < html.indexOf('<strong>Afspraak</strong>'));
   assert.ok(html.indexOf('<strong>Afspraak</strong>') < html.indexOf('<strong>Samen</strong>'));
+});
+
+test('appointment calendar marks birthdays and includes the names in the day label', () => {
+  const source = readFileSync(require.resolve('../app'), 'utf8');
+  const birthday = { id: 'm1', name: 'Mama', birthDate: '2000-11-18' };
+  const context = vm.createContext({
+    state: { appointments: [] },
+    appointmentMonth: new Date(2026, 10, 1),
+    appointmentCalendarDate: '',
+    DAYS: ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'],
+    appointmentOccurrences: () => [],
+    birthdaysOn: date => date.getMonth() === 10 && date.getDate() === 18 ? [birthday] : [],
+    escapeHtml: value => String(value),
+    formatDate: date => `${date.getDate()} november ${date.getFullYear()}`,
+    dateKey: date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+  });
+  vm.runInContext(
+    source.slice(source.indexOf('function renderAppointmentCalendar('), source.indexOf('function changeAppointmentMonth(')),
+    context
+  );
+  const html = context.renderAppointmentCalendar();
+  const birthdayCell = html.match(/<button[^>]*data-date="2026-11-18"[^>]*>[\s\S]*?<\/button>/)[0];
+  assert.match(birthdayCell, /aria-label="18 november 2026: 0 afspraken · 1 verjaardag: Mama"/);
+  assert.match(birthdayCell, /class="birthday-marker"/);
+  const normalCell = html.match(/<button[^>]*data-date="2026-11-19"[^>]*>[\s\S]*?<\/button>/)[0];
+  assert.doesNotMatch(normalCell, /birthday-marker/);
+});
+
+test('selecting a calendar day lists the family birthday with appointments', () => {
+  const source = readFileSync(require.resolve('../app'), 'utf8');
+  const birthday = { id: 'm1', name: 'Mama', birthDate: '2000-11-18' };
+  const context = vm.createContext({
+    state: { members: [birthday], appointments: [] },
+    appointmentMonth: new Date(2026, 10, 1),
+    appointmentCalendarDate: '2026-11-18',
+    appointmentMemberIds,
+    isChild: () => true,
+    appointmentsForMonth: () => [],
+    birthdaysOn: date => date.getMonth() === 10 && date.getDate() === 18 ? [birthday] : [],
+    renderAppointmentCalendar: () => '<div>Kalender</div>',
+    renderAppointmentRows: () => '',
+    parseDate: value => new Date(`${value}T12:00:00`),
+    dateKey: date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
+    formatDate: date => `${date.getDate()} november ${date.getFullYear()}`,
+    escapeHtml: value => String(value)
+  });
+  vm.runInContext(
+    source.slice(source.indexOf('function renderAppointments('), source.indexOf('function renderAppointmentCalendar(')),
+    context
+  );
+  const html = context.renderAppointments();
+  assert.match(html, /Afspraken en verjaardagen op 18 november 2026/);
+  assert.match(html, /Verjaardag van Mama/);
+  assert.match(html, /26 jaar · 18 november 2026/);
+  assert.doesNotMatch(html, /Geen afspraken of verjaardagen op deze dag/);
 });
 
 test('current month lists upcoming and ongoing appointments; other months show overlapping appointments', () => {
@@ -205,7 +260,7 @@ test('month calendar shows every day with appointment counts and navigates acros
     state: { appointments: [timed, allDay, multi] },
     appointmentMonth: new Date(2026, 10, 1), appointmentCalendarDate: '',
     DAYS: ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'],
-    appointmentOnDate, appointmentOccurrences,
+    appointmentOnDate, appointmentOccurrences, birthdaysOn: () => [],
     render: () => { renders++; },
     document: { querySelector: selector => ({ focus() { focused = selector; } }) }
   });

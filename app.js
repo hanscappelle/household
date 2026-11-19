@@ -957,16 +957,25 @@ function renderAppointments() {
     `${a.startDate}T${a.startTime}`.localeCompare(`${b.startDate}T${b.startTime}`) || a.title.localeCompare(b.title, 'nl'));
   const visibleAppointments = appointmentsForMonth(appointments, appointmentMonth, now, appointmentCalendarDate)
     .sort((a, b) => `${a.startDate}T${a.startTime}`.localeCompare(`${b.startDate}T${b.startTime}`) || a.title.localeCompare(b.title, 'nl'));
+  const visibleBirthdays = appointmentCalendarDate
+    ? birthdaysOn(parseDate(appointmentCalendarDate)).map(member => ({ member, date: appointmentCalendarDate }))
+    : Array.from({ length: new Date(appointmentMonth.getFullYear(), appointmentMonth.getMonth() + 1, 0).getDate() }, (_, index) =>
+      new Date(appointmentMonth.getFullYear(), appointmentMonth.getMonth(), index + 1))
+      .filter(date => !isCurrentMonth || dateKey(date) >= dateKey(now))
+      .flatMap(date => birthdaysOn(date).map(member => ({ member, date: dateKey(date) })));
   const listTitle = appointmentCalendarDate
-    ? `Afspraken op ${formatDate(parseDate(appointmentCalendarDate), { day: 'numeric', month: 'long', year: 'numeric' })}`
-    : isCurrentMonth ? 'Aankomende afspraken' : `Afspraken in ${formatDate(appointmentMonth, { month: 'long', year: 'numeric' })}`;
+    ? `Afspraken en verjaardagen op ${formatDate(parseDate(appointmentCalendarDate), { day: 'numeric', month: 'long', year: 'numeric' })}`
+    : isCurrentMonth ? 'Aankomende afspraken en verjaardagen' : `Afspraken en verjaardagen in ${formatDate(appointmentMonth, { month: 'long', year: 'numeric' })}`;
   return `<div class="page-heading"><div><h1>Afspraken <span class="nav-beta">BETA</span></h1><p>Alle afspraken van het gezin op één plek.</p></div>${isChild() ? '' : '<button type="button" class="button" data-action="new-appointment"><span class="plus">+</span> Afspraak toevoegen</button>'}</div>
     ${renderAppointmentCalendar()}
     <div class="section-heading"><h2>${escapeHtml(listTitle)}</h2>${appointmentCalendarDate ? '<button type="button" class="text-button" data-action="clear-appointment-day">Dagselectie wissen</button>' : ''}</div>
-    <div class="panel appointments-panel">${visibleAppointments.length ? visibleAppointments.map(item => {
+    <div class="panel appointments-panel">${visibleAppointments.length || visibleBirthdays.length ? `${visibleBirthdays.map(({ member, date }) => {
+      const age = Number(date.slice(0, 4)) - parseDate(member.birthDate).getFullYear();
+      return `<div class="birthday-row"><span class="birthday-icon" aria-hidden="true">🎂</span><div><strong>Verjaardag van ${escapeHtml(member.name)}</strong><small>${age} jaar · ${escapeHtml(formatDate(parseDate(date), { day: 'numeric', month: 'long', year: 'numeric' }))}</small></div></div>`;
+    }).join('')}${visibleAppointments.map(item => {
       const names = state.members.filter(person => appointmentMemberIds(item).includes(person.id)).map(person => person.name);
       return `<div class="appointment-list-item">${renderAppointmentRows([item])}<small>${escapeHtml(names.join(', ') || 'Voor iedereen')}</small></div>`;
-    }).join('') : `<div class="empty">${appointmentCalendarDate ? 'Geen afspraken op deze dag.' : isCurrentMonth ? 'Geen aankomende afspraken.' : 'Geen afspraken in deze maand.'}</div>`}</div>`;
+    }).join('')}` : `<div class="empty">${appointmentCalendarDate ? 'Geen afspraken of verjaardagen op deze dag.' : isCurrentMonth ? 'Geen aankomende afspraken of verjaardagen.' : 'Geen afspraken of verjaardagen in deze maand.'}</div>`}</div>`;
 }
 
 function renderAppointmentCalendar() {
@@ -982,14 +991,18 @@ function renderAppointmentCalendar() {
     const date = new Date(year, month, day);
     const key = dateKey(date);
     const count = state.appointments.flatMap(item => appointmentOccurrences(item, key, key)).length;
+    const birthdayMembers = birthdaysOn(date);
     const isToday = key === dateKey(new Date());
-    const label = `${formatDate(date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}${isToday ? ' (vandaag)' : ''}: ${count} ${count === 1 ? 'afspraak' : 'afspraken'}`;
-    return `<td><button type="button" class="month-day ${key === appointmentCalendarDate ? 'selected' : ''} ${isToday ? 'today' : ''}" data-action="select-appointment-day" data-date="${key}" aria-label="${escapeHtml(label)}"${isToday ? ' aria-current="date"' : ''} aria-pressed="${key === appointmentCalendarDate}"><span class="month-day-number">${day}</span>${count ? `<span class="month-appointment-count" aria-hidden="true">${count}</span>` : ''}</button></td>`;
+    const birthdayLabel = birthdayMembers.length
+      ? ` · ${birthdayMembers.length} ${birthdayMembers.length === 1 ? 'verjaardag' : 'verjaardagen'}: ${birthdayMembers.map(member => member.name).join(', ')}`
+      : '';
+    const label = `${formatDate(date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}${isToday ? ' (vandaag)' : ''}: ${count} ${count === 1 ? 'afspraak' : 'afspraken'}${birthdayLabel}`;
+    return `<td><button type="button" class="month-day ${key === appointmentCalendarDate ? 'selected' : ''} ${isToday ? 'today' : ''}" data-action="select-appointment-day" data-date="${key}" aria-label="${escapeHtml(label)}"${isToday ? ' aria-current="date"' : ''} aria-pressed="${key === appointmentCalendarDate}"><span class="month-day-number">${day}</span>${count ? `<span class="month-appointment-count" aria-hidden="true">${count}</span>` : ''}${birthdayMembers.length ? '<span class="birthday-marker" aria-hidden="true">🎂</span>' : ''}</button></td>`;
   });
   const weeks = Array.from({ length: cellCount / 7 }, (_, index) => `<tr>${cells.slice(index * 7, index * 7 + 7).join('')}</tr>`).join('');
   const monthLabel = formatDate(firstDay, { month: 'long', year: 'numeric' });
   return `<section class="panel appointment-calendar" aria-labelledby="appointment-month-title">
-    <div class="calendar-head"><div><strong id="appointment-month-title">${escapeHtml(monthLabel)}</strong><small>Aantal afspraken per dag · Kies een dag voor de afspraken</small></div>
+    <div class="calendar-head"><div><strong id="appointment-month-title">${escapeHtml(monthLabel)}</strong><small>Afspraken en verjaardagen · Kies een dag voor de details</small></div>
       <div class="calendar-controls"><button type="button" class="icon-button" data-action="previous-appointment-month" aria-label="Vorige maand">‹</button><button type="button" class="icon-button" data-action="next-appointment-month" aria-label="Volgende maand">›</button></div>
     </div>
     <table class="appointment-month-table" aria-labelledby="appointment-month-title"><thead><tr>${DAYS.map(day => `<th scope="col">${day}</th>`).join('')}</tr></thead><tbody>${weeks}</tbody></table>
