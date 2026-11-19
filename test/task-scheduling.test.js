@@ -71,11 +71,13 @@ test('one-time tasks occur only on their chosen date', () => {
   assert.equal(freeTaskOccurrenceDate(task, '2026-11-18', '2026-11-16', {}), '2026-11-18');
   assert.equal(freeTaskOccurrenceDate(task, '2026-11-20', '2026-11-16', {}), '2026-11-18');
   assert.equal(flexibleTaskOccurrenceDate(task, '2026-11-18', '2026-11-16', {}), '2026-11-18');
-  assert.equal(flexibleTaskOccurrenceDate(task, '2026-11-19', '2026-11-16', {}), null);
+  assert.equal(flexibleTaskOccurrenceDate(task, '2026-11-19', '2026-11-16', {}), '2026-11-18');
 
   const completed = { 'once|2026-11-18': { completedAt: '2026-11-20' } };
   assert.equal(freeTaskOccurrenceDate(task, '2026-11-20', '2026-11-16', completed), '2026-11-18');
   assert.equal(freeTaskOccurrenceDate(task, '2026-11-21', '2026-11-16', completed), null);
+  assert.equal(flexibleTaskOccurrenceDate(task, '2026-11-20', '2026-11-16', completed), '2026-11-18');
+  assert.equal(flexibleTaskOccurrenceDate(task, '2026-11-21', '2026-11-16', completed), null);
 });
 
 test('assigned one-time tasks appear in the planner once and retain their completion date', () => {

@@ -148,6 +148,11 @@ test('one-time tasks are accepted and their date is saved', () => {
   const data = backup(task).data;
   data.members.push({ id: 'm1', name: 'Ada' });
   assert.equal(context.validateBackup({ format: 'ons-huishouden-backup', version: 1, data }).tasks[0].date, '2026-11-18');
+  const flexibleTask = context.validateBackup({
+    format: 'ons-huishouden-backup', version: 1,
+    data: { ...data, tasks: [{ ...task, flexibleSchedule: true, flexibleSince: '2026-11-18' }] }
+  }).tasks[0];
+  assert.equal(flexibleTask.flexibleSchedule, true);
   assert.throws(() => context.validateBackup({
     format: 'ons-huishouden-backup', version: 1,
     data: { ...data, tasks: [{ ...task, date: '2026-02-30' }] }

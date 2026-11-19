@@ -79,7 +79,17 @@ function flexibleTaskOccurrenceDate(task, selectedDate, freeSince, completed) {
   if (task.frequency === 'once') {
     if (start > end || !/^\d{4}-\d{2}-\d{2}$/.test(task.date || '')) return null;
     const dueDate = parseDate(task.date);
-    return dueDate >= start && dueDate <= end ? dateKey(dueDate) : null;
+    if (dateKey(dueDate) !== task.date || dueDate > end) return null;
+    const dueDateKey = dateKey(dueDate);
+    const completion = completed[`${task.id}|${dueDateKey}`];
+    if (!completion) return dueDateKey;
+    const completedAt = typeof completion === 'object' &&
+      /^\d{4}-\d{2}-\d{2}$/.test(completion.completedAt || '')
+      ? completion.completedAt
+      : dueDateKey;
+    return (completedAt > dueDateKey ? completedAt : dueDateKey) >= selectedDate
+      ? dueDateKey
+      : null;
   }
   if (start > end || !['daily', 'weekly', 'monthly', 'yearly'].includes(task.frequency)) return null;
 

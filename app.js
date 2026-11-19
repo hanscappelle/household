@@ -270,7 +270,7 @@ function schedulesFor(task) {
 }
 
 function frequencyLabel(task) {
-  if (task.flexibleSchedule && task.frequency !== 'once') {
+  if (task.flexibleSchedule) {
     return `${FREQUENCIES[task.frequency]} · Vrij in te plannen${task.freeToTake ? ' · Voor iedereen' : ''}`;
   }
   return task.schedules ? 'Gecombineerd' : FREQUENCIES[task.frequency];
@@ -477,9 +477,10 @@ function taskMenu(task, date, memberId) {
 function taskSchedule(task) {
   if (task.frequency === 'once') {
     const date = task.date ? formatDate(parseDate(task.date), { day: 'numeric', month: 'long', year: 'numeric' }) : 'Nog geen datum gekozen';
-    if (task.freeToTake) return `Voor iedereen · ${date}`;
+    const flexible = task.flexibleSchedule ? 'Vrij in te plannen · ' : '';
+    if (task.freeToTake) return `${flexible}Voor iedereen · ${date}`;
     const members = membersForAssignment(task.memberIds || (task.memberId ? [task.memberId] : []));
-    return `${members.map(member => member.name).join(', ') || 'Nog niet toegewezen'} · ${date}`;
+    return `${flexible}${members.map(member => member.name).join(', ') || 'Nog niet toegewezen'} · ${date}`;
   }
   if (task.flexibleSchedule) {
     if (task.freeToTake) return 'Vrij in te plannen · Voor iedereen';
@@ -1242,7 +1243,7 @@ function renderHelp() {
         <p>Op <a href="#overzicht">Overzicht</a> zie je de weekplanning, taken en verjaardagen. Kies een dag in de agenda of gebruik de pijlen om naar een andere week te gaan. De taken van de gekozen dag staan gegroepeerd per verantwoordelijke. Vink een taak af wanneer die klaar is.</p>
         <p>Naast de weekplanning zie je de gezinsleden; daaronder staan gedeelde notities als post-its. Kies <strong>Notitie toevoegen</strong> om in een venster een titel en beschrijving in te vullen. De auteur wordt automatisch ingevuld. Zet eventueel <strong>Markeer als belangrijk</strong> aan; dit staat standaard uit. Belangrijke notities krijgen een uitroepteken en staan bovenaan.</p>
         <p>Open het driepuntjesmenu op een post-it om die te bewerken of te archiveren. Bij bewerken door een ander gezinslid worden diens naam en bewerktijd vermeld. Gearchiveerde notities verdwijnen van het overzicht. Via <a href="#notitiearchief">Notitiearchief</a> kun je ze herstellen of definitief verwijderen.</p>
-        <p>Op <a href="#taken">Alle taken</a> kun je een taak openen om de planning te wijzigen. Kies per dag, week, maand of eenmalige datum wie de taak uitvoert. Een eenmalige taak verschijnt alleen op de gekozen datum en wordt niet herhaald. Standaard wijs je de taak aan één gezinslid toe; zet <strong>Gedeelde taak</strong> aan om meerdere personen te selecteren. Zet <strong>Vrij in te plannen</strong> aan om een taak zonder vaste dag te plannen; de taak blijft deze periode in de planning staan tot ze is afgerond. Je kunt dit combineren met <strong>Voor iedereen</strong>. De taak verschijnt dan bovenaan de planning, zonder verantwoordelijke. Na afronden verschijnt ze weer in de volgende periode. Zonder die combinatie verschijnt de taak op de reguliere frequentiedag en schuift ze dagelijks door zolang die openstaat. Markeer in het taakformulier belangrijke taken; die herken je aan het label <strong>Belangrijk</strong>. Gebruik de zoekbalk en filters om taken terug te vinden.</p>
+        <p>Op <a href="#taken">Alle taken</a> kun je een taak openen om de planning te wijzigen. Kies per dag, week, maand of eenmalige datum wie de taak uitvoert. Een eenmalige taak verschijnt alleen op de gekozen datum en wordt niet herhaald. Standaard wijs je de taak aan één gezinslid toe; zet <strong>Gedeelde taak</strong> aan om meerdere personen te selecteren. Zet <strong>Vrij in te plannen</strong> aan om een taak zonder vaste dag te plannen; bij terugkerende taken blijft ze deze periode in de planning staan tot ze is afgerond en verschijnt ze daarna weer in de volgende periode. Bij een eenmalige taak blijft ze vanaf de gekozen datum staan tot ze is afgerond, zonder opnieuw te verschijnen. Je kunt dit combineren met <strong>Voor iedereen</strong>. De taak verschijnt dan bovenaan de planning, zonder verantwoordelijke. Zonder de combinatie met vrij inplannen verschijnt een taak voor iedereen op de reguliere frequentiedag en schuift ze dagelijks door zolang die openstaat. Markeer in het taakformulier belangrijke taken; die herken je aan het label <strong>Belangrijk</strong>. Gebruik de zoekbalk en filters om taken terug te vinden.</p>
         <p>Vink je een taak na de geplande dag af, dan krijgt die het label <strong>Te laat uitgevoerd</strong>. Bij elk gezinslid kun je via <strong>Statistieken bekijken</strong> zien hoeveel taken die persoon te laat ingepland had; dit wordt niet gekoppeld aan het account dat de taak heeft afgevinkt.</p>
       </section>
       <section class="panel help-panel"><h2>Afspraken (beta)</h2>
@@ -1491,9 +1492,11 @@ function scheduleFields(task, allowMultipleMembers = false, freeToTake = false, 
   if (task.frequency === 'once') {
     const memberField = freeToTake ? '' :
       `<div class="field full"><span class="field-label">${memberWord}</span>${assignmentChoices('memberIds', task.memberIds || (task.memberId ? [task.memberId] : []), allowMultipleMembers)}<span class="field-help">${selectionHelp}</span></div>`;
-    const help = freeToTake
-      ? 'Deze taak heeft één geplande datum en wordt niet herhaald. Als ze dan nog openstaat, blijft ze in de planning tot iemand haar afvinkt.'
-      : 'Deze taak verschijnt alleen op de gekozen datum en wordt niet herhaald.';
+    const help = flexibleSchedule
+      ? 'Deze taak heeft één geplande datum en wordt niet herhaald. Vanaf die datum blijft ze in de planning tot ze is afgerond.'
+      : freeToTake
+        ? 'Deze taak heeft één geplande datum en wordt niet herhaald. Als ze dan nog openstaat, blijft ze in de planning tot iemand haar afvinkt.'
+        : 'Deze taak verschijnt alleen op de gekozen datum en wordt niet herhaald.';
     return `${memberField}<div class="field full"><label for="date">Datum</label><input id="date" name="date" type="date" value="${escapeHtml(task.date)}" required><span class="field-help">${help}</span></div>`;
   }
   if (freeToTake) {
@@ -1572,12 +1575,6 @@ function openTask(id) {
     <div class="modal-actions">${existing ? '<button type="button" class="button danger" data-action="delete-task">Verwijderen</button>' : ''}<button type="button" class="button secondary" data-action="close-modal">Annuleren</button><button type="submit" class="button">Opslaan</button></div></form>`;
   const form = document.querySelector('#task-form');
     const renderActiveSchedule = () => {
-      const oneTime = activeSchedule.frequency === 'once';
-      form.elements.flexibleSchedule.disabled = oneTime;
-      if (oneTime) {
-        form.elements.flexibleSchedule.checked = false;
-        task.flexibleSchedule = false;
-      }
       document.querySelector('#schedule-fields').innerHTML = scheduleFields(activeSchedule, task.allowMultipleMembers, task.freeToTake, task.flexibleSchedule);
       document.querySelector('#multiple-members-option').style.display = task.freeToTake ? 'none' : '';
     };
