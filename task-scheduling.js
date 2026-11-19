@@ -22,6 +22,7 @@ function regularOccurrence(task, date) {
   if (task.frequency === 'daily') return true;
   if (task.frequency === 'weekly') return task.weekday === weekday;
   if (task.frequency === 'monthly') return task.monthDay === date.getDate();
+  if (task.frequency === 'once') return task.date === dateKey(date);
   return task.frequency === 'yearly' && /^\d{4}-\d{2}-\d{2}$/.test(task.date || '') &&
     task.date.slice(5) === dateKey(date).slice(5);
 }
@@ -38,6 +39,21 @@ function freeTaskOccurrenceDate(task, selectedDate, freeSince, completed) {
   const start = parseDate(freeSince);
   const end = parseDate(selectedDate);
   if (start > end) return null;
+  if (task.frequency === 'once') {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(task.date || '')) return null;
+    const dueDate = parseDate(task.date);
+    if (dueDate < start || dueDate > end) return null;
+    const dueDateKey = dateKey(dueDate);
+    const completion = completed[`${task.id}|${dueDateKey}`];
+    if (!completion) return dueDateKey;
+    const completedAt = typeof completion === 'object' &&
+      /^\d{4}-\d{2}-\d{2}$/.test(completion.completedAt || '')
+      ? completion.completedAt
+      : dueDateKey;
+    return (completedAt > dueDateKey ? completedAt : dueDateKey) >= selectedDate
+      ? dueDateKey
+      : null;
+  }
 
   let dueDate = nextOccurrenceOnOrAfter(task, start);
   while (dueDate && dueDate <= end) {
@@ -60,6 +76,11 @@ function freeTaskOccurrenceDate(task, selectedDate, freeSince, completed) {
 function flexibleTaskOccurrenceDate(task, selectedDate, freeSince, completed) {
   const start = parseDate(freeSince);
   const end = parseDate(selectedDate);
+  if (task.frequency === 'once') {
+    if (start > end || !/^\d{4}-\d{2}-\d{2}$/.test(task.date || '')) return null;
+    const dueDate = parseDate(task.date);
+    return dueDate >= start && dueDate <= end ? dateKey(dueDate) : null;
+  }
   if (start > end || !['daily', 'weekly', 'monthly', 'yearly'].includes(task.frequency)) return null;
 
   const periodStart = date => {

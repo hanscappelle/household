@@ -65,6 +65,56 @@ test('flexible monthly and yearly tasks use the calendar period without a fixed 
   assert.equal(flexibleTaskOccurrenceDate(monthly, '2026-12-01', '2026-11-15', completed), '2026-12-01');
 });
 
+test('one-time tasks occur only on their chosen date', () => {
+  const task = { id: 'once', frequency: 'once', date: '2026-11-18' };
+  assert.equal(freeTaskOccurrenceDate(task, '2026-11-17', '2026-11-16', {}), null);
+  assert.equal(freeTaskOccurrenceDate(task, '2026-11-18', '2026-11-16', {}), '2026-11-18');
+  assert.equal(freeTaskOccurrenceDate(task, '2026-11-20', '2026-11-16', {}), '2026-11-18');
+  assert.equal(flexibleTaskOccurrenceDate(task, '2026-11-18', '2026-11-16', {}), '2026-11-18');
+  assert.equal(flexibleTaskOccurrenceDate(task, '2026-11-19', '2026-11-16', {}), null);
+
+  const completed = { 'once|2026-11-18': { completedAt: '2026-11-20' } };
+  assert.equal(freeTaskOccurrenceDate(task, '2026-11-20', '2026-11-16', completed), '2026-11-18');
+  assert.equal(freeTaskOccurrenceDate(task, '2026-11-21', '2026-11-16', completed), null);
+});
+
+test('assigned one-time tasks appear in the planner once and retain their completion date', () => {
+  const app = readFileSync(require.resolve('../app'), 'utf8');
+  const context = vm.createContext({
+    state: {
+      members: [{ id: 'm1', name: 'Ada' }],
+      tasks: [{ id: 'once', title: 'Pakket ophalen', frequency: 'once', date: '2026-11-18', memberIds: ['m1'] }],
+      completed: {}
+    },
+    DAYS: ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'],
+    FREQUENCIES: { daily: 'Dagelijks', weekly: 'Wekelijks', monthly: 'Maandelijks', yearly: 'Jaarlijks', once: 'Eenmalig' },
+    dateKey: date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
+    validBackupDate: value => /^\d{4}-\d{2}-\d{2}$/.test(value || ''),
+    parseDate: key => {
+      const [year, month, day] = key.split('-').map(Number);
+      return new Date(year, month - 1, day);
+    },
+    isoWeek: () => 1
+  });
+  vm.runInNewContext(readFileSync(require.resolve('../task-scheduling'), 'utf8'), context);
+  vm.runInContext(
+    app.slice(app.indexOf('function membersForAssignment('), app.indexOf('function birthdaysOn(')) +
+    app.slice(app.indexOf('function completionKey('), app.indexOf('function showToast(')),
+    context
+  );
+
+  const tasksOn = date => context.tasksOn(context.parseDate(date)).length;
+  assert.equal(tasksOn('2026-11-17'), 0);
+  assert.equal(tasksOn('2026-11-18'), 1);
+  assert.equal(tasksOn('2026-11-19'), 0);
+  assert.equal(context.isScheduled(context.state.tasks[0]), true);
+  assert.equal(context.completionKey(context.state.tasks[0], context.parseDate('2026-11-18')), 'once|2026-11-18');
+
+  context.state.completed['once|2026-11-18'] = true;
+  assert.equal(context.isDone(context.state.tasks[0], context.parseDate('2026-11-18')), true);
+  assert.equal(tasksOn('2026-11-18'), 1);
+});
+
 test('combined free tasks stay unassigned and in the plan until the period is completed', () => {
   const app = readFileSync(require.resolve('../app'), 'utf8');
   const context = vm.createContext({
@@ -77,7 +127,7 @@ test('combined free tasks stay unassigned and in the plan until the period is co
       completed: {}
     },
     DAYS: ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'],
-    FREQUENCIES: { daily: 'Dagelijks', weekly: 'Wekelijks', monthly: 'Maandelijks', yearly: 'Jaarlijks' },
+    FREQUENCIES: { daily: 'Dagelijks', weekly: 'Wekelijks', monthly: 'Maandelijks', yearly: 'Jaarlijks', once: 'Eenmalig' },
     dateKey: date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
     validBackupDate: value => /^\d{4}-\d{2}-\d{2}$/.test(value || ''),
     parseDate: key => {
@@ -121,7 +171,7 @@ test('flexible task completion stays on the selected planner date', async () => 
       completed: {}
     },
     DAYS: ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'],
-    FREQUENCIES: { daily: 'Dagelijks', weekly: 'Wekelijks', monthly: 'Maandelijks', yearly: 'Jaarlijks' },
+    FREQUENCIES: { daily: 'Dagelijks', weekly: 'Wekelijks', monthly: 'Maandelijks', yearly: 'Jaarlijks', once: 'Eenmalig' },
     currentUserId: 'user-1',
     demoMode: false,
     dateKey: date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,

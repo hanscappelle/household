@@ -1,7 +1,7 @@
 const THEME_KEY = 'ons-huishouden-thema';
 const BACKUP_FORMAT = 'ons-huishouden-backup';
 const DAYS = ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'];
-const FREQUENCIES = { daily: 'Dagelijks', weekly: 'Wekelijks', monthly: 'Maandelijks', yearly: 'Jaarlijks' };
+const FREQUENCIES = { daily: 'Dagelijks', weekly: 'Wekelijks', monthly: 'Maandelijks', yearly: 'Jaarlijks', once: 'Eenmalig' };
 const COLOR_PALETTES = [
   { id: 'forest', label: 'Bosgroen', description: 'De oorspronkelijke groene tinten' },
   { id: 'ocean', label: 'Oceaanblauw', description: 'Frisse blauw- en zeetinten' },
@@ -313,6 +313,7 @@ function occursOn(task, date) {
       if (schedule.frequency === 'daily') return true;
       if (schedule.frequency === 'weekly') return schedule.weekday === (date.getDay() || 7);
       if (schedule.frequency === 'monthly') return schedule.monthDay === date.getDate();
+      if (schedule.frequency === 'once') return schedule.date === dateKey(date);
       return schedule.frequency === 'yearly' && schedule.date?.slice(5) === dateKey(date).slice(5);
     });
   }
@@ -322,18 +323,22 @@ function occursOn(task, date) {
   if (task.frequency === 'daily') return true;
   if (task.frequency === 'weekly') return task.weekday === weekday;
   if (task.frequency === 'monthly') return task.monthDay === date.getDate();
+  if (task.frequency === 'once') return task.date === dateKey(date);
   return task.frequency === 'yearly' && task.date?.slice(5) === dateKey(date).slice(5);
 }
 
 function isScheduled(task) {
   if (task.flexibleSchedule) {
-    return Object.hasOwn(FREQUENCIES, task.frequency) && (task.freeToTake || assignedMemberIds(task).length > 0);
+    return Object.hasOwn(FREQUENCIES, task.frequency) &&
+      (task.frequency !== 'once' || validBackupDate(task.date)) &&
+      (task.freeToTake || assignedMemberIds(task).length > 0);
   }
   if (task.freeToTake) {
     return schedulesFor(task).some(schedule => {
       if (schedule.frequency === 'daily') return true;
       if (schedule.frequency === 'weekly') return Number.isInteger(schedule.weekday) && schedule.weekday >= 1 && schedule.weekday <= 7;
       if (schedule.frequency === 'monthly') return Number.isInteger(schedule.monthDay) && schedule.monthDay >= 1 && schedule.monthDay <= 31;
+      if (schedule.frequency === 'once') return validBackupDate(schedule.date);
       return schedule.frequency === 'yearly' && /^\d{4}-\d{2}-\d{2}$/.test(schedule.date || '') &&
         validBackupDate(schedule.date);
     });
@@ -348,6 +353,7 @@ function isScheduled(task) {
     }
     if (!membersForAssignment(schedule.memberIds || (schedule.memberId ? [schedule.memberId] : [])).length) return false;
     if (schedule.frequency === 'monthly') return Number.isInteger(schedule.monthDay) && schedule.monthDay >= 1 && schedule.monthDay <= 31;
+    if (schedule.frequency === 'once') return validBackupDate(schedule.date);
     if (schedule.frequency === 'yearly' && /^\d{4}-\d{2}-\d{2}$/.test(schedule.date)) {
       const date = parseDate(schedule.date);
       return !Number.isNaN(date.getTime()) && dateKey(date) === schedule.date;
@@ -469,6 +475,12 @@ function taskMenu(task, date, memberId) {
 }
 
 function taskSchedule(task) {
+  if (task.frequency === 'once') {
+    const date = task.date ? formatDate(parseDate(task.date), { day: 'numeric', month: 'long', year: 'numeric' }) : 'Nog geen datum gekozen';
+    if (task.freeToTake) return `Voor iedereen · ${date}`;
+    const members = membersForAssignment(task.memberIds || (task.memberId ? [task.memberId] : []));
+    return `${members.map(member => member.name).join(', ') || 'Nog niet toegewezen'} · ${date}`;
+  }
   if (task.flexibleSchedule) {
     if (task.freeToTake) return 'Vrij in te plannen · Voor iedereen';
     const members = membersForAssignment(task.memberIds || (task.memberId ? [task.memberId] : []));
@@ -1230,7 +1242,7 @@ function renderHelp() {
         <p>Op <a href="#overzicht">Overzicht</a> zie je de weekplanning, taken en verjaardagen. Kies een dag in de agenda of gebruik de pijlen om naar een andere week te gaan. De taken van de gekozen dag staan gegroepeerd per verantwoordelijke. Vink een taak af wanneer die klaar is.</p>
         <p>Naast de weekplanning zie je de gezinsleden; daaronder staan gedeelde notities als post-its. Kies <strong>Notitie toevoegen</strong> om in een venster een titel en beschrijving in te vullen. De auteur wordt automatisch ingevuld. Zet eventueel <strong>Markeer als belangrijk</strong> aan; dit staat standaard uit. Belangrijke notities krijgen een uitroepteken en staan bovenaan.</p>
         <p>Open het driepuntjesmenu op een post-it om die te bewerken of te archiveren. Bij bewerken door een ander gezinslid worden diens naam en bewerktijd vermeld. Gearchiveerde notities verdwijnen van het overzicht. Via <a href="#notitiearchief">Notitiearchief</a> kun je ze herstellen of definitief verwijderen.</p>
-        <p>Op <a href="#taken">Alle taken</a> kun je een taak openen om de planning te wijzigen. Kies per dag, week, maand of eenmalige datum wie de taak uitvoert. Standaard wijs je de taak aan één gezinslid toe; zet <strong>Gedeelde taak</strong> aan om meerdere personen te selecteren. Zet <strong>Vrij in te plannen</strong> aan om een taak zonder vaste dag te plannen; de taak blijft deze periode in de planning staan tot ze is afgerond. Je kunt dit combineren met <strong>Voor iedereen</strong>. De taak verschijnt dan bovenaan de planning, zonder verantwoordelijke. Na afronden verschijnt ze weer in de volgende periode. Zonder die combinatie verschijnt de taak op de reguliere frequentiedag en schuift ze dagelijks door zolang die openstaat. Markeer in het taakformulier belangrijke taken; die herken je aan het label <strong>Belangrijk</strong>. Gebruik de zoekbalk en filters om taken terug te vinden.</p>
+        <p>Op <a href="#taken">Alle taken</a> kun je een taak openen om de planning te wijzigen. Kies per dag, week, maand of eenmalige datum wie de taak uitvoert. Een eenmalige taak verschijnt alleen op de gekozen datum en wordt niet herhaald. Standaard wijs je de taak aan één gezinslid toe; zet <strong>Gedeelde taak</strong> aan om meerdere personen te selecteren. Zet <strong>Vrij in te plannen</strong> aan om een taak zonder vaste dag te plannen; de taak blijft deze periode in de planning staan tot ze is afgerond. Je kunt dit combineren met <strong>Voor iedereen</strong>. De taak verschijnt dan bovenaan de planning, zonder verantwoordelijke. Na afronden verschijnt ze weer in de volgende periode. Zonder die combinatie verschijnt de taak op de reguliere frequentiedag en schuift ze dagelijks door zolang die openstaat. Markeer in het taakformulier belangrijke taken; die herken je aan het label <strong>Belangrijk</strong>. Gebruik de zoekbalk en filters om taken terug te vinden.</p>
         <p>Vink je een taak na de geplande dag af, dan krijgt die het label <strong>Te laat uitgevoerd</strong>. Bij elk gezinslid kun je via <strong>Statistieken bekijken</strong> zien hoeveel taken die persoon te laat ingepland had; dit wordt niet gekoppeld aan het account dat de taak heeft afgevinkt.</p>
       </section>
       <section class="panel help-panel"><h2>Afspraken (beta)</h2>
@@ -1476,6 +1488,11 @@ function scheduleFields(task, allowMultipleMembers = false, freeToTake = false, 
   const selectionHelp = allowMultipleMembers
     ? 'Selecteer iedereen die de taak uitvoert; elk gezinslid vinkt de taak apart af'
     : 'Kies wie de taak uitvoert';
+  if (task.frequency === 'once') {
+    const memberField = freeToTake ? '' :
+      `<div class="field full"><span class="field-label">${memberWord}</span>${assignmentChoices('memberIds', task.memberIds || (task.memberId ? [task.memberId] : []), allowMultipleMembers)}<span class="field-help">${selectionHelp}</span></div>`;
+    return `${memberField}<div class="field full"><label for="date">Datum</label><input id="date" name="date" type="date" value="${escapeHtml(task.date)}" required><span class="field-help">Deze taak verschijnt alleen op de gekozen datum en wordt niet herhaald.</span></div>`;
+  }
   if (freeToTake) {
     if (flexibleSchedule) {
       const period = task.frequency === 'daily' ? 'dag' : task.frequency === 'weekly' ? 'week' : task.frequency === 'monthly' ? 'maand' : 'jaar';
@@ -1506,6 +1523,7 @@ function readSchedule(task, data, allowMultipleMembers, freeToTake = false, flex
   if (flexibleSchedule) {
     task.memberIds = assignmentIds('memberIds');
     task.memberId = task.memberIds[0] || '';
+    if (task.frequency === 'once') task.date = String(data.get('date') || '');
     return;
   }
   if (task.frequency === 'daily') {
@@ -1523,6 +1541,7 @@ function readSchedule(task, data, allowMultipleMembers, freeToTake = false, flex
     }
     if (task.frequency === 'monthly') task.monthDay = Number(data.get('monthDay')) || 1;
     if (task.frequency === 'yearly') task.date = String(data.get('date') || '');
+    if (task.frequency === 'once') task.date = String(data.get('date') || '');
   }
 }
 

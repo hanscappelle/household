@@ -14,7 +14,7 @@ const context = vm.createContext({
   CUSTOM_TEXT_LIMITS: {},
   CUSTOM_TEXT_DEFAULTS: {},
   DAYS: ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'],
-  FREQUENCIES: { daily: 'Dagelijks', weekly: 'Wekelijks', monthly: 'Maandelijks', yearly: 'Jaarlijks' },
+  FREQUENCIES: { daily: 'Dagelijks', weekly: 'Wekelijks', monthly: 'Maandelijks', yearly: 'Jaarlijks', once: 'Eenmalig' },
   normalizeTask,
   validTaskAssignments,
   validAppointments
@@ -141,6 +141,21 @@ test('saved empty member selections load and normalize without becoming assignme
   assert.deepEqual(result.tasks[0].memberIds, []);
   assert.deepEqual(result.tasks[0].dailyAssignments[1], []);
   assert.equal(result.tasks[0].allowMultipleMembers, false);
+});
+
+test('one-time tasks are accepted and their date is saved', () => {
+  const task = { id: 'once', title: 'Pakket ophalen', frequency: 'once', date: '2026-11-18', memberId: 'm1' };
+  const data = backup(task).data;
+  data.members.push({ id: 'm1', name: 'Ada' });
+  assert.equal(context.validateBackup({ format: 'ons-huishouden-backup', version: 1, data }).tasks[0].date, '2026-11-18');
+  assert.throws(() => context.validateBackup({
+    format: 'ons-huishouden-backup', version: 1,
+    data: { ...data, tasks: [{ ...task, date: '2026-02-30' }] }
+  }), /ongeldige gegevens/);
+
+  const schedule = { frequency: 'once' };
+  context.readSchedule(schedule, { getAll: () => [], get: name => name === 'date' ? '2026-11-18' : null }, false);
+  assert.equal(schedule.date, '2026-11-18');
 });
 
 test('flexible scheduling is preserved and requires a boolean flag', () => {
