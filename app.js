@@ -1536,7 +1536,9 @@ function validateBackup(backup) {
 function exportBackup() {
   const backup = { format: BACKUP_FORMAT, version: 1, data: state };
   const contents = JSON.stringify(backup, null, 2);
-  const filename = `huishouden-backup-${dateKey(new Date())}.json`;
+  const now = new Date();
+  const time = [now.getHours(), now.getMinutes(), now.getSeconds()].map(part => String(part).padStart(2, '0')).join('-');
+  const filename = `huishouden-backup-${dateKey(now)}-${time}.json`;
   if (window.HouseholdAndroid?.saveBackup) {
     window.HouseholdAndroid.saveBackup(filename, contents);
     return;

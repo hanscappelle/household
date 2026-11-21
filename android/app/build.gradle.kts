@@ -4,14 +4,14 @@ plugins {
 }
 
 android {
-    namespace = "nl.betyre.household"
+    namespace = "be.hcpl.android.bubble"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "nl.betyre.household"
+        applicationId = "be.hcpl.android.bubble"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
+        versionCode = 10
         versionName = "1.0"
     }
 

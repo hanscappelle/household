@@ -306,6 +306,8 @@ houden hun spreekknoppen.
 
 Je kunt hier ook handmatig een JSON-bestand downloaden met gezinsleden, taken,
 planningen, afvinkjes, boodschappen, kookinspiratie, notities en persoonlijke teksten.
+De bestandsnaam bevat de lokale datum en tijd, bijvoorbeeld
+`huishouden-backup-2026-11-21-17-20-57.json`.
 Bewaar dit bestand veilig: het bevat persoonlijke gegevens. Je voorkeur voor
 lichte of donkere modus en je persoonlijke kleurenpalet staan niet in de back-up.
 
