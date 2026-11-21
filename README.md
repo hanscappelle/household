@@ -1,12 +1,18 @@
 # Ons huishouden
 
+Android-debugversie: [APK downloaden](release/household-debug.apk)
+
 Een dashboard voor huishoudelijke taken en de planning per gezinslid.
 Een huishouden deelt één dataset in een MySQL/MariaDB-database; elk gezinslid
 kan met een eigen account inloggen.
 
 Publicatie: <https://betyre.alwaysdata.net/household/>
 
+![Schermafbeelding van het app-overzicht in de demo](release/demo-overview.png)
+
 ## Gebruik van de app
+
+### Eerste keer gebruiken
 
 Bij een nieuw account bevat de app fictieve voorbeeldgegevens: Mama, Papa en
 Kind, zonder geboortedatums, enkele huishoudelijke taken met een
@@ -15,6 +21,8 @@ gegevens aanpassen of verwijderen.
 Vul bij je eigen gezinslid onder **Ons gezin** hetzelfde e-mailadres in als
 waarmee je inlogt. De naam van dat gezinslid verschijnt dan bovenaan; zonder
 koppeling staat daar **Gezinslid**.
+
+### Overzicht en taken
 
 Op het overzicht staat de taakverdeling per gezinslid voor de gekozen dag en
 voor de hele bijbehorende week (maandag tot en met zondag). Standaard wijs je
@@ -27,6 +35,9 @@ Zet bij een taak **Vrij op te nemen taak** aan om die zonder toewijzing onder
 dagelijks door. Als de volgende reguliere frequentiedag aanbreekt terwijl de
 taak nog openstaat, blijft hetzelfde exemplaar staan; na afvinken verschijnt
 het volgende exemplaar pas op de eerstvolgende reguliere frequentiedag.
+
+### Afspraken
+
 Via **Afspraken** (beta) kun je afspraken toevoegen, wijzigen en verwijderen.
 Een maandkalender boven de lijst toont het aantal afspraken per dag; met de
 pijlen blader je naar andere maanden. Een afspraak telt één keer per dag,
@@ -399,8 +410,8 @@ Android-apparaat of emulator. Je kunt vanuit die map ook
 nieuwer vereist. De app vraagt internettoegang en laat alleen HTTPS-verkeer
 toe.
 
-De nieuwste Android-debugversie is beschikbaar als
-[APK-download](release/household-debug.apk) in de map `release`.
+De nieuwste Android-debugversie is beschikbaar via de downloadlink bovenaan
+deze README.
 
 ### Projectnotities
 
