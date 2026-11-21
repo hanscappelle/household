@@ -122,7 +122,9 @@ Via **Bekijken** bij **Ons gezin** op het overzicht kun je gezinsleden
 beheren. Bij elk gezinslid kun je optioneel een geboortedatum en e-mailadres
 invullen. Gebruik het e-mailadres waarmee diegene inlogt als het gezinslid
 een eigen account heeft; dit is een profielgegeven en koppelt accounts niet
-automatisch. De app toont
+automatisch. Ouders kunnen gezinsleden verwijderen, behalve het gezinslid dat
+gekoppeld is aan de gebruiker die het dashboard heeft aangemaakt.
+De app toont
 de leeftijd rekening houdend met de verjaardag; voor 29 februari is dat in
 een niet-schrikkeljaar vanaf 1 maart. Als alleen een eerder opgegeven
 geboortejaar bekend is, toont de app het verschil met het huidige jaar met

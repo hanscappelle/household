@@ -92,6 +92,19 @@ test(`accounts en opslag op ${basePath || '/'}`, { skip: !configured, timeout: 3
   const state = await request('/api/state', { cookie: first.cookie });
   assert.equal(state.status, 200);
   assert.equal(state.json.data.members.length, 3);
+  const ownerLinked = structuredClone(state.json.data);
+  ownerLinked.members[0].email = emails[0];
+  assert.equal((await request('/api/state', {
+    method: 'PUT', cookie: first.cookie, body: { data: ownerLinked, revision: state.json.revision }
+  })).status, 200);
+  const ownerLinkedState = await request('/api/state', { cookie: first.cookie });
+  const ownerRemoved = structuredClone(ownerLinkedState.json.data);
+  ownerRemoved.members = ownerRemoved.members.filter(member => member.id !== ownerLinked.members[0].id);
+  assert.equal((await request('/api/state', {
+    method: 'PUT', cookie: first.cookie, body: { data: ownerRemoved, revision: ownerLinkedState.json.revision }
+  })).status, 403);
+  state.json.revision = ownerLinkedState.json.revision;
+  state.json.data = ownerLinkedState.json.data;
   const invalidCustomization = structuredClone(state.json.data);
   invalidCustomization.customization = { ...invalidCustomization.customization, websiteTitle: '' };
   assert.equal((await request('/api/state', {

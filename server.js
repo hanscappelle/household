@@ -453,9 +453,19 @@ router.put('/api/state', authenticate, async (req, res) => {
       !Object.values(data.completed).every(validCompletion) || notesInvalid) {
     return res.status(400).json({ error: 'Ongeldige gegevens of revisie.' });
   }
-  const [currentRows] = await pool.execute('SELECT data FROM households WHERE id = ? AND revision = ?', [req.user.household_id, revision]);
+  const [currentRows] = await pool.execute(
+    'SELECT households.data, households.revision, users.email AS owner_email FROM households JOIN users ON users.id = households.owner_user_id WHERE households.id = ? AND households.revision = ?',
+    [req.user.household_id, revision]
+  );
   if (!currentRows.length) return res.status(409).json({ error: 'De gegevens zijn ondertussen op een ander apparaat gewijzigd.' });
   const currentData = JSON.parse(currentRows[0].data);
+  const ownerEmail = String(currentRows[0].owner_email || '').toLowerCase();
+  const ownerMember = ownerEmail ? currentData.members.find(member =>
+    typeof member.email === 'string' && member.email.toLowerCase() === ownerEmail) : null;
+  if (ownerMember && !data.members.some(member => String(member.id) === String(ownerMember.id))) {
+    return res.status(403).json({ error: 'De gebruiker die het dashboard heeft aangemaakt kan niet worden verwijderd.' });
+  }
+
   const appointments = data.appointments === undefined ? currentData.appointments || [] : data.appointments;
   if (!validAppointments(appointments, data.members)) {
     return res.status(400).json({ error: 'De afspraken bevatten ongeldige gegevens of onbekende gezinsleden.' });
