@@ -1,12 +1,11 @@
 # Ons huishouden
 
-Android-debugversie: [APK downloaden](release/household-debug.apk)
-
 Een dashboard voor huishoudelijke taken en de planning per gezinslid.
 Een huishouden deelt één dataset in een MySQL/MariaDB-database; elk gezinslid
 kan met een eigen account inloggen.
 
-Publicatie: <https://betyre.alwaysdata.net/household/>
+Web versie: <https://betyre.alwaysdata.net/household/>
+Android-debugversie: [APK downloaden](release/household-debug.apk)
 
 ![Schermafbeelding van het app-overzicht in de demo](release/demo-overview.png)
 
