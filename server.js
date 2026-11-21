@@ -467,6 +467,8 @@ router.put('/api/state', authenticate, async (req, res) => {
   const submittedNotes = data.notes || previousNotes;
   const author = currentData.members.find(member =>
     typeof member.email === 'string' && member.email.toLowerCase() === req.user.email.toLowerCase())?.name || req.user.email;
+  const currentMemberId = currentData.members.find(member =>
+    typeof member.email === 'string' && member.email.toLowerCase() === req.user.email.toLowerCase())?.id;
   const previousById = new Map(previousNotes.map(note => [note.id, note]));
   const notes = submittedNotes.map(note => {
     const previous = previousById.get(note.id);
@@ -487,6 +489,7 @@ router.put('/api/state', authenticate, async (req, res) => {
     };
   });
   const createdAt = new Date().toISOString().slice(0, 10);
+  let invalidCompletionActor = false;
   const completed = Object.fromEntries(Object.entries(data.completed).map(([key, value]) => {
     if (value?.memberCompletions) {
       const previous = currentData.completed?.[key];
@@ -494,15 +497,32 @@ router.put('/api/state', authenticate, async (req, res) => {
       const memberCompletions = Object.fromEntries(Object.entries(value.memberCompletions).map(([memberId, record]) => {
         const previousRecord = previousMembers[memberId] ?? previous;
         if (record === true || isDeepStrictEqual(record, previousRecord)) return [memberId, record];
-        return [memberId, { completedAt: record.completedAt, completedByUserId: req.user.id }];
+        if (record.completedByMemberId != null && String(record.completedByMemberId) !== String(currentMemberId)) {
+          invalidCompletionActor = true;
+        }
+        return [memberId, {
+          completedAt: record.completedAt,
+          completedByUserId: req.user.id,
+          ...(record.completedByMemberId == null ? {} : { completedByMemberId: record.completedByMemberId })
+        }];
       }));
       return [key, { memberCompletions }];
     }
     if (!value || typeof value !== 'object' || isDeepStrictEqual(value, currentData.completed?.[key])) {
       return [key, value];
     }
-    return [key, { completedAt: value.completedAt, completedByUserId: req.user.id }];
+    if (value.completedByMemberId != null && String(value.completedByMemberId) !== String(currentMemberId)) {
+      invalidCompletionActor = true;
+    }
+    return [key, {
+      completedAt: value.completedAt,
+      completedByUserId: req.user.id,
+      ...(value.completedByMemberId == null ? {} : { completedByMemberId: value.completedByMemberId })
+    }];
   }));
+  if (invalidCompletionActor) {
+    return res.status(400).json({ error: 'Een afvinkje kan alleen aan het gezinslid van je eigen login worden gekoppeld.' });
+  }
   let nextData = { ...data, completed, notes, appointments };
   for (const collection of ['tasks', 'groceries', 'mealIdeas', 'notes']) {
     nextData[collection] = registerCreatedItems(currentData[collection], nextData[collection], req.user.id, createdAt);

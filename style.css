@@ -17,10 +17,10 @@
 .password-toggle-slash{display:none}
 .password-toggle[aria-pressed="true"] .password-toggle-slash{display:block}
 .auth-panel label{font-weight:700}
-.demo-banner{margin:18px 42px 0;padding:12px 16px;border:1px solid #e8d5a5;border-radius:8px;background:#fff7e2;color:#684c1d;font-size:12px;line-height:1.5}
-[data-theme="dark"] .demo-banner{background:#493f2a;border-color:#806a3d;color:#f1ddac}
-@media(max-width:1000px){.demo-banner{margin-left:25px;margin-right:25px}}
-@media(max-width:650px){.demo-banner{margin-left:18px;margin-right:18px}}
+.demo-banner,.shared-account-banner{margin:18px 42px 0;padding:12px 16px;border:1px solid #e8d5a5;border-radius:8px;background:#fff7e2;color:#684c1d;font-size:12px;line-height:1.5}
+[data-theme="dark"] .demo-banner,[data-theme="dark"] .shared-account-banner{background:#493f2a;border-color:#806a3d;color:#f1ddac}
+@media(max-width:1000px){.demo-banner,.shared-account-banner{margin-left:25px;margin-right:25px}}
+@media(max-width:650px){.demo-banner,.shared-account-banner{margin-left:18px;margin-right:18px}}
 #auth-error{color:#ad4439}
 #invite-error,#household-invite-error,#password-reset-error{color:#ad4439}
 .recovery{position:fixed;inset:0;z-index:100;background:rgba(20,35,25,.75)}

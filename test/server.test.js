@@ -132,6 +132,11 @@ test(`accounts en opslag op ${basePath || '/'}`, { skip: !configured, timeout: 3
     completedAt,
     completedByUserId: 'spoofed-user'
   };
+  const spoofedCompletionActor = structuredClone(changed);
+  spoofedCompletionActor.completed[`${changed.tasks[0].id}|${dueDate}`].completedByMemberId = 'spoofed-member';
+  assert.equal((await request('/api/state', {
+    method: 'PUT', cookie: first.cookie, body: { data: spoofedCompletionActor, revision: state.json.revision }
+  })).status, 400);
   changed.groceries.push({ id: 'test', name: 'Melk', done: false, urgent: false });
   changed.appointments.push({ id: 'a1', title: 'Afspraak', memberIds: ['member-1', 'member-2'], allDay: true,
     startDate: '2026-11-18', endDate: '2026-11-18', startTime: '', endTime: '',

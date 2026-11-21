@@ -1,4 +1,5 @@
 const THEME_KEY = 'ons-huishouden-thema';
+const SHARED_ACCOUNT_KEY = 'ons-huishouden-gedeelde-sessie';
 const BACKUP_FORMAT = 'ons-huishouden-backup';
 const DAYS = ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'];
 const FREQUENCIES = { daily: 'Dagelijks', weekly: 'Wekelijks', monthly: 'Maandelijks', yearly: 'Jaarlijks', once: 'Eenmalig' };
@@ -44,6 +45,7 @@ let createdPasswordResetEmail = '';
 let accountEmail = '';
 let currentUserId = '';
 let currentRole = '';
+let sharedAccount = false;
 const isChild = () => currentRole === 'child';
 let demoMode = false;
 let themeBeforeDemo = 'light';
@@ -81,6 +83,55 @@ function applyColorPalette(palette) {
 function applyTextSize(size) {
   textSize = size;
   document.documentElement.dataset.textSize = size;
+}
+
+function loadSharedAccountPreference() {
+  try {
+    return localStorage.getItem(SHARED_ACCOUNT_KEY) === 'true';
+  } catch (error) {
+    console.error('Instelling voor gedeelde sessie laden mislukt:', error);
+    throw new Error('De instelling voor de gedeelde sessie kon niet van dit apparaat worden geladen.');
+  }
+}
+
+function saveSharedAccountPreference(enabled) {
+  try {
+    localStorage.setItem(SHARED_ACCOUNT_KEY, String(enabled));
+  } catch (error) {
+    console.error('Instelling voor gedeelde sessie opslaan mislukt:', error);
+    throw new Error('De instelling voor de gedeelde sessie kon niet op dit apparaat worden opgeslagen.');
+  }
+}
+
+async function updateSessionSetting(input) {
+  const panel = input.closest('#session-settings');
+  const errorBox = panel.querySelector('#session-settings-error');
+  errorBox.textContent = '';
+  if (input.name === 'sharedAccount') {
+    try {
+      saveSharedAccountPreference(input.checked);
+      sharedAccount = input.checked;
+      document.querySelector('#shared-account-banner').hidden = !sharedAccount;
+      showToast('Gedeelde sessie-instelling opgeslagen op dit apparaat');
+    } catch (error) {
+      errorBox.textContent = error.message;
+      input.checked = sharedAccount;
+    }
+    return;
+  }
+  if (input.name !== 'speakButtonsForAdults' || isChild()) return;
+  const customization = {
+    ...state.customization,
+    speakButtonsForAdults: input.checked
+  };
+  const nextState = { ...state, customization };
+  if (await save(nextState)) {
+    state = nextState;
+    render();
+    showToast('Spraakinstelling opgeslagen');
+  } else {
+    errorBox.textContent = 'De spraakinstelling kon niet worden opgeslagen.';
+  }
 }
 
 function initializeTheme() {
@@ -287,12 +338,12 @@ function assignedMemberIds(task) {
     .filter(id => state.members.some(member => member.id === id)))];
 }
 
-function membersOn(task, date) {
+function scheduledMembersOn(task, date) {
   if (task.freeToTake) return [];
   if (task.flexibleSchedule) return membersForAssignment(task.memberIds || (task.memberId ? [task.memberId] : []));
   if (task.schedules) {
     const schedule = task.schedules.find(part => occursOn(part, date));
-    return schedule ? membersOn(schedule, date) : [];
+    return schedule ? scheduledMembersOn(schedule, date) : [];
   }
   let ids = task.memberIds || (task.memberId ? [task.memberId] : []);
   if (task.frequency === 'daily') ids = task.dailyAssignments[date.getDay() || 7];
@@ -300,6 +351,33 @@ function membersOn(task, date) {
   return (Array.isArray(ids) ? ids : ids ? [ids] : [])
     .map(id => state.members.find(member => member.id === id))
     .filter(Boolean);
+}
+
+function completionMemberId(assignedMemberId, record) {
+  const completedByMemberId = record && typeof record === 'object' ? record.completedByMemberId : '';
+  return completedByMemberId && state.members.some(member => member.id === completedByMemberId)
+    ? completedByMemberId
+    : assignedMemberId;
+}
+
+function membersOn(task, date) {
+  const assignedMembers = scheduledMembersOn(task, date);
+  const completion = state.completed[completionKey(task, date)];
+  if (task.freeToTake) {
+    const completedBy = state.members.find(member => member.id === completion?.completedByMemberId);
+    return completedBy ? [completedBy] : assignedMembers;
+  }
+  if (completion?.memberCompletions) {
+    return assignedMembers.map(member => {
+      const completedByMemberId = completionMemberId(member.id, completion.memberCompletions[member.id]);
+      return state.members.find(item => item.id === completedByMemberId) || member;
+    });
+  }
+  if (completion?.completedByMemberId && assignedMembers.length === 1) {
+    const completedBy = state.members.find(member => member.id === completion.completedByMemberId);
+    if (completedBy) return [completedBy];
+  }
+  return assignedMembers;
 }
 
 function occursOn(task, date) {
@@ -402,9 +480,13 @@ function isDone(task, date, memberId) {
     return completedAt ? completedAt <= dateKey(date) : Boolean(record);
   };
   if (!completion || typeof completion !== 'object' || !completion.memberCompletions) return completedOnDate(completion);
-  if (memberId) return completedOnDate(completion.memberCompletions[memberId]);
+  if (memberId) {
+    const record = Object.entries(completion.memberCompletions).find(([assignedMemberId, item]) =>
+      completionMemberId(assignedMemberId, item) === memberId)?.[1];
+    return completedOnDate(record);
+  }
   const members = membersOn(task, date);
-  return members.length > 0 && members.every(member => completedOnDate(completion.memberCompletions[member.id]));
+  return members.length > 0 && members.every(member => isDone(task, date, member.id));
 }
 
 function completionDate(value) {
@@ -417,7 +499,8 @@ function isLate(task, date, memberId) {
   if (task.flexibleSchedule) return false;
   const completion = state.completed[completionKey(task, date)];
   const record = completion?.memberCompletions
-    ? completion.memberCompletions[memberId]
+    ? Object.entries(completion.memberCompletions).find(([assignedMemberId, item]) =>
+      completionMemberId(assignedMemberId, item) === memberId)?.[1]
     : completion;
   const completedAt = completionDate(record);
   return completedAt !== null && completedAt > dateKey(date);
@@ -610,39 +693,41 @@ async function updateTaskCompletion({ taskId, date, memberId, checked }) {
   const completedAt = dateKey(task.flexibleSchedule ? selectedDate : new Date());
   const key = completionKey(task, selectedDate);
   const existing = state.completed[key];
-  const assignedMemberIds = membersOn(task, selectedDate).map(member => member.id);
+  const assignedMemberIds = scheduledMembersOn(task, selectedDate).map(member => member.id);
+  const assignedMemberId = existing?.memberCompletions
+    ? Object.entries(existing.memberCompletions).find(([id, record]) =>
+      completionMemberId(id, record) === memberId)?.[0] || memberId
+    : assignedMemberIds.includes(memberId) ? memberId : assignedMemberIds[0] || memberId;
   const usesMemberCompletions = !task.freeToTake &&
     (Boolean(existing?.memberCompletions) || assignedMemberIds.length > 1);
   if (usesMemberCompletions) {
-    if (!assignedMemberIds.includes(memberId)) {
+    if (!assignedMemberIds.includes(assignedMemberId)) {
       console.error('De afgevinkte gezinslid hoort niet bij deze taak.');
       render();
       return;
     }
     const memberCompletions = existing?.memberCompletions
-      ? Object.entries(existing.memberCompletions).filter(([id]) => id !== memberId)
-      : assignedMemberIds.filter(id => id !== memberId).map(id => [id, existing]);
+      ? Object.entries(existing.memberCompletions).filter(([id]) => id !== assignedMemberId)
+      : assignedMemberIds.filter(id => id !== assignedMemberId).map(id => [id, existing]);
     if (checked) {
       const completion = { completedAt };
-      if (demoMode) {
+      if (!sharedAccount) {
         const member = currentMember();
         if (member) completion.completedByMemberId = member.id;
-      } else {
-        completion.completedByUserId = currentUserId;
       }
-      memberCompletions.push([memberId, completion]);
+      if (!demoMode) completion.completedByUserId = currentUserId;
+      memberCompletions.push([assignedMemberId, completion]);
     }
     const records = Object.fromEntries(memberCompletions);
     if (Object.keys(records).length) state.completed[key] = { memberCompletions: records };
     else delete state.completed[key];
   } else if (checked) {
     const completion = { completedAt };
-    if (demoMode) {
+    if (!sharedAccount) {
       const member = currentMember();
       if (member) completion.completedByMemberId = member.id;
-    } else {
-      completion.completedByUserId = currentUserId;
     }
+    if (!demoMode) completion.completedByUserId = currentUserId;
     state.completed[key] = completion;
   } else delete state.completed[key];
   if (await save()) render();
@@ -805,7 +890,7 @@ function renderDashboard() {
     index,
     tasks: todayTasks.filter(task => membersOn(task, date).some(assigned => assigned.id === member.id))
   }));
-  const freeTasks = todayTasks.filter(task => task.freeToTake);
+  const freeTasks = todayTasks.filter(task => task.freeToTake && membersOn(task, date).length === 0);
   const dailyLoads = memberLoads.map(({ member, tasks }) => ({ member, count: tasks.length }));
   const weeklyLoads = state.members.map(member => ({
     member,
@@ -1222,12 +1307,19 @@ function renderBackup() {
         <div class="field"><label for="custom-sidebar-title">Kleine boodschap: titel</label><input id="custom-sidebar-title" name="sidebarTitle" required maxlength="${CUSTOM_TEXT_LIMITS.sidebarTitle}" value="${escapeHtml(state.customization.sidebarTitle)}"></div>
         <div class="field"><label for="custom-sidebar-text">Kleine boodschap: tekst</label><input id="custom-sidebar-text" name="sidebarText" required maxlength="${CUSTOM_TEXT_LIMITS.sidebarText}" value="${escapeHtml(state.customization.sidebarText)}"></div>
       </div>
-      <label class="important-checkbox"><input type="checkbox" name="speakButtonsForAdults" ${state.customization.speakButtonsForAdults === true ? 'checked' : ''}> Spreekknoppen ook tonen voor volwassenen</label>
-      <div class="field-help">Kindaccounts houden hun spreekknoppen. Deze instelling geldt voor ouders en andere volwassen accounts in het gezin.</div>
       <div class="modal-actions"><button type="button" class="button secondary" data-action="reset-customization">Standaardteksten herstellen</button><button type="submit" class="button">Instellingen opslaan</button></div>
     </form>
-    ${demoMode ? '<div class="panel backup-panel"><h2>Back-up</h2><p>Back-ups downloaden en terugzetten zijn beschikbaar met een account, niet in de demo.</p></div>' : `<div class="panel backup-panel"><h2>Back-up downloaden</h2><p>Download een JSON-bestand met gezinsleden, taken, afspraken, planningen, afvinkjes, boodschappen, kookinspiratie en notities. Bewaar dit bestand op een veilige plek: het bevat persoonlijke gegevens.</p><button class="button" data-action="export-backup">Back-up downloaden</button></div>
-    <div class="panel backup-panel"><h2>Back-up terugzetten</h2><p>Een back-up terugzetten vervangt de huidige gegevens van je account. Download eventueel eerst een back-up van de huidige gegevens.</p><label for="backup-file" class="field-label">JSON-bestand kiezen</label><input id="backup-file" type="file" accept=".json,application/json"><button class="button secondary" data-action="import-backup">Back-up terugzetten</button></div>`}`}`;
+    `}
+    <section id="session-settings" class="panel backup-panel">
+      <h2>Sessie en spraak</h2>
+      <label class="important-checkbox"><input type="checkbox" name="sharedAccount" ${sharedAccount ? 'checked' : ''}> Deze sessie is voor iedereen in het gezin</label>
+      <div class="field-help">Deze keuze wordt op dit apparaat bewaard totdat iemand haar hier wijzigt. Bij een gedeelde sessie blijven afgevinkte taken gekoppeld aan de ingeplande persoon. Anders wordt de huidige herhaling gekoppeld aan het gezinslid van deze login.</div>
+      ${isChild() ? '' : `<label class="important-checkbox"><input type="checkbox" name="speakButtonsForAdults" ${state.customization.speakButtonsForAdults === true ? 'checked' : ''}> Spreekknoppen ook tonen voor volwassenen</label>
+      <div class="field-help">Kindaccounts houden hun spreekknoppen. Deze instelling geldt voor ouders en andere volwassen accounts in het gezin.</div>`}
+      <div id="session-settings-error" role="alert"></div>
+    </section>
+    ${isChild() ? '' : demoMode ? '<div class="panel backup-panel"><h2>Back-up</h2><p>Back-ups downloaden en terugzetten zijn beschikbaar met een account, niet in de demo.</p></div>' : `<div class="panel backup-panel"><h2>Back-up downloaden</h2><p>Download een JSON-bestand met gezinsleden, taken, afspraken, planningen, afvinkjes, boodschappen, kookinspiratie en notities. Bewaar dit bestand op een veilige plek: het bevat persoonlijke gegevens.</p><button class="button" data-action="export-backup">Back-up downloaden</button></div>
+    <div class="panel backup-panel"><h2>Back-up terugzetten</h2><p>Een back-up terugzetten vervangt de huidige gegevens van je account. Download eventueel eerst een back-up van de huidige gegevens.</p><label for="backup-file" class="field-label">JSON-bestand kiezen</label><input id="backup-file" type="file" accept=".json,application/json"><button class="button secondary" data-action="import-backup">Back-up terugzetten</button></div>`}`;
 }
 
 function renderHelp() {
@@ -1244,7 +1336,7 @@ function renderHelp() {
         <p>Naast de weekplanning zie je de gezinsleden; daaronder staan gedeelde notities als post-its. Kies <strong>Notitie toevoegen</strong> om in een venster een titel en beschrijving in te vullen. De auteur wordt automatisch ingevuld. Zet eventueel <strong>Markeer als belangrijk</strong> aan; dit staat standaard uit. Belangrijke notities krijgen een uitroepteken en staan bovenaan.</p>
         <p>Open het driepuntjesmenu op een post-it om die te bewerken of te archiveren. Bij bewerken door een ander gezinslid worden diens naam en bewerktijd vermeld. Gearchiveerde notities verdwijnen van het overzicht. Via <a href="#notitiearchief">Notitiearchief</a> kun je ze herstellen of definitief verwijderen.</p>
         <p>Op <a href="#taken">Alle taken</a> kun je een taak openen om de planning te wijzigen. Kies per dag, week, maand of eenmalige datum wie de taak uitvoert. Een eenmalige taak verschijnt alleen op de gekozen datum en wordt niet herhaald. Standaard wijs je de taak aan één gezinslid toe; zet <strong>Gedeelde taak</strong> aan om meerdere personen te selecteren. Zet <strong>Vrij in te plannen</strong> aan om een taak zonder vaste dag te plannen; bij terugkerende taken blijft ze deze periode in de planning staan tot ze is afgerond en verschijnt ze daarna weer in de volgende periode. Bij een eenmalige taak blijft ze vanaf de gekozen datum staan tot ze is afgerond, zonder opnieuw te verschijnen. Je kunt dit combineren met <strong>Voor iedereen</strong>. De taak verschijnt dan bovenaan de planning, zonder verantwoordelijke. Zonder de combinatie met vrij inplannen verschijnt een taak voor iedereen op de reguliere frequentiedag en schuift ze dagelijks door zolang die openstaat. Markeer in het taakformulier belangrijke taken; die herken je aan het label <strong>Belangrijk</strong>. Gebruik de zoekbalk en filters om taken terug te vinden.</p>
-        <p>Vink je een taak na de geplande dag af, dan krijgt die het label <strong>Te laat uitgevoerd</strong>. Bij elk gezinslid kun je via <strong>Statistieken bekijken</strong> zien hoeveel taken die persoon te laat ingepland had; dit wordt niet gekoppeld aan het account dat de taak heeft afgevinkt.</p>
+        <p>Vink je een taak na de geplande dag af, dan krijgt die het label <strong>Te laat uitgevoerd</strong>. Bij elk gezinslid kun je via <strong>Statistieken bekijken</strong> zien hoeveel taken die persoon te laat ingepland had. Bij een eigen login telt de taak mee voor het gezinslid dat de herhaling heeft afgerond; bij een gezinsaccount blijft ze meetellen voor de oorspronkelijk ingeplande persoon.</p>
       </section>
       <section class="panel help-panel"><h2>Afspraken (beta)</h2>
         <p>Ouders kunnen via <a href="#afspraken">Afspraken</a> afspraken toevoegen, bewerken en verwijderen. Kies een begin- en einddatum en tijd, of selecteer <strong>Hele dag</strong>. Bij hele dagen telt de einddatum mee. Selecteer eventueel één of meer gezinsleden; anders staat de afspraak bovenaan de weekplanner onder <strong>Voor iedereen</strong>. Afspraken staan op elke betrokken dag boven de taken van elk geselecteerd gezinslid. Kindaccounts kunnen afspraken bekijken.</p>
@@ -1263,6 +1355,7 @@ function renderHelp() {
         <p>Bij <a href="#instellingen">Instellingen</a> kan ieder gezinslid het kleurenpalet en de tekstgrootte voor de eigen login kiezen. Ouders kunnen ook de websitetitel, de ondertekst van het logo en de welkomst- en zijpaneelteksten aanpassen, spreekknoppen voor volwassenen aanzetten en back-ups beheren. De teksten zijn zichtbaar voor het hele gezin.</p>
         <p>Kies bij Instellingen een van de kleurenpaletten <strong>Bosgroen</strong>, <strong>Oceaanblauw</strong>, <strong>Lavendel</strong> of <strong>Terracotta</strong>. Het kleurenpalet wordt per login bewaard, geldt ook in donkere modus en verandert niets voor andere gezinsleden. De keuze wordt niet opgenomen in een back-up.</p>
         <p>Kies bij <strong>Tekstgrootte</strong> voor <strong>Groter</strong> of <strong>Nog groter</strong> om de weergave te vergroten. Deze voorkeur wordt per login bewaard en is op elk apparaat beschikbaar.</p>
+        <p>In het vak <strong>Sessie en spraak</strong> kun je aangeven dat de sessie voor iedereen in het gezin is als meerdere personen dezelfde login gebruiken. Deze keuze blijft op dit apparaat bewaard totdat iemand haar wijzigt. Er verschijnt bovenaan een melding en afgevinkte taken blijven gekoppeld aan de ingeplande persoon. Bij een eigen login wordt een afgevinkte taak aan het gekoppelde gezinslid toegerekend, alleen voor die ene herhaling.</p>
         <p>Je kunt daar ook een JSON-back-up downloaden of terugzetten. Terugzetten vervangt de huidige gezinsgegevens; maak eventueel eerst een back-up. Bewaar het bestand veilig, want het bevat persoonlijke gegevens.</p>
       </section>
       <section class="panel help-panel"><h2>Wijzigingen op meerdere apparaten</h2>
@@ -1924,6 +2017,10 @@ document.addEventListener('click', async event => {
 
 document.addEventListener('change', async event => {
   const target = event.target;
+  if (target.closest('#session-settings') && target.matches('input[type="checkbox"]')) {
+    await updateSessionSetting(target);
+    return;
+  }
   if (target.dataset.action === 'meal-wish') {
     const nextState = { ...state, mealIdeas: state.mealIdeas.map(idea => idea.id === target.dataset.id ? {
       ...idea, wishedBy: target.checked ? [...idea.wishedBy, target.dataset.memberId] : idea.wishedBy.filter(id => id !== target.dataset.memberId)
@@ -2026,7 +2123,10 @@ document.addEventListener('submit', async event => {
       const result = await api('api/preferences', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ colorPalette: selectedPalette, textSize: selectedTextSize })
+        body: JSON.stringify({
+          colorPalette: selectedPalette,
+          textSize: selectedTextSize
+        })
       });
       applyColorPalette(result.colorPalette);
       applyTextSize(result.textSize);
@@ -2049,7 +2149,7 @@ document.addEventListener('submit', async event => {
       if (value === null) return;
       customization[key] = value;
     }
-    customization.speakButtonsForAdults = form.elements.speakButtonsForAdults.checked;
+    customization.speakButtonsForAdults = state.customization.speakButtonsForAdults === true;
     const invalidKey = Object.keys(CUSTOM_TEXT_LIMITS).find(key =>
       !customization[key] || customization[key].length > CUSTOM_TEXT_LIMITS[key]);
     if (invalidKey) {
@@ -2160,10 +2260,18 @@ document.querySelector('#theme-toggle').addEventListener('click', () => {
 });
 window.addEventListener('storage', event => {
   if (!demoMode && (event.key === THEME_KEY || event.key === null)) applyTheme(event.newValue);
+  if (event.key === SHARED_ACCOUNT_KEY || event.key === null) {
+    sharedAccount = event.newValue === 'true';
+    const banner = document.querySelector('#shared-account-banner');
+    banner.hidden = !sharedAccount;
+    const checkbox = document.querySelector('#session-settings [name="sharedAccount"]');
+    if (checkbox) checkbox.checked = sharedAccount;
+  }
 });
 initializeTheme();
 
 function startDemo() {
+  const sessionIsShared = loadSharedAccountPreference();
   const demoData = {
     members: SEED_MEMBERS.map(member => ({ ...member, createdAt: dateKey(new Date()) })),
     tasks: SEED_TASKS.map((task, index) => ({ ...task, important: index === 0 })),
@@ -2182,11 +2290,13 @@ function startDemo() {
   accountEmail = 'Demogebruiker';
   currentUserId = 'demo';
   currentRole = 'owner';
+  sharedAccount = sessionIsShared;
   householdInfo = { members: [], invitations: [], canInvite: false };
   applyColorPalette('forest');
   document.querySelector('#auth-screen').hidden = true;
   document.querySelector('#app').hidden = false;
   document.querySelector('#demo-banner').hidden = false;
+  document.querySelector('#shared-account-banner').hidden = !sharedAccount;
   document.querySelector('#logout').textContent = 'Demo afsluiten';
   document.querySelector('#account-name').textContent = '';
   history.replaceState(null, '', `${location.pathname}#overzicht`);
@@ -2204,11 +2314,13 @@ async function openAccount() {
   accountEmail = result.email;
   currentRole = result.role;
   currentUserId = String(householdInfo.members.find(member => member.email.toLowerCase() === result.email.toLowerCase())?.id || '');
+  sharedAccount = loadSharedAccountPreference();
   applyColorPalette(preferences.colorPalette);
   applyTextSize(preferences.textSize);
   document.querySelector('#auth-screen').hidden = true;
   document.querySelector('#invite-screen').hidden = true;
   document.querySelector('#app').hidden = false;
+  document.querySelector('#shared-account-banner').hidden = !sharedAccount;
   if (new URLSearchParams(location.search).has('uitnodiging')) {
     history.replaceState(null, '', `${location.pathname}${location.hash}`);
   }
@@ -2233,7 +2345,14 @@ function setAuthPasswordVisible(visible) {
 authPasswordToggle.addEventListener('click', () => setAuthPasswordVisible(authPassword.type === 'password'));
 authForm.addEventListener('reset', () => setAuthPasswordVisible(false));
 const authError = document.querySelector('#auth-error');
-document.querySelector('#start-demo').addEventListener('click', startDemo);
+document.querySelector('#start-demo').addEventListener('click', () => {
+  try {
+    startDemo();
+  } catch (error) {
+    console.error('Demomodus starten mislukt:', error);
+    authError.textContent = error.message;
+  }
+});
 authEmail.addEventListener('invalid', () => {
   authError.textContent = 'Vul een geldig e-mailadres in.';
 });
@@ -2379,6 +2498,8 @@ document.querySelector('#logout').addEventListener('click', async () => {
     accountEmail = '';
     currentUserId = '';
     currentRole = '';
+    sharedAccount = false;
+    document.querySelector('#shared-account-banner').hidden = true;
     colorPalette = 'forest';
     document.documentElement.dataset.palette = colorPalette;
     document.querySelector('#auth-error').textContent = '';

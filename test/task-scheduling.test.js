@@ -18,6 +18,117 @@ test('scheduler helper is available to the browser app', () => {
   assert.match(server, /'task-scheduling\.js'/);
 });
 
+test('shared session preference persists locally across account sessions', () => {
+  const app = readFileSync(require.resolve('../app'), 'utf8');
+  const values = new Map();
+  const context = vm.createContext({
+    SHARED_ACCOUNT_KEY: 'ons-huishouden-gedeelde-sessie',
+    localStorage: {
+      getItem: key => values.get(key) ?? null,
+      setItem: (key, value) => values.set(key, value)
+    }
+  });
+  vm.runInContext(
+    app.slice(app.indexOf('function loadSharedAccountPreference('), app.indexOf('function initializeTheme(')),
+    context
+  );
+
+  assert.equal(context.loadSharedAccountPreference(), false);
+  context.saveSharedAccountPreference(true);
+  assert.equal(context.loadSharedAccountPreference(), true);
+  context.saveSharedAccountPreference(false);
+  assert.equal(context.loadSharedAccountPreference(), false);
+});
+
+test('session and speech settings render in a separate panel after display and text settings', () => {
+  const app = readFileSync(require.resolve('../app'), 'utf8');
+  const renderBackup = app.slice(app.indexOf('function renderBackup('), app.indexOf('function renderHelp('));
+  const renderForRole = role => {
+    const context = vm.createContext({
+      CUSTOM_TEXT_LIMITS: {
+        websiteTitle: 60, brandSubtitle: 40, welcomeTitle: 80,
+        welcomeText: 160, sidebarTitle: 100, sidebarText: 200
+      },
+      COLOR_PALETTES: [{ id: 'forest', label: 'Bosgroen', description: 'Groen' }],
+      state: {
+        customization: {
+          websiteTitle: 'Thuis', brandSubtitle: 'SAMEN', welcomeTitle: 'Welkom',
+          welcomeText: 'Samen thuis', sidebarTitle: 'Samen', sidebarText: 'Thuis',
+          speakButtonsForAdults: true
+        }
+      },
+      isChild: () => role === 'child',
+      demoMode: true,
+      sharedAccount: true,
+      colorPalette: 'forest',
+      textSize: 'normal',
+      escapeHtml: value => String(value)
+    });
+    vm.runInContext(renderBackup, context);
+    return context.renderBackup();
+  };
+  const parentSettings = renderForRole('parent');
+  assert.ok(parentSettings.indexOf('Jouw weergave') < parentSettings.indexOf('Teksten personaliseren'));
+  assert.ok(parentSettings.indexOf('Teksten personaliseren') < parentSettings.indexOf('Sessie en spraak'));
+  assert.match(parentSettings, /name="speakButtonsForAdults"/);
+  assert.doesNotMatch(parentSettings, /Sessie-instellingen opslaan/);
+  const childSettings = renderForRole('child');
+  assert.match(childSettings, /name="sharedAccount"/);
+  assert.doesNotMatch(childSettings, /name="speakButtonsForAdults"/);
+  assert.doesNotMatch(childSettings, /Teksten personaliseren/);
+});
+
+test('session and speech checkboxes save immediately when changed', async () => {
+  const app = readFileSync(require.resolve('../app'), 'utf8');
+  const values = new Map();
+  const errorBox = { textContent: '' };
+  const banner = { hidden: true };
+  const panel = { querySelector: () => errorBox };
+  const context = vm.createContext({
+    SHARED_ACCOUNT_KEY: 'ons-huishouden-gedeelde-sessie',
+    localStorage: {
+      getItem: key => values.get(key) ?? null,
+      setItem: (key, value) => values.set(key, value)
+    },
+    state: { customization: { speakButtonsForAdults: false } },
+    sharedAccount: false,
+    isChild: () => false,
+    save: async nextState => {
+      context.state = nextState;
+      return true;
+    },
+    document: {
+      querySelector: selector => {
+        assert.equal(selector, '#shared-account-banner');
+        return banner;
+      }
+    },
+    showToast() {},
+    render() {}
+  });
+  vm.runInContext(
+    app.slice(app.indexOf('function saveSharedAccountPreference('), app.indexOf('function initializeTheme(')),
+    context
+  );
+  const checkbox = (name, checked) => ({
+    name,
+    checked,
+    closest: selector => {
+      assert.equal(selector, '#session-settings');
+      return panel;
+    }
+  });
+
+  await context.updateSessionSetting(checkbox('sharedAccount', true));
+  assert.equal(values.get('ons-huishouden-gedeelde-sessie'), 'true');
+  assert.equal(context.sharedAccount, true);
+  assert.equal(banner.hidden, false);
+
+  await context.updateSessionSetting(checkbox('speakButtonsForAdults', true));
+  assert.equal(context.state.customization.speakButtonsForAdults, true);
+  assert.equal(errorBox.textContent, '');
+});
+
 test('flexible daily tasks remain in the plan until completed for the day', () => {
   const task = { id: 'daily', frequency: 'daily' };
   const completed = {};
@@ -175,6 +286,7 @@ test('flexible task completion stays on the selected planner date', async () => 
     DAYS: ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'],
     FREQUENCIES: { daily: 'Dagelijks', weekly: 'Wekelijks', monthly: 'Maandelijks', yearly: 'Jaarlijks', once: 'Eenmalig' },
     currentUserId: 'user-1',
+    sharedAccount: true,
     demoMode: false,
     dateKey: date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
     validBackupDate: value => /^\d{4}-\d{2}-\d{2}$/.test(value || ''),
@@ -201,6 +313,147 @@ test('flexible task completion stays on the selected planner date', async () => 
   assert.equal(context.isDone(context.state.tasks[0], context.parseDate('2026-11-20'), 'm1'), true);
   assert.equal(context.tasksOn(context.parseDate('2026-11-20')).length, 1);
   assert.equal(context.tasksOn(context.parseDate('2026-11-21')).length, 0);
+});
+
+test('individual logins reassign only the completed task occurrence', async () => {
+  const app = readFileSync(require.resolve('../app'), 'utf8');
+  const context = vm.createContext({
+    state: {
+      members: [{ id: 'm1', name: 'Ada' }, { id: 'm2', name: 'Bram' }],
+      tasks: [{
+        id: 'weekly', title: 'Badkamer schoonmaken', frequency: 'weekly', weekday: 1,
+        weeklyAssignments: { odd: ['m1'], even: ['m1'] }
+      }],
+      completed: {}
+    },
+    DAYS: ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'],
+    FREQUENCIES: { daily: 'Dagelijks', weekly: 'Wekelijks', monthly: 'Maandelijks', yearly: 'Jaarlijks', once: 'Eenmalig' },
+    currentUserId: 'user-2',
+    accountEmail: 'bram@example.test',
+    sharedAccount: false,
+    demoMode: false,
+    dateKey: date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
+    validBackupDate: value => /^\d{4}-\d{2}-\d{2}$/.test(value || ''),
+    parseDate: key => {
+      const [year, month, day] = key.split('-').map(Number);
+      return new Date(year, month - 1, day);
+    },
+    isoWeek: () => 1,
+    save: async () => true,
+    render() {}
+  });
+  context.currentMember = () => context.state.members.find(member => member.id === 'm2');
+  vm.runInNewContext(readFileSync(require.resolve('../task-scheduling'), 'utf8'), context);
+  vm.runInContext(
+    app.slice(app.indexOf('function membersForAssignment('), app.indexOf('function completionKey(')) +
+    app.slice(app.indexOf('function completionKey('), app.indexOf('function showToast(')) +
+    app.slice(app.indexOf('async function updateTaskCompletion('), app.indexOf('function speakText(')),
+    context
+  );
+
+  const dueDate = context.parseDate('2026-11-16');
+  await context.updateTaskCompletion({
+    taskId: 'weekly', date: '2026-11-16', memberId: 'm1', checked: true
+  });
+  assert.equal(context.state.completed['weekly|2026-11-16'].completedByMemberId, 'm2');
+  assert.deepEqual([...context.membersOn(context.state.tasks[0], dueDate).map(member => member.id)], ['m2']);
+  assert.equal(context.isDone(context.state.tasks[0], dueDate, 'm2'), true);
+
+  const nextOccurrence = context.parseDate('2026-11-23');
+  assert.deepEqual([...context.membersOn(context.state.tasks[0], nextOccurrence).map(member => member.id)], ['m1']);
+  assert.equal(context.isDone(context.state.tasks[0], nextOccurrence, 'm1'), false);
+});
+
+test('individual logins can take ownership of an everyone task for one occurrence', async () => {
+  const app = readFileSync(require.resolve('../app'), 'utf8');
+  const context = vm.createContext({
+    state: {
+      members: [{ id: 'm1', name: 'Ada' }, { id: 'm2', name: 'Bram' }],
+      tasks: [{
+        id: 'shared-weekly', title: 'Vuilnis buitenzetten', frequency: 'weekly',
+        weekday: 1, freeToTake: true, freeSince: '2026-11-16'
+      }],
+      completed: {}
+    },
+    DAYS: ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'],
+    FREQUENCIES: { daily: 'Dagelijks', weekly: 'Wekelijks', monthly: 'Maandelijks', yearly: 'Jaarlijks', once: 'Eenmalig' },
+    currentUserId: 'user-2',
+    accountEmail: 'bram@example.test',
+    sharedAccount: false,
+    demoMode: false,
+    dateKey: date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
+    validBackupDate: value => /^\d{4}-\d{2}-\d{2}$/.test(value || ''),
+    parseDate: key => {
+      const [year, month, day] = key.split('-').map(Number);
+      return new Date(year, month - 1, day);
+    },
+    isoWeek: () => 1,
+    save: async () => true,
+    render() {}
+  });
+  context.currentMember = () => context.state.members.find(member => member.id === 'm2');
+  vm.runInNewContext(readFileSync(require.resolve('../task-scheduling'), 'utf8'), context);
+  vm.runInContext(
+    app.slice(app.indexOf('function membersForAssignment('), app.indexOf('function completionKey(')) +
+    app.slice(app.indexOf('function completionKey('), app.indexOf('function showToast(')) +
+    app.slice(app.indexOf('async function updateTaskCompletion('), app.indexOf('function speakText(')),
+    context
+  );
+
+  const completedDay = context.parseDate('2026-11-16');
+  await context.updateTaskCompletion({
+    taskId: 'shared-weekly', date: '2026-11-16', memberId: undefined, checked: true
+  });
+  assert.equal(context.state.completed['shared-weekly|2026-11-16'].completedByMemberId, 'm2');
+  assert.deepEqual([...context.membersOn(context.state.tasks[0], completedDay).map(member => member.id)], ['m2']);
+  assert.equal(context.isDone(context.state.tasks[0], completedDay, 'm2'), true);
+
+  const nextOccurrence = context.parseDate('2026-11-23');
+  assert.deepEqual([...context.membersOn(context.state.tasks[0], nextOccurrence)], []);
+});
+
+test('shared logins leave completed everyone tasks unassigned', async () => {
+  const app = readFileSync(require.resolve('../app'), 'utf8');
+  const context = vm.createContext({
+    state: {
+      members: [{ id: 'm1', name: 'Ada' }],
+      tasks: [{
+        id: 'shared-weekly', title: 'Vuilnis buitenzetten', frequency: 'weekly',
+        weekday: 1, freeToTake: true, freeSince: '2026-11-16'
+      }],
+      completed: {}
+    },
+    DAYS: ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'],
+    FREQUENCIES: { daily: 'Dagelijks', weekly: 'Wekelijks', monthly: 'Maandelijks', yearly: 'Jaarlijks', once: 'Eenmalig' },
+    currentUserId: 'user-1',
+    accountEmail: 'ada@example.test',
+    sharedAccount: true,
+    demoMode: false,
+    dateKey: date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
+    validBackupDate: value => /^\d{4}-\d{2}-\d{2}$/.test(value || ''),
+    parseDate: key => {
+      const [year, month, day] = key.split('-').map(Number);
+      return new Date(year, month - 1, day);
+    },
+    isoWeek: () => 1,
+    save: async () => true,
+    render() {}
+  });
+  context.currentMember = () => context.state.members[0];
+  vm.runInNewContext(readFileSync(require.resolve('../task-scheduling'), 'utf8'), context);
+  vm.runInContext(
+    app.slice(app.indexOf('function membersForAssignment('), app.indexOf('function completionKey(')) +
+    app.slice(app.indexOf('function completionKey('), app.indexOf('function showToast(')) +
+    app.slice(app.indexOf('async function updateTaskCompletion('), app.indexOf('function speakText(')),
+    context
+  );
+
+  const completedDay = context.parseDate('2026-11-16');
+  await context.updateTaskCompletion({
+    taskId: 'shared-weekly', date: '2026-11-16', memberId: undefined, checked: true
+  });
+  assert.equal(context.state.completed['shared-weekly|2026-11-16'].completedByMemberId, undefined);
+  assert.deepEqual([...context.membersOn(context.state.tasks[0], completedDay)], []);
 });
 
 test('parent can mark a late shared-task completion as not late without reopening it', async () => {

@@ -233,6 +233,7 @@ test('a shared task remains open until each assigned member has completed it', (
     validBackupDate: value => /^\d{4}-\d{2}-\d{2}$/.test(value)
   });
   vm.runInContext(
+    app.slice(app.indexOf('function completionMemberId('), app.indexOf('function membersOn(')) +
     app.slice(app.indexOf('function completionKey('), app.indexOf('function showToast(')),
     completionContext
   );
