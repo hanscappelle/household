@@ -28,7 +28,9 @@ voor de hele bijbehorende week (maandag tot en met zondag). Standaard wijs je
 een taak aan één gezinslid toe. Zet in het taakvenster **Taak door meerdere
 gezinsleden laten uitvoeren** aan om meerdere personen te selecteren; de taak
 verschijnt dan bij ieder van hen. Een terugkerende taak telt voor elke dag
-waarop die is ingepland.
+waarop die is ingepland. Naast iedere naam toont het overzicht het aantal
+uitgevoerde taken van het totaal, bijvoorbeeld `3/6`; in spraak wordt dit voluit
+uitgesproken, bijvoorbeeld "3 taken van 6 taken uitgevoerd".
 Zet bij een taak **Vrij op te nemen taak** aan om die zonder toewijzing onder
 **Vrij op te nemen taken** in de dagplanning te tonen. Een open taak schuift
 dagelijks door. Als de volgende reguliere frequentiedag aanbreekt terwijl de

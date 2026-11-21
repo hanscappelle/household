@@ -338,6 +338,7 @@ test('dashboard places shared appointments before shared tasks and personal appo
   assert.ok([sharedHeading, sharedAppointment, sharedTask, personalHeading, personalAppointment, personalTask].every(index => index >= 0));
   assert.ok(sharedHeading < sharedAppointment && sharedAppointment < sharedTask && sharedTask < personalHeading &&
     personalHeading < personalAppointment && personalAppointment < personalTask);
+  assert.match(html, /class="day-task-member-progress" aria-label="0 taken van 1 taak uitgevoerd">0\/1<\/span>/);
   assert.match(html, /class="appointment-icon" role="img" aria-label="Afspraak"/);
   assert.doesNotMatch(html, /class="appointment-row[^"]*"[^>]*>[^]*?<input[^>]*type="checkbox"/);
   const sharedStart = html.indexOf('<span>Voor iedereen</span>');

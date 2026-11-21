@@ -627,8 +627,9 @@ function taskSpeechText(task, done, date) {
 function memberSpeechText(member, tasks, date) {
   const completed = tasks.filter(task => isDone(task, date, member.id)).length;
   const dateLabel = formatDate(date, { weekday: 'long', day: 'numeric', month: 'long' });
-  const planned = tasks.length === 1 ? 'staat 1 taak' : `staan ${tasks.length} taken`;
-  return `${member.name}. Op ${dateLabel} ${planned} ingepland, waarvan ${completed} ${completed === 1 ? 'is' : 'zijn'} afgerond.`;
+  const completedText = `${completed} ${completed === 1 ? 'taak' : 'taken'}`;
+  const totalText = `${tasks.length} ${tasks.length === 1 ? 'taak' : 'taken'}`;
+  return `${member.name}. Op ${dateLabel}: ${completedText} van ${totalText} uitgevoerd.`;
 }
 
 function mealSpeechText(idea, rank = [...state.mealIdeas]
@@ -923,7 +924,11 @@ function renderDashboard() {
           <div class="day-detail"><div class="day-detail-head"><strong>${escapeHtml(formatDate(date, { weekday: 'long', day: 'numeric', month: 'long' }))}</strong><span>${todayTasks.length} ${todayTasks.length === 1 ? 'taak' : 'taken'}</span></div>
             ${birthdays.map(member => `<div class="birthday-row"><span class="birthday-icon" aria-hidden="true">🎂</span><div><strong>Verjaardag van ${escapeHtml(member.name)}</strong><small>${date.getFullYear() - parseDate(member.birthDate).getFullYear()} jaar</small></div></div>`).join('')}
             ${freeTasks.length || dayAppointments.some(item => !appointmentMemberIds(item).length) ? `<section class="day-task-group"><h3 class="free-task-heading"><span class="avatar free-task-avatar" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3.5 19v-1.5a5.5 5.5 0 0 1 11 0V19z"/><path d="M16 5.3a3 3 0 0 1 0 5.4M17 13a5 5 0 0 1 3.5 4.8V19h-4"/></svg></span><span>Voor iedereen</span></h3>${renderAppointmentRows(dayAppointments.filter(item => !appointmentMemberIds(item).length))}${renderTaskRows(freeTasks, date)}</section>` : ''}
-            ${memberLoads.filter(group => group.tasks.length || dayAppointments.some(item => appointmentMemberIds(item).includes(group.member.id))).map(({ member, index, tasks }) => `<section class="day-task-group"><div class="day-task-member"><h3 class="day-task-member-heading"><span aria-hidden="true">${avatar(member, index)}</span><span>${escapeHtml(member.name)}</span></h3>${speakButton('speak-member', member.id, member.name, 'Naam en taken voorlezen', memberSpeechText(member, tasks, date))}</div>${renderAppointmentRows(dayAppointments.filter(item => appointmentMemberIds(item).includes(member.id)))}${renderTaskRows(tasks, date, member.id)}</section>`).join('')}
+            ${memberLoads.filter(group => group.tasks.length || dayAppointments.some(item => appointmentMemberIds(item).includes(group.member.id))).map(({ member, index, tasks }) => {
+              const completed = tasks.filter(task => isDone(task, date, member.id)).length;
+              const progressText = `${completed} ${completed === 1 ? 'taak' : 'taken'} van ${tasks.length} ${tasks.length === 1 ? 'taak' : 'taken'} uitgevoerd`;
+              return `<section class="day-task-group"><div class="day-task-member"><h3 class="day-task-member-heading"><span aria-hidden="true">${avatar(member, index)}</span><span>${escapeHtml(member.name)}</span><span class="day-task-member-progress" aria-label="${escapeHtml(progressText)}">${completed}/${tasks.length}</span></h3>${speakButton('speak-member', member.id, member.name, 'Naam en taken voorlezen', memberSpeechText(member, tasks, date))}</div>${renderAppointmentRows(dayAppointments.filter(item => appointmentMemberIds(item).includes(member.id)))}${renderTaskRows(tasks, date, member.id)}</section>`;
+            }).join('')}
             ${!todayTasks.length && !birthdays.length && !dayAppointments.length ? `<div class="empty"><span class="empty-icon">☼</span><strong>Een lekker lege planning</strong>Plan een taak of afspraak in en die verschijnt hier.</div>` : ''}
           </div>
         </div>

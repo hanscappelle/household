@@ -69,15 +69,15 @@ test('member speech includes the selected day task totals and completed count', 
   ];
   assert.equal(
     context.memberSpeechText(member, tasks, date),
-    'Sanne. Op woensdag 19 november staan 3 taken ingepland, waarvan 1 is afgerond.'
+    'Sanne. Op woensdag 19 november: 1 taak van 3 taken uitgevoerd.'
   );
   assert.equal(
     context.memberSpeechText(member, [{ doneFor: ['m1'] }], date),
-    'Sanne. Op woensdag 19 november staat 1 taak ingepland, waarvan 1 is afgerond.'
+    'Sanne. Op woensdag 19 november: 1 taak van 1 taak uitgevoerd.'
   );
   assert.equal(
     context.memberSpeechText(member, [], date),
-    'Sanne. Op woensdag 19 november staan 0 taken ingepland, waarvan 0 zijn afgerond.'
+    'Sanne. Op woensdag 19 november: 0 taken van 0 taken uitgevoerd.'
   );
 });
 
