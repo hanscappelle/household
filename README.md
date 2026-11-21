@@ -373,6 +373,21 @@ Oceaanblauw, Lavendel en Terracotta. Het gekozen palet wordt per login
 opgeslagen, geldt ook in de donkere modus en verandert de weergave voor andere
 gezinsaccounts niet. Bestaande accounts beginnen met Bosgroen.
 
+In het vak **Sessie en spraak** worden de selectievakjes meteen opgeslagen
+zodra je ze aan- of uitvinkt. **Deze sessie is voor iedereen in het gezin**
+is bedoeld voor een apparaat waarop meerdere personen dezelfde login
+gebruiken. De keuze wordt lokaal in de browser van dat apparaat bewaard,
+geldt daar voor alle accounts en wordt niet naar andere apparaten
+gesynchroniseerd. Als de optie aanstaat, blijft een afgevinkte taak gekoppeld
+aan de ingeplande persoon. Als ze uitstaat, wordt de afgevinkte taak
+toegerekend aan het gezinslid dat aan de ingelogde account is gekoppeld, alleen
+voor die ene herhaling. Dit geldt ook voor taken die voor iedereen zijn
+ingepland: na het afvinken verschijnen ze bij dat gezinslid. De planning van
+volgende herhalingen blijft ongewijzigd. Bovenaan de app verschijnt een
+melding zolang de optie actief is. Ouders kunnen in hetzelfde vak
+**Spreekknoppen ook tonen voor volwassenen** aan- of uitzetten; kindaccounts
+houden hun spreekknoppen.
+
 Je kunt hier ook handmatig een JSON-bestand downloaden met gezinsleden, taken,
 planningen, afvinkjes, boodschappen, kookinspiratie, notities en persoonlijke teksten.
 Bewaar dit bestand veilig: het bevat persoonlijke gegevens. Je voorkeur voor
