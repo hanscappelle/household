@@ -46,6 +46,7 @@ alle afspraken die nog niet zijn afgelopen. Blader naar een andere maand om
 de afspraken in die maand te zien, ook als ze al voorbij zijn. Kies een dag
 om alleen de afspraken van die dag te tonen, ook voor eerdere dagen in de
 huidige maand. De lijst is gesorteerd op begindatum en begintijd.
+
 Een afspraak heeft een begin- en einddatum en een begin- en eindtijd, of duurt
 een hele dag. Bij afspraken voor hele dagen telt ook de einddatum mee; bij
 afspraken met tijd is het eindtijdstip exclusief. Bij het wijzigen van de
@@ -53,6 +54,7 @@ begindatum schuift een eerdere einddatum automatisch mee naar de begindatum;
 een latere einddatum blijft staan. Meerdaagse afspraken staan op elke betrokken
 dag in de weekplanner. Koppel een afspraak eventueel aan één
 of meer gezinsleden: ze staat dan boven de taken van elk geselecteerd gezinslid.
+
 Afspraken zonder gezinslid staan
 samen met de vrij op te nemen taken bovenaan onder **Voor iedereen**. Afspraken
 zijn geen taken en tellen niet mee in taakstatistieken. Kindaccounts kunnen
@@ -60,6 +62,7 @@ afspraken bekijken, maar niet beheren. Bij het verwijderen van een gezinslid
 blijven afspraken bij de overige geselecteerde gezinsleden staan, of onder
 **Voor iedereen** als er niemand meer is geselecteerd. Afspraken worden ook
 in back-ups opgenomen; oudere back-ups zonder afspraken blijven bruikbaar.
+
 Een afspraak kan wekelijks, elke twee weken, maandelijks of jaarlijks herhalen,
 telkens vanaf de gekozen begindatum en eventueel tot
 en met een gekozen einddatum voor de start van de laatste herhaling. Als een
@@ -69,6 +72,9 @@ afspraak per reeks. Kies bij bewerken of verwijderen voor één afspraak of de
 hele reeks. Uitzonderingen blijven bestaan als de reeks wordt aangepast; een
 reeks met uitzonderingen kan niet worden omgezet naar een eenmalige afspraak.
 De huidige dag is gemarkeerd in de maandkalender.
+
+### Statistieken
+
 Onder **Ons gezin** staat ook de aanmaakdatum van elk gezinslid. Via
 **Statistieken bekijken** zie je hoeveel taakmomenten er vanaf die datum tot
 en met vandaag volgens de huidige planning aan die persoon waren toegewezen,
@@ -87,7 +93,7 @@ bestonden voordat de makerregistratie beschikbaar was, tellen niet mee.
 Voor makerstatistieken moet het account via het e-mailadres aan een gezinslid
 zijn gekoppeld.
 
-## Demo proberen
+### Demo proberen
 
 Kies op het aanmeldscherm **Demo proberen** om zonder account met fictieve
 gezinsleden, taken, boodschappen, gerechten en een notitie te oefenen.
@@ -97,7 +103,7 @@ wijzigingen. Demo-inhoud wordt niet naar de database of een nieuw account
 overgezet. Uitnodigingen, wachtwoordreset en back-ups zijn alleen beschikbaar
 met een echt account. Gebruik geen persoonlijke gegevens in de demo.
 
-## Bestaande browsergegevens overzetten
+### Bestaande browsergegevens overzetten
 
 Maak **vóór het vervangen van de oude versie** via **Instellingen** een
 JSON-export op het apparaat en in de browser waar de gegevens staan. Maak
@@ -108,6 +114,8 @@ De oude browsergegevens worden niet automatisch overgenomen of gewist. Is de
 oude site al vervangen zonder export, dan moet de oude versie weer op
 dezelfde browser-origin (protocol, host en poort) beschikbaar zijn om daar
 de gegevens te kunnen exporteren.
+
+### Gezinsleden en accounts
 
 Via **Bekijken** bij **Ons gezin** op het overzicht kun je gezinsleden
 beheren. Bij elk gezinslid kun je optioneel een geboortedatum en e-mailadres
@@ -122,6 +130,8 @@ blijft zichtbaar totdat je een geboortedatum invult.
 Verjaardagen verschijnen jaarlijks met een taartje in de weekagenda, vanaf de
 eerste verjaardag. Voor 29 februari verschijnt de verjaardag in een
 niet-schrikkeljaar op 1 maart. Verjaardagen tellen niet mee als taken.
+
+#### Uitnodigingen en rollen
 
 Op **Ons gezin** kun je ook gezinsleden uitnodigen voor hetzelfde dashboard.
 Selecteer desgewenst een bestaand gezinslid om het account na acceptatie aan
@@ -144,7 +154,7 @@ nieuw account nodig: een bestaand account kan niet aan een uitnodiging worden
 gekoppeld. Bij acceptatie wordt het e-mailadres van het gekozen profiel
 bijgewerkt naar het e-mailadres waarmee het account inlogt.
 
-### Accounts en wachtwoord
+#### Wachtwoord beheren
 
 Registratie staat open voor iedereen die de site kan bereiken. Het e-mailadres
 is een gebruikersnaam en wordt niet geverifieerd; er is geen e-mailverificatie
@@ -156,7 +166,7 @@ kiezen. Bestaande sessies van dat account worden na de reset beëindigd. Deel de
 link niet openbaar; iedereen die de link ontvangt kan het wachtwoord resetten.
 Bewaar je wachtwoord veilig.
 
-## Notities
+### Notities
 
 Onder de weekplanning op **Overzicht** staat het notitieblok voor het hele
 huishouden. Plaats een notitie met titel en beschrijving; de auteur wordt
@@ -175,7 +185,7 @@ beschrijving laten voorlezen.
 Archiveer notities om ze van het overzicht te halen. Via **Notitiearchief**
 kun je ze herstellen of definitief verwijderen.
 
-## Plannen
+### Plannen
 
 Klik op een taak in **Alle taken** om de planning te bewerken. Per ingepland
 moment is één gezinslid verantwoordelijk:
@@ -187,6 +197,8 @@ moment is één gezinslid verantwoordelijk:
   in een maand, dan wordt die maand overgeslagen.
 - Jaarlijks: kies een gezinslid en eventueel een dag en maand. Het gekozen
   jaartal wordt genegeerd; op 29 februari valt de taak alleen in schrikkeljaren.
+
+#### Belangrijke taken en dagoverzicht
 
 Vink in het taakformulier **Markeer als belangrijk** aan om een taak extra
 opvallend te labelen. Het uitroepteken bij de taak geeft dit aan op het overzicht en in
@@ -214,6 +226,8 @@ Filter op planningsstatus via **Alle statussen** of klik op de kolomkop
 Met het kruisje in het zoekveld maak je de zoektekst leeg zonder de andere
 filters te wijzigen.
 
+#### Gecombineerde taken en synchronisatie
+
 Eerder samengevoegde taken behouden hun schema's en afvinkjes. Hun schema's
 kun je via **bewerken** afzonderlijk aanpassen; bij overlap heeft het eerste
 passende schema voorrang.
@@ -231,7 +245,7 @@ downloaden en daarna herladen. Kindaccounts kunnen herladen; de laatste
 niet-bevestigde wijziging kan dan verloren gaan. Terugzetten van een back-up
 vervangt de servergegevens.
 
-## Boodschappen
+### Boodschappen
 
 Via **Boodschappen** kun je producten toevoegen, afvinken als ze gekocht zijn
 en verwijderen. Afgevinkte producten blijven staan totdat je ze verwijdert en
@@ -241,7 +255,7 @@ Met het vlaggetje naast een product markeer je het als dringend of verwijder je
 die markering. Ook bij afgevinkte producten blijft de markering bewaard. De
 lijst hoort bij je account.
 
-## Kookinspiratie
+### Kookinspiratie
 
 Via **Kookinspiratie** kun je gerechten of voeding toevoegen en verwijderen.
 Vink per gerecht aan welke gezinsleden er zin in hebben; je kunt die wensen
@@ -253,7 +267,9 @@ Kindaccounts kunnen een gerecht met de luidsprekerknop laten voorlezen.
 Bij het verwijderen van een gezinslid verdwijnen diens wensen, maar de
 gerechten blijven staan. De lijst hoort bij je account.
 
-## Instellingen en back-up
+### Instellingen en back-up
+
+#### Teksten en kleuren
 
 Via **Instellingen** kun je de titel van de website (standaard **Ons
 huishouden**), de ondertekst van het logo (standaard **SAMEN THUIS**), de
@@ -265,6 +281,8 @@ Je kunt op deze pagina ook kiezen uit de kleurenpaletten Bosgroen,
 Oceaanblauw, Lavendel en Terracotta. Het gekozen palet wordt per login
 opgeslagen, geldt ook in de donkere modus en verandert de weergave voor andere
 gezinsaccounts niet. Bestaande accounts beginnen met Bosgroen.
+
+#### Sessie en spraak
 
 In het vak **Sessie en spraak** worden de selectievakjes meteen opgeslagen
 zodra je ze aan- of uitvinkt. **Deze sessie is voor iedereen in het gezin**
@@ -281,6 +299,8 @@ melding zolang de optie actief is. Ouders kunnen in hetzelfde vak
 **Spreekknoppen ook tonen voor volwassenen** aan- of uitzetten; kindaccounts
 houden hun spreekknoppen.
 
+#### Back-ups
+
 Je kunt hier ook handmatig een JSON-bestand downloaden met gezinsleden, taken,
 planningen, afvinkjes, boodschappen, kookinspiratie, notities en persoonlijke teksten.
 Bewaar dit bestand veilig: het bevat persoonlijke gegevens. Je voorkeur voor
@@ -296,14 +316,14 @@ begint de boodschappenlijst leeg. Boodschappen uit oudere back-ups zonder
 dringendheidsmarkering zijn niet dringend.
 Bij oudere back-ups zonder kookinspiratie begint die lijst leeg.
 
-## Help voor gebruikers
+### Help voor gebruikers
 
 In de app vind je via **Help** een praktische uitleg over aanmelden, het
 overzicht en taken, gedeelde post-itnotities en hun driepuntjesmenu,
 gezinsleden uitnodigen, boodschappen, kookinspiratie, de vier persoonlijke
 kleurenpaletten, instellingen, back-ups en het gebruik op meerdere apparaten.
 
-## Weergave
+### Weergave
 
 Met de knop **Donker** bovenaan schakel je donkere modus in. Met **Licht**
 schakel je terug. Je keuze wordt afzonderlijk in de lokale browser bewaard.
