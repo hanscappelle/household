@@ -63,6 +63,7 @@ let memberFilter = 'all';
 let statusFilter = 'all';
 let statusSort = 'none';
 let pendingTaskCompletion = null;
+let pendingBackupRestore = null;
 let toastTimer;
 
 function applyTheme(theme) {
@@ -1324,7 +1325,7 @@ function renderBackup() {
       <div id="session-settings-error" role="alert"></div>
     </section>
     ${isChild() ? '' : demoMode ? '<div class="panel backup-panel"><h2>Back-up</h2><p>Back-ups downloaden en terugzetten zijn beschikbaar met een account, niet in de demo.</p></div>' : `<div class="panel backup-panel"><h2>Back-up downloaden</h2><p>Download een JSON-bestand met gezinsleden, taken, afspraken, planningen, afvinkjes, boodschappen, kookinspiratie en notities. Bewaar dit bestand op een veilige plek: het bevat persoonlijke gegevens.</p><button class="button" data-action="export-backup">Back-up downloaden</button></div>
-    <div class="panel backup-panel"><h2>Back-up terugzetten</h2><p>Een back-up terugzetten vervangt de huidige gegevens van je account. Download eventueel eerst een back-up van de huidige gegevens.</p><label for="backup-file" class="field-label">JSON-bestand kiezen</label><input id="backup-file" type="file" accept=".json,application/json"><button class="button secondary" data-action="import-backup">Back-up terugzetten</button></div>`}`;
+    <div class="panel backup-panel backup-restore-warning"><h2>Back-up terugzetten</h2><p class="backup-warning"><strong>Let op:</strong> het terugzetten van een back-up wist alle huidige gegevens en instellingen in deze sessie en vervangt deze volledig door alle gegevens uit het gekozen bestand. Download eerst een back-up als je de huidige situatie wilt bewaren.</p><label for="backup-file" class="field-label">JSON-bestand kiezen</label><input id="backup-file" type="file" accept=".json,application/json"><button class="button secondary" data-action="import-backup">Back-up terugzetten</button></div>`}`;
 }
 
 function renderHelp() {
@@ -1550,6 +1551,14 @@ function exportBackup() {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+function backupReplaceCounts(current, restored) {
+  return {
+    members: { current: current.members?.length || 0, restored: restored.members?.length || 0 },
+    tasks: { current: current.tasks?.length || 0, restored: restored.tasks?.length || 0 },
+    appointments: { current: current.appointments?.length || 0, restored: restored.appointments?.length || 0 }
+  };
+}
+
 async function importBackup() {
   const file = document.querySelector('#backup-file').files[0];
   if (!file) { alert('Kies eerst een JSON-back-upbestand.'); return; }
@@ -1561,15 +1570,11 @@ async function importBackup() {
     alert(`De back-up kon niet worden teruggezet: ${error.message}`);
     return;
   }
-  if (!confirm('De huidige gegevens van je account worden volledig vervangen. Wil je deze back-up terugzetten?')) return;
-  if (!await save(restored, { mergeOnConflict: false })) return;
-  state = restored;
-  taskSearch = '';
-  frequencyFilter = 'all';
-  memberFilter = 'all';
-  statusFilter = 'all';
-  statusSort = 'none';
-  render();
+  const counts = backupReplaceCounts(state, restored);
+  pendingBackupRestore = restored;
+  document.querySelector('#modal-content').innerHTML = `<div class="modal-inner backup-confirmation"><div class="modal-head"><div><h2 id="modal-title">Back-up terugzetten?</h2><p>Alle huidige gegevens en instellingen worden gewist en vervangen.</p></div><button type="button" class="close" data-action="close-modal" aria-label="Sluiten">×</button></div><div class="backup-count-warning"><strong>Wat wordt vervangen</strong><table><thead><tr><th>Gegevens</th><th>Nu in deze sessie</th><th>Uit back-up</th></tr></thead><tbody><tr><th scope="row">Gezinsleden</th><td>${counts.members.current}</td><td>${counts.members.restored}</td></tr><tr><th scope="row">Taken</th><td>${counts.tasks.current}</td><td>${counts.tasks.restored}</td></tr><tr><th scope="row">Afspraken</th><td>${counts.appointments.current}</td><td>${counts.appointments.restored}</td></tr></tbody></table></div><div class="modal-actions"><button type="button" class="button secondary" data-action="close-modal">Annuleren</button><button type="button" class="button danger" data-action="confirm-import-backup">Back-up terugzetten</button></div></div>`;
+  document.querySelector('#modal').showModal();
+  document.querySelector('[data-action="confirm-import-backup"]').focus();
   showToast('Back-up teruggezet');
 }
 
@@ -1841,6 +1846,7 @@ document.addEventListener('keydown', event => {
 const modalDialog = document.querySelector('#modal');
 modalDialog.addEventListener('close', () => {
   pendingTaskCompletion = null;
+  pendingBackupRestore = null;
 });
 modalDialog.addEventListener('click', event => {
   if (event.target === modalDialog) modalDialog.close();
@@ -1904,6 +1910,20 @@ document.addEventListener('click', async event => {
   }
   if (action === 'export-backup') exportBackup();
   if (action === 'import-backup') await importBackup();
+  if (action === 'confirm-import-backup') {
+    const restored = pendingBackupRestore;
+    pendingBackupRestore = null;
+    document.querySelector('#modal').close();
+    if (!restored || !await save(restored, { mergeOnConflict: false })) return;
+    state = restored;
+    taskSearch = '';
+    frequencyFilter = 'all';
+    memberFilter = 'all';
+    statusFilter = 'all';
+    statusSort = 'none';
+    render();
+    showToast('Back-up teruggezet');
+  }
   if (action === 'reset-customization') {
     const nextState = { ...state, customization: { ...state.customization, ...CUSTOM_TEXT_DEFAULTS } };
     if (await save(nextState)) {
@@ -2010,6 +2030,7 @@ document.addEventListener('click', async event => {
   }
   if (action === 'close-modal') {
     pendingTaskCompletion = null;
+    pendingBackupRestore = null;
     document.querySelector('#modal').close();
   }
   if (action === 'task-completion-answer') {

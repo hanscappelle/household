@@ -310,8 +310,11 @@ Bewaar dit bestand veilig: het bevat persoonlijke gegevens. Je voorkeur voor
 lichte of donkere modus en je persoonlijke kleurenpalet staan niet in de back-up.
 
 Kies op dezelfde pagina een eerder gedownload bestand en klik op **Back-up
-terugzetten**. Na bevestiging worden de huidige gegevens van je huishouden
-vervangen, niet samengevoegd. Maak eventueel eerst een back-up van de huidige
+terugzetten**. Op deze pagina staat voortdurend een duidelijke waarschuwing dat
+alle huidige gegevens en instellingen in de sessie worden gewist en volledig door
+de back-up worden vervangen, niet samengevoegd. Daarna toont het bevestigingsvenster
+naast elkaar hoeveel gezinsleden, taken en afspraken er nu zijn tegenover hoeveel
+ze uit de gekozen back-up worden. Maak eventueel eerst een back-up van de huidige
 gegevens. Een JSON-back-up wordt niet automatisch gemaakt of bijgewerkt. Zorg daarnaast
 als beheerder voor regelmatige databaseback-ups en test het terugzetten.
 Oudere back-ups zonder boodschappen kunnen ook worden teruggezet; daarbij

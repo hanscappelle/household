@@ -23,9 +23,23 @@ vm.runInContext(
   app.slice(app.indexOf('function validateMealIdeas('), app.indexOf('let state = null;')) +
   app.slice(app.indexOf('function dateKey('), app.indexOf('function addDays(')) +
   app.slice(app.indexOf('function validBackupDate('), app.indexOf('function exportBackup(')) +
-  app.slice(app.indexOf('function readSchedule('), app.indexOf('function clearTaskAssignments(')),
+  app.slice(app.indexOf('function readSchedule('), app.indexOf('function clearTaskAssignments(')) +
+  app.slice(app.indexOf('function backupReplaceCounts('), app.indexOf('async function importBackup(')),
   context
 );
+
+test('backup replacement counts current and restored members, tasks and appointments', () => {
+  const counts = context.backupReplaceCounts(
+    { members: [{ id: 'm1' }, { id: 'm2' }], tasks: [{ id: 't1' }], appointments: [{ id: 'a1' }, { id: 'a2' }, { id: 'a3' }] },
+    { members: [{ id: 'm3' }], tasks: [{ id: 't1' }, { id: 't2' }], appointments: [] }
+  );
+  assert.equal(counts.members.current, 2);
+  assert.equal(counts.members.restored, 1);
+  assert.equal(counts.tasks.current, 1);
+  assert.equal(counts.tasks.restored, 2);
+  assert.equal(counts.appointments.current, 3);
+  assert.equal(counts.appointments.restored, 0);
+});
 
 test('a concurrent completion of a deleted task cannot be saved as a merge', () => {
   const base = {
