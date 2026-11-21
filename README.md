@@ -4,52 +4,9 @@ Een dashboard voor huishoudelijke taken en de planning per gezinslid.
 Een huishouden deelt één dataset in een MySQL/MariaDB-database; elk gezinslid
 kan met een eigen account inloggen.
 
-Live versie: <https://betyre.alwaysdata.net/household/>
+Publicatie: <https://betyre.alwaysdata.net/household/>
 
-## Lokaal starten
-
-Benodigd: Node.js 20.6 of nieuwer, npm en een draaiende MySQL- of
-MariaDB-server. Maak eerst een lege database en een databasegebruiker met
-rechten daarop. Installeer daarna de dependencies:
-
-```sh
-npm ci
-```
-
-Maak buiten de projectmap een privébestand met bijvoorbeeld de naam
-`household.env` en pas de waarden aan:
-
-```dotenv
-DB_HOST=localhost
-DB_PORT=3306
-DB_NAME=household
-DB_USER=household
-DB_PASSWORD="eigen-databasewachtwoord"
-APP_ORIGIN=http://localhost:3000
-PORT=3000
-# Optioneel, alleen bij een submap:
-# APP_BASE_PATH=/household
-```
-
-Gebruik de juiste waarden en beveilig dit bestand, bijvoorbeeld met
-`chmod 600 /pad/naar/household.env`. Start vanuit de projectmap:
-
-```sh
-node --env-file=/pad/naar/household.env server.js
-```
-
-Open <http://localhost:3000>, maak een account met een e-mailadres en een
-wachtwoord van minimaal 12 tekens en log in. `APP_ORIGIN` moet exact overeenkomen
-met het adres in de browser, inclusief protocol en eventuele poort, zonder pad
-of afsluitende slash. De server luistert standaard alleen lokaal. `IP` (of
-`HOST`) en `PORT` bepalen het luisteradres; op een host achter een proxy stelt
-de host deze vaak zelf in. Voor een lokale Unix-socket kan optioneel
-`DB_SOCKET` worden ingesteld. Stel `DB_SSL=true` in als de databaseserver
-een vertrouwde TLS-verbinding ondersteunt en vereist.
-Voor een submap zet je bijvoorbeeld `APP_BASE_PATH=/household` en open je
-<http://localhost:3000/household/>. Laat deze instelling weg voor de root.
-Gebruik uitsluitend letters, cijfers, `_` en `-` in de padsegmenten, met
-een `/` aan het begin en zonder `/` aan het einde.
+## Gebruik van de app
 
 Bij een nieuw account bevat de app fictieve voorbeeldgegevens: Mama, Papa en
 Kind, zonder geboortedatums, enkele huishoudelijke taken met een
@@ -129,93 +86,6 @@ wijzigingen. Demo-inhoud wordt niet naar de database of een nieuw account
 overgezet. Uitnodigingen, wachtwoordreset en back-ups zijn alleen beschikbaar
 met een echt account. Gebruik geen persoonlijke gegevens in de demo.
 
-## Hostingsconfiguratie: alwaysdata
-
-1. Maak bij **Databases > MySQL** een MariaDB/MySQL-database en gebruiker
-   met alle rechten op die database. Noteer de volledige databasenaam,
-   gebruikersnaam, het wachtwoord en de servernaam; die is doorgaans
-   `mysql-[account].alwaysdata.net`, poort 3306.
-2. Upload de projectbestanden naar bijvoorbeeld `/home/[account]/household`
-   en voer via SSH in die map `npm ci --omit=dev` uit. Kies bij
-   **Environment > Node.js** een ondersteunde Node.js-versie (minimaal 20.6).
-3. Maak bijvoorbeeld `/home/[account]/household.env` aan met dezelfde
-   variabelen als hierboven, maar met de databasegegevens van alwaysdata en
-   `APP_ORIGIN=https://[account].alwaysdata.net` (of je eigen HTTPS-domein).
-   Wil je de app op `https://[account].alwaysdata.net/household/` gebruiken,
-   voeg dan `APP_BASE_PATH=/household` toe. Zet het pad **niet** in
-   `APP_ORIGIN`: dat bevat alleen protocol en domein.
-   Vervang de placeholders, laat `PORT` en `IP` weg zodat alwaysdata deze
-   bepaalt, en maak het bestand alleen leesbaar voor je account met
-   `chmod 600 /home/[account]/household.env`. Zet geen wachtwoorden in
-   broncode of Git.
-4. Maak bij **Web > Sites** een site van het type **Node.js**, koppel het
-   gewenste domein en gebruik als startcommando:
-
-   ```sh
-   node --env-file=/home/[account]/household.env /home/[account]/household/server.js
-   ```
-
-   De server maakt de tabellen bij de eerste start automatisch aan. Bekijk
-   bij problemen de sitelog en controleer databasegegevens en rechten.
-5. Activeer onder **Web > Sites > Modify > SSL** de optie **Force HTTPS**.
-   alwaysdata verzorgt certificaten voor gekoppelde adressen; wacht bij een
-   eigen domein zo nodig op DNS en certificaatuitgifte. Open de HTTPS-site en
-   maak een account aan.
-
-### App onder een submap bereikbaar maken
-
-De instelling `APP_BASE_PATH` zorgt dat de Node-app zelf reageert op de
-ingestelde submap, maar configureert **niet** de routing bij de hosting. De
-requests naar `/household` en `/household/` en alle onderliggende paden,
-waaronder `/household/api/`, moeten bij het Node-proces terechtkomen met
-het pad ongewijzigd. De app stuurt `/household` door naar `/household/`.
-Een submap in `/home/[account]/www` plaatsen of een statische/PHP-site
-instellen voert `server.js` niet uit.
-
-Als het domein volledig aan de Node.js-site is toegewezen, kan die site
-deze requests zelf ontvangen. De app serveert dan alleen `/household/` en
-niet de rest van het domein. Staat er al een andere site op het domein,
-dan moet die bestaande site of een reverse proxy specifiek `/household`
-naar het Node-proces doorsturen en de overige paden ongemoeid laten.
-Hoe dit bij alwaysdata kan hangt af van het sitetype en de mogelijkheden
-van het account; controleer dit bij alwaysdata of vraag hun support. Stel
-dit niet in door simpelweg de bestaande site te vervangen als die behouden
-moet blijven. Gebruik een privé luisteradres en stel de proxy zo in dat
-het publieke HTTPS-adres en de originele `Origin`-header behouden blijven.
-
-Zie ook de officiële instructies voor
-[Node.js](https://help.alwaysdata.com/en/docs/web-hosting/languages/nodejs/configuration/),
-[MariaDB](https://help.alwaysdata.com/en/docs/web-hosting/databases/mariadb/)
-en [Force HTTPS](https://help.alwaysdata.com/en/docs/web-hosting/sites/ssl-tls/redirect-http-to-https/).
-
-## Andere hosting en beveiliging
-
-Gebruik een host die een blijvend Node.js-proces en MySQL/MariaDB ondersteunt,
-niet alleen statische hosting. Installeer met `npm ci --omit=dev`, configureer
-dezelfde omgevingsvariabelen en start `node server.js` met een procesbeheerder.
-Plaats een HTTPS-reverse-proxy voor de app, stuur HTTP door naar HTTPS en stel
-`APP_ORIGIN` in op de publieke HTTPS-origin. Voor een submap stel je daarnaast
-`APP_BASE_PATH` in en stuur je het volledige pad ongewijzigd door naar Node.
-Alleen voor lokaal testen is HTTP
-op `localhost` of `127.0.0.1` toegestaan. Stel `TRUST_PROXY` alleen in als de
-exacte betrouwbare proxyadressen bekend zijn; zonder deze instelling kan de
-aanmeldlimiet achter een proxy voor alle gebruikers samen gelden.
-
-Registratie staat open voor iedereen die de site kan bereiken. Het e-mailadres
-is een gebruikersnaam en wordt niet geverifieerd; er is geen e-mailverificatie
-of zelfstandig wachtwoordherstel via e-mail. Een ouder kan op **Ons gezin** bij
-een ander account in hetzelfde huishouden een eenmalige resetlink maken. Deel
-die link rechtstreeks met de betreffende gebruiker: de link is één uur geldig,
-wordt na gebruik onbruikbaar en laat de gebruiker zelf een nieuw wachtwoord
-kiezen. Bestaande sessies van dat account worden na de reset beëindigd. Deel de
-link niet openbaar; iedereen die de link ontvangt kan het wachtwoord resetten.
-Bewaar je wachtwoord veilig. Wachtwoorden worden met scrypt gehasht; sessies
-verlopen na zeven dagen. Aanmeldpogingen zijn per proces en IP beperkt, dus
-voor publieke of grotere installaties zijn aanvullende bescherming tegen
-misbruik en monitoring via de hosting/proxy aan te raden. Beheerders van de
-server en database kunnen de opgeslagen gegevens inzien. Beveilig de database,
-de host en de back-ups en houd Node.js en dependencies bijgewerkt.
-
 ## Bestaande browsergegevens overzetten
 
 Maak **vóór het vervangen van de oude versie** via **Instellingen** een
@@ -262,6 +132,18 @@ Een genodigde heeft een
 nieuw account nodig: een bestaand account kan niet aan een uitnodiging worden
 gekoppeld. Bij acceptatie wordt het e-mailadres van het gekozen profiel
 bijgewerkt naar het e-mailadres waarmee het account inlogt.
+
+### Accounts en wachtwoord
+
+Registratie staat open voor iedereen die de site kan bereiken. Het e-mailadres
+is een gebruikersnaam en wordt niet geverifieerd; er is geen e-mailverificatie
+of zelfstandig wachtwoordherstel via e-mail. Een ouder kan op **Ons gezin** bij
+een ander account in hetzelfde huishouden een eenmalige resetlink maken. Deel
+die link rechtstreeks met de betreffende gebruiker: de link is één uur geldig,
+wordt na gebruik onbruikbaar en laat de gebruiker zelf een nieuw wachtwoord
+kiezen. Bestaande sessies van dat account worden na de reset beëindigd. Deel de
+link niet openbaar; iedereen die de link ontvangt kan het wachtwoord resetten.
+Bewaar je wachtwoord veilig.
 
 ## Notities
 
@@ -421,20 +303,95 @@ Bij het invoeren of bewerken krijgen taken, boodschappen, gerechten,
 gezinsnamen, notitietitels en gepersonaliseerde teksten automatisch een
 hoofdletter aan het begin. Bestaande gegevens worden niet ongevraagd gewijzigd.
 
-## Testen
+De Android-app heeft een groen launchericoon met een huisje en opent de
+gepubliceerde webversie (zie de link bovenaan) in een ingebouwde WebView. De app
+gebruikt dezelfde webversie en vereist geen aparte API. Aanmelden en sessies
+werken binnen de WebView; links naar andere websites openen in de browser.
+Back-ups downloaden en terugzetten gebruiken de bestandskiezer van Android.
+Veeg bovenaan de pagina omlaag om de huidige pagina te vernieuwen.
+
+## Project opzetten en technische informatie
+
+### Lokaal starten
+
+Benodigd: Node.js 20.6 of nieuwer, npm en een draaiende MySQL- of
+MariaDB-server. Maak eerst een lege database en een databasegebruiker met
+rechten daarop. Installeer daarna de dependencies:
+
+```sh
+npm ci
+```
+
+Maak buiten de projectmap een privébestand met bijvoorbeeld de naam
+`household.env` en pas de waarden aan:
+
+```dotenv
+DB_HOST=localhost
+DB_PORT=3306
+DB_NAME=household
+DB_USER=household
+DB_PASSWORD="eigen-databasewachtwoord"
+APP_ORIGIN=http://localhost:3000
+PORT=3000
+# Optioneel, alleen bij een submap:
+# APP_BASE_PATH=/household
+```
+
+Gebruik de juiste waarden en beveilig dit bestand, bijvoorbeeld met
+`chmod 600 /pad/naar/household.env`. Start vanuit de projectmap:
+
+```sh
+node --env-file=/pad/naar/household.env server.js
+```
+
+Open <http://localhost:3000>, maak een account met een e-mailadres en een
+wachtwoord van minimaal 12 tekens en log in. `APP_ORIGIN` moet exact overeenkomen
+met het adres in de browser, inclusief protocol en eventuele poort, zonder pad
+of afsluitende slash. De server luistert standaard alleen lokaal. `IP` (of
+`HOST`) en `PORT` bepalen het luisteradres; op een host achter een proxy stelt
+de host deze vaak zelf in. Voor een lokale Unix-socket kan optioneel
+`DB_SOCKET` worden ingesteld. Stel `DB_SSL=true` in als de databaseserver
+een vertrouwde TLS-verbinding ondersteunt en vereist.
+Voor een submap zet je bijvoorbeeld `APP_BASE_PATH=/household` en open je
+<http://localhost:3000/household/>. Laat deze instelling weg voor de root.
+Gebruik uitsluitend letters, cijfers, `_` en `-` in de padsegmenten, met
+een `/` aan het begin en zonder `/` aan het einde.
+
+### Publiceren en beveiliging
+
+Gebruik een host die een blijvend Node.js-proces en MySQL/MariaDB ondersteunt,
+niet alleen statische hosting. Installeer met `npm ci --omit=dev`, configureer
+dezelfde omgevingsvariabelen en start `node server.js` met een procesbeheerder.
+Plaats een HTTPS-reverse-proxy voor de app, stuur HTTP door naar HTTPS en stel
+`APP_ORIGIN` in op de publieke HTTPS-origin. Voor een submap stel je daarnaast
+`APP_BASE_PATH` in en stuur je het volledige pad ongewijzigd door naar Node.
+Alleen voor lokaal testen is HTTP op `localhost` of `127.0.0.1` toegestaan.
+Stel `TRUST_PROXY` alleen in als de exacte betrouwbare proxyadressen bekend
+zijn; zonder deze instelling kan de aanmeldlimiet achter een proxy voor alle
+gebruikers samen gelden.
+
+`APP_BASE_PATH` configureert alleen de app, niet de routing van de proxy. Stuur
+de requests naar `/household`, `/household/` en alle onderliggende paden,
+waaronder `/household/api/`, ongewijzigd door naar het Node-proces. De app stuurt
+`/household` door naar `/household/`. Als er al een andere site op het domein
+staat, moet de proxy alleen dit pad naar Node doorsturen en de overige paden
+ongemoeid laten. Gebruik een privé luisteradres en behoud het publieke
+HTTPS-adres en de originele `Origin`-header.
+
+Wachtwoorden worden met scrypt gehasht; sessies verlopen na zeven dagen.
+Aanmeldpogingen zijn per proces en IP beperkt, dus
+voor publieke of grotere installaties zijn aanvullende bescherming tegen
+misbruik en monitoring via de hosting/proxy aan te raden. Beheerders van de
+server en database kunnen de opgeslagen gegevens inzien. Beveilig de database,
+de host en de back-ups en houd Node.js en dependencies bijgewerkt.
+
+### Testen
 
 Stel de databasevariabelen in voor een afzonderlijke testdatabase en voer
 `npm test` uit. De integratietest maakt tijdelijke testaccounts aan en
 verwijdert deze weer. Zonder databaseconfiguratie wordt de test overgeslagen.
 
-## Android-app
-
-De Android-app heeft een groen launchericoon met een huisje en opent het dashboard op
-<https://betyre.alwaysdata.net/household/> in een ingebouwde WebView. De app
-gebruikt dezelfde webversie en vereist geen aparte API. Aanmelden en sessies
-werken binnen de WebView; links naar andere websites openen in de browser.
-Back-ups downloaden en terugzetten gebruiken de bestandskiezer van Android.
-Veeg bovenaan de pagina omlaag om de huidige pagina te vernieuwen.
+### Android-app bouwen
 
 Open de map `android` in Android Studio en bouw of start de app op een
 Android-apparaat of emulator. Je kunt vanuit die map ook
@@ -445,11 +402,15 @@ toe.
 De nieuwste Android-debugversie is beschikbaar als
 [APK-download](release/household-debug.apk) in de map `release`.
 
-## Niet doen
+### Projectnotities
+
+#### Niet doen
+
 - Samenvoegen van taken vanuit UI, onnodig complex en weinig meerwaarde.
 - Apart dashboard per gezinslid, ook hier veel te complex en weinig meerwaarde, hooguit beperkingen voor kind rol.
 
-## Nog te bekijken
+#### Nog te bekijken
+
 - app vertaling voorzien
 - feature requests voorzien (link naar github)
 - opensource project, github
