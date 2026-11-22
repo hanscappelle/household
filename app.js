@@ -1237,7 +1237,19 @@ function renderTasks() {
 function renderFamily() {
   const roles = { owner: 'Ouder', parent: 'Ouder', partner: 'Ouder', child: 'Kind' };
   return `<div class="page-heading"><div><h1>Ons gezin</h1><p>Iedereen draagt op zijn eigen manier bij.</p></div>${isChild() ? '' : '<button class="button" data-action="new-member"><span class="plus">+</span> Gezinslid toevoegen</button>'}</div>
-    <div class="members-grid">${state.members.map((member, index) => `<div class="panel member-card">${avatar(member, index)}<h3>${escapeHtml(member.name)}</h3><p>${escapeHtml(memberDetails(member))}${member.email ? `<br>${escapeHtml(member.email)}` : ''}<br>${state.tasks.filter(task => assignedMemberIds(task).includes(member.id)).length} toegewezen taken</p><p class="member-created"><strong>Aangemaakt:</strong> ${escapeHtml(createdDateLabel(member))}</p><a class="text-button member-stats-link" href="#statistieken/${encodeURIComponent(member.id)}">Statistieken bekijken →</a>${isChild() ? '' : `<button class="text-button" data-action="edit-member" data-id="${escapeHtml(member.id)}">Gegevens bewerken →</button>`}</div>`).join('')}</div>
+    <div class="members-grid">${state.members.map((member, index) => {
+      const statistics = memberStatistics(member);
+      return `<div class="panel member-card">${avatar(member, index)}<h3>${escapeHtml(member.name)}</h3><p>${escapeHtml(memberDetails(member))}${member.email ? `<br>${escapeHtml(member.email)}` : ''}<br>${state.tasks.filter(task => assignedMemberIds(task).includes(member.id)).length} toegewezen taken</p>
+        <section class="member-task-statistics" aria-label="Taakstatistieken">
+          <h4>Taken sinds aanmaak</h4>
+          ${statistics ? `<div class="member-task-statistics-grid">
+            <div class="member-task-statistic"><strong>${statistics.completed}</strong><span>Uitgevoerde taken</span></div>
+            <div class="member-task-statistic"><strong>${statistics.scheduled}</strong><span>Ingeplande taken</span></div>
+            <div class="member-task-statistic"><strong>${statistics.completedLate}</strong><span>Te laat uitgevoerd</span></div>
+          </div>` : '<p class="member-statistics-unavailable">Niet beschikbaar zonder aanmaakdatum.</p>'}
+        </section>
+        <p class="member-created"><strong>Aangemaakt:</strong> ${escapeHtml(createdDateLabel(member))}</p><a class="text-button member-stats-link" href="#statistieken/${encodeURIComponent(member.id)}">Statistieken bekijken →</a>${isChild() ? '' : `<button class="text-button" data-action="edit-member" data-id="${escapeHtml(member.id)}">Gegevens bewerken →</button>`}</div>`;
+    }).join('')}</div>
     ${demoMode ? '<div class="panel backup-panel"><h2>Gezinsaccounts</h2><p>Uitnodigingen en wachtwoordreset zijn beschikbaar nadat je een account hebt aangemaakt.</p></div>' : `<section class="household-access">
       <div class="section-heading"><div><h2>Samen in hetzelfde dashboard</h2><p>Nodig je partner of kinderen uit met hun eigen e-mailadres en wachtwoord.</p></div></div>
       <div class="panel backup-panel">

@@ -76,7 +76,8 @@ De huidige dag is gemarkeerd in de maandkalender.
 
 ### Statistieken
 
-Onder **Ons gezin** staat ook de aanmaakdatum van elk gezinslid. Via
+Op elke tegel onder **Ons gezin** staan het aantal uitgevoerde, ingeplande en
+te laat uitgevoerde taken sinds de aanmaakdatum van dat gezinslid. Via
 **Statistieken bekijken** zie je hoeveel taakmomenten er vanaf die datum tot
 en met vandaag volgens de huidige planning aan die persoon waren toegewezen,
 hoeveel daarvan zijn afgevinkt en hoeveel daarvan te laat zijn afgevinkt. Een
