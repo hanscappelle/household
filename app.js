@@ -872,7 +872,37 @@ function renderMemberStatistics(member) {
       <div class="stat"><span class="stat-icon">✓</span><div><strong>${statistics.completed}</strong><small>Uitgevoerde taken</small></div></div>
       <div class="stat"><span class="stat-icon">!</span><div><strong>${statistics.completedLate}</strong><small>Te laat uitgevoerde taken</small></div></div>
       ${statistics.creations.map(({ label, count, percentage }) => `<div class="stat"><span class="stat-icon">＋</span><div><strong>${count}</strong><small>${escapeHtml(label)} · ${percentage}% van gezin</small></div></div>`).join('')}
-    </div><p class="member-statistics-note">Taken zijn geteld op basis van de huidige planning en opgeslagen afvinkjes. Te laat uitgevoerde taken worden toegerekend aan de gezinsleden voor wie ze op de geplande dag waren ingepland, ongeacht wie ze heeft afgevinkt. De percentages zijn het aandeel van alle geregistreerde aanmaakacties in die categorie sinds de aanmaakdatum. Oudere items zonder makerregistratie tellen niet mee. Voor makerstatistieken moet het account via het e-mailadres aan een gezinslid zijn gekoppeld.</p>` : '<div class="panel member-statistics-empty">Er zijn nog geen statistieken te berekenen. Vul de aanmaakdatum in via <a href="#gezin">Ons gezin</a> → <strong>Gegevens bewerken</strong>.</div>'}`;
+    </div>${renderMemberStatisticsChart(member, statistics)}<p class="member-statistics-note">Taken zijn geteld op basis van de huidige planning en opgeslagen afvinkjes. Te laat uitgevoerde taken worden toegerekend aan de gezinsleden voor wie ze op de geplande dag waren ingepland, ongeacht wie ze heeft afgevinkt. De percentages zijn het aandeel van alle geregistreerde aanmaakacties in die categorie sinds de aanmaakdatum. Oudere items zonder makerregistratie tellen niet mee. Voor makerstatistieken moet het account via het e-mailadres aan een gezinslid zijn gekoppeld.</p>` : '<div class="panel member-statistics-empty">Er zijn nog geen statistieken te berekenen. Vul de aanmaakdatum in via <a href="#gezin">Ons gezin</a> → <strong>Gegevens bewerken</strong>.</div>'}`;
+}
+
+function renderMemberStatisticsChart(selectedMember, selectedStatistics) {
+  const comparison = state.members.map(member => ({
+    member,
+    statistics: member.id === selectedMember.id ? selectedStatistics : memberStatistics(member)
+  }));
+  const metrics = [
+    { key: 'scheduled', label: 'Ingeplande taken' },
+    { key: 'completed', label: 'Uitgevoerde taken' },
+    { key: 'completedLate', label: 'Te laat uitgevoerde taken' }
+  ];
+  return `<section class="panel member-comparison" aria-labelledby="member-comparison-title">
+    <h2 id="member-comparison-title">Vergelijking met gezin</h2>
+    <p>Aantallen per gezinslid sinds diens aanmaakdatum. Gezinsleden zonder aanmaakdatum worden zonder waarde getoond.</p>
+    <div class="member-comparison-metrics">${metrics.map(({ key, label }) => {
+      const available = comparison.filter(item => item.statistics);
+      const maximum = Math.max(0, ...available.map(item => item.statistics[key]));
+      return `<section class="member-comparison-metric"><h3>${label}</h3><ul>${comparison.map(({ member, statistics }) => {
+        const selected = member.id === selectedMember.id;
+        const value = statistics?.[key];
+        const width = value == null || maximum === 0 ? 0 : value / maximum * 100;
+        return `<li class="member-comparison-row${selected ? ' selected' : ''}">
+          <a class="member-comparison-name" href="#statistieken/${encodeURIComponent(member.id)}"${selected ? ' aria-current="page"' : ''}>${escapeHtml(member.name)}${selected ? '<span class="member-comparison-selected">dit gezinslid</span>' : ''}</a>
+          <span class="member-comparison-bar" aria-hidden="true"><span style="width:${width}%"></span></span>
+          <strong>${value == null ? '–' : value}</strong>
+        </li>`;
+      }).join('')}</ul></section>`;
+    }).join('')}</div>
+  </section>`;
 }
 
 function renderDashboard() {

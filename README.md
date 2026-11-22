@@ -81,6 +81,9 @@ te laat uitgevoerde taken sinds de aanmaakdatum van dat gezinslid. Via
 **Statistieken bekijken** zie je hoeveel taakmomenten er vanaf die datum tot
 en met vandaag volgens de huidige planning aan die persoon waren toegewezen,
 hoeveel daarvan zijn afgevinkt en hoeveel daarvan te laat zijn afgevinkt. Een
+grafiek op die pagina vergelijkt deze drie aantallen met die van de andere
+gezinsleden; ieder aantal loopt vanaf de eigen aanmaakdatum van het gezinslid.
+Gezinsleden zonder aanmaakdatum staan zonder waarde in de grafiek. Een
 te late taak telt mee voor de gezinsleden aan wie die op de geplande dag was
 toegewezen, ongeacht welk account de taak heeft afgevinkt. Een taak geldt als
 te laat wanneer die na de geplande dag wordt afgevinkt; oudere afvinkjes zonder
