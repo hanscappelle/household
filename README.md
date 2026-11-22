@@ -438,7 +438,7 @@ verwijdert deze weer. Zonder databaseconfiguratie wordt de test overgeslagen.
 
 ### Android-app bouwen
 
-Android-debugversie: [APK downloaden](release/household-debug.apk)
+Android-debugversie: [APK downloaden](release/app-debug.apk)
 
 Open de map `android` in Android Studio en bouw of start de app op een
 Android-apparaat of emulator. Je kunt vanuit die map ook
