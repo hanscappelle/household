@@ -84,6 +84,8 @@ hoeveel daarvan zijn afgevinkt en hoeveel daarvan te laat zijn afgevinkt. Een
 grafiek op die pagina vergelijkt deze drie aantallen met die van de andere
 gezinsleden; ieder aantal loopt vanaf de eigen aanmaakdatum van het gezinslid.
 Gezinsleden zonder aanmaakdatum staan zonder waarde in de grafiek. Een
+klik op een van de drie taakstatistieken toont de bijbehorende taken met hun
+geplande datum en status.
 te late taak telt mee voor de gezinsleden aan wie die op de geplande dag was
 toegewezen, ongeacht welk account de taak heeft afgevinkt. Een taak geldt als
 te laat wanneer die na de geplande dag wordt afgevinkt; oudere afvinkjes zonder

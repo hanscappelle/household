@@ -62,6 +62,7 @@ let frequencyFilter = 'all';
 let memberFilter = 'all';
 let statusFilter = 'all';
 let statusSort = 'none';
+let activeMemberTaskMetric = null;
 let pendingTaskCompletion = null;
 let pendingBackupRestore = null;
 let toastTimer;
@@ -866,13 +867,52 @@ function createdDateLabel(member) {
 
 function renderMemberStatistics(member) {
   const statistics = memberStatistics(member);
+  if (activeMemberTaskMetric?.memberId !== member.id) activeMemberTaskMetric = null;
+  const taskMetrics = [
+    { key: 'scheduled', label: 'Ingeplande taken', icon: '◷' },
+    { key: 'completed', label: 'Uitgevoerde taken', icon: '✓' },
+    { key: 'completedLate', label: 'Te laat uitgevoerde taken', icon: '!' }
+  ];
   return `<div class="page-heading"><div><h1>Statistieken: ${escapeHtml(member.name)}</h1><p>${statistics ? `Vanaf ${createdDateLabel(member)} tot en met vandaag.` : 'De aanmaakdatum van dit gezinslid is nog niet bekend.'}</p></div><a class="button secondary" href="#gezin">← Terug naar ons gezin</a></div>
     ${statistics ? `<div class="stats member-statistics">
-      <div class="stat"><span class="stat-icon">◷</span><div><strong>${statistics.scheduled}</strong><small>Ingeplande taken</small></div></div>
-      <div class="stat"><span class="stat-icon">✓</span><div><strong>${statistics.completed}</strong><small>Uitgevoerde taken</small></div></div>
-      <div class="stat"><span class="stat-icon">!</span><div><strong>${statistics.completedLate}</strong><small>Te laat uitgevoerde taken</small></div></div>
+      ${taskMetrics.map(({ key, label, icon }) => `<button type="button" class="stat member-stat-trigger${activeMemberTaskMetric?.metric === key ? ' active' : ''}" data-action="toggle-member-task-list" data-member-id="${escapeHtml(member.id)}" data-metric="${key}" aria-expanded="${activeMemberTaskMetric?.metric === key}" aria-controls="member-task-list"><span class="stat-icon">${icon}</span><span class="member-stat-trigger-copy"><strong>${statistics[key]}</strong><small>${label}</small></span></button>`).join('')}
       ${statistics.creations.map(({ label, count, percentage }) => `<div class="stat"><span class="stat-icon">＋</span><div><strong>${count}</strong><small>${escapeHtml(label)} · ${percentage}% van gezin</small></div></div>`).join('')}
-    </div>${renderMemberStatisticsChart(member, statistics)}<p class="member-statistics-note">Taken zijn geteld op basis van de huidige planning en opgeslagen afvinkjes. Te laat uitgevoerde taken worden toegerekend aan de gezinsleden voor wie ze op de geplande dag waren ingepland, ongeacht wie ze heeft afgevinkt. De percentages zijn het aandeel van alle geregistreerde aanmaakacties in die categorie sinds de aanmaakdatum. Oudere items zonder makerregistratie tellen niet mee. Voor makerstatistieken moet het account via het e-mailadres aan een gezinslid zijn gekoppeld.</p>` : '<div class="panel member-statistics-empty">Er zijn nog geen statistieken te berekenen. Vul de aanmaakdatum in via <a href="#gezin">Ons gezin</a> → <strong>Gegevens bewerken</strong>.</div>'}`;
+    </div>${activeMemberTaskMetric ? renderMemberTaskTable(member, activeMemberTaskMetric.metric) : '<div id="member-task-list" hidden></div>'}${renderMemberStatisticsChart(member, statistics)}<p class="member-statistics-note">Taken zijn geteld op basis van de huidige planning en opgeslagen afvinkjes. Te laat uitgevoerde taken worden toegerekend aan de gezinsleden voor wie ze op de geplande dag waren ingepland, ongeacht wie ze heeft afgevinkt. De percentages zijn het aandeel van alle geregistreerde aanmaakacties in die categorie sinds de aanmaakdatum. Oudere items zonder makerregistratie tellen niet mee. Voor makerstatistieken moet het account via het e-mailadres aan een gezinslid zijn gekoppeld.</p>` : '<div class="panel member-statistics-empty">Er zijn nog geen statistieken te berekenen. Vul de aanmaakdatum in via <a href="#gezin">Ons gezin</a> → <strong>Gegevens bewerken</strong>.</div>'}`;
+}
+
+function memberTaskOccurrences(member, metric) {
+  if (!validBackupDate(member.createdAt)) return [];
+  const occurrences = [];
+  const start = parseDate(member.createdAt);
+  const end = parseDate(dateKey(new Date()));
+  for (let date = start; date <= end; date = addDays(date, 1)) {
+    for (const task of state.tasks) {
+      if (!occursOn(task, date) || !membersOn(task, date).some(assigned => assigned.id === member.id)) continue;
+      const completed = isDone(task, date, member.id);
+      const completedLate = isLate(task, date, member.id);
+      if (metric === 'completed' && !completed) continue;
+      if (metric === 'completedLate' && !completedLate) continue;
+      occurrences.push({ task, date, completed, completedLate });
+    }
+  }
+  return occurrences;
+}
+
+function renderMemberTaskTable(member, metric) {
+  const labels = {
+    scheduled: 'Ingeplande taken',
+    completed: 'Uitgevoerde taken',
+    completedLate: 'Te laat uitgevoerde taken'
+  };
+  const occurrences = memberTaskOccurrences(member, metric);
+  occurrences.reverse();
+  return `<section class="panel member-task-list" id="member-task-list" aria-labelledby="member-task-list-title">
+    <h2 id="member-task-list-title">${labels[metric]} · ${escapeHtml(member.name)}</h2>
+    ${occurrences.length ? `<div class="member-task-list-scroll"><table class="task-table"><thead><tr><th scope="col">Taak</th><th scope="col">Geplande datum</th><th scope="col">Status</th></tr></thead><tbody>${occurrences.map(({ task, date, completed, completedLate }) => {
+      const status = completedLate ? 'Te laat uitgevoerd' : completed ? 'Op tijd uitgevoerd' : 'Openstaand';
+      return `<tr><td>${escapeHtml(task.title)}</td><td>${escapeHtml(formatDate(date, { day: 'numeric', month: 'long', year: 'numeric' }))}</td><td>${status}</td></tr>`;
+    }).join('')}</tbody></table></div>` : '<p class="member-task-list-empty">Geen taken gevonden.</p>'}
+  </section>`;
 }
 
 function renderMemberStatisticsChart(selectedMember, selectedStatistics) {
@@ -1914,6 +1954,17 @@ document.addEventListener('click', async event => {
     return;
   }
   closeNoteMenus();
+  if (action === 'toggle-member-task-list') {
+    const sameMetric = activeMemberTaskMetric?.memberId === button.dataset.memberId &&
+      activeMemberTaskMetric?.metric === button.dataset.metric;
+    activeMemberTaskMetric = sameMetric ? null : {
+      memberId: button.dataset.memberId,
+      metric: button.dataset.metric
+    };
+    render();
+    document.querySelector(`[data-action="toggle-member-task-list"][data-metric="${button.dataset.metric}"]`)?.focus();
+    return;
+  }
   if (action === 'speak-task' || action === 'speak-member' || action === 'speak-meal' || action === 'speak-appointment' || action === 'speak-note') speakItem(action, button.dataset.id, button.dataset.speechText);
   if (action === 'new-note') openNewNote();
   if (action === 'new-task') openTask();
