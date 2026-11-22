@@ -5,7 +5,7 @@ Een huishouden deelt één dataset in een MySQL/MariaDB-database; elk gezinslid
 kan met een eigen account inloggen.
 
 Web versie: <https://betyre.alwaysdata.net/household/>
-Android-debugversie: [APK downloaden](release/household-debug.apk)
+Android App: <https://play.google.com/store/apps/details?id=be.hcpl.android.bubble&pli=1>
 
 ![Schermafbeelding van het app-overzicht in de demo](release/demo-overview.png)
 
@@ -437,6 +437,8 @@ Stel de databasevariabelen in voor een afzonderlijke testdatabase en voer
 verwijdert deze weer. Zonder databaseconfiguratie wordt de test overgeslagen.
 
 ### Android-app bouwen
+
+Android-debugversie: [APK downloaden](release/household-debug.apk)
 
 Open de map `android` in Android Studio en bouw of start de app op een
 Android-apparaat of emulator. Je kunt vanuit die map ook
