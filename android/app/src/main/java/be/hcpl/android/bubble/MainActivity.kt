@@ -1,4 +1,4 @@
-package nl.betyre.household
+package be.hcpl.android.bubble
 
 import android.app.Activity
 import android.app.AlertDialog
