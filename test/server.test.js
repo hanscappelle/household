@@ -8,9 +8,13 @@ const net = require('node:net');
 const mysql = require('mysql2/promise');
 
 const configured = ['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASSWORD'].every(key => process.env[key]);
+const decodeQuotedPrintable = message => message
+  .replace(/=\r\n/g, '')
+  .replace(/=([0-9A-F]{2})/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
 
 async function startSmtpTestServer() {
   const messages = [];
+  let rejectNextMessage = false;
   const server = net.createServer(socket => {
     socket.setEncoding('utf8');
     socket.write('220 test SMTP ready\r\n');
@@ -26,9 +30,14 @@ async function startSmtpTestServer() {
         if (inData) {
           if (line === '.') {
             inData = false;
-            messages.push(messageLines.join('\r\n'));
+            if (rejectNextMessage) {
+              rejectNextMessage = false;
+              socket.write('550 message rejected\r\n');
+            } else {
+              messages.push(messageLines.join('\r\n'));
+              socket.write('250 message accepted\r\n');
+            }
             messageLines = [];
-            socket.write('250 message accepted\r\n');
           } else {
             messageLines.push(line.startsWith('..') ? line.slice(1) : line);
           }
@@ -54,11 +63,96 @@ async function startSmtpTestServer() {
   return {
     port: server.address().port,
     messages,
+    rejectNextMessage: () => { rejectNextMessage = true; },
     close: () => new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
   };
 }
 
 for (const basePath of ['', '/household']) {
+test(`uitnodigingsmail op ${basePath || '/'}`, { skip: !configured, timeout: 30000 }, async t => {
+  const port = Number(process.env.TEST_PORT || 19877) + (basePath ? 1 : 0);
+  const origin = `http://127.0.0.1:${port}`;
+  const smtp = await startSmtpTestServer();
+  const server = spawn(process.execPath, ['server.js'], {
+    cwd: require('node:path').join(__dirname, '..'),
+    env: {
+      ...process.env, APP_ORIGIN: origin, APP_BASE_PATH: basePath, IP: '127.0.0.1', PORT: String(port), TRUST_PROXY: '',
+      SMTP_HOST: '127.0.0.1', SMTP_PORT: String(smtp.port), SMTP_SECURE: 'false',
+      SMTP_USER: 'test@example.test', SMTP_PASSWORD: 'test-password', SMTP_FROM: 'household@example.test'
+    },
+    stdio: ['ignore', 'pipe', 'pipe']
+  });
+  let output = '';
+  server.stdout.on('data', chunk => { output += chunk; });
+  server.stderr.on('data', chunk => { output += chunk; });
+  const pool = mysql.createPool({
+    host: process.env.DB_HOST, port: Number(process.env.DB_PORT || 3306),
+    socketPath: process.env.DB_SOCKET || undefined,
+    user: process.env.DB_USER, password: process.env.DB_PASSWORD, database: process.env.DB_NAME
+  });
+  const emails = Array.from({ length: 3 }, () => `${randomUUID()}@example.test`);
+  t.after(async () => {
+    await pool.execute('DELETE FROM users WHERE email IN (?, ?, ?)', emails);
+    await pool.end();
+    server.kill();
+    if (server.exitCode === null) await new Promise(resolve => server.once('exit', resolve));
+    await smtp.close();
+  });
+  for (let i = 0; i < 100 && !output.includes('Server luistert'); i++) {
+    if (server.exitCode !== null) throw new Error(output);
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+  assert.match(output, /Server luistert/);
+  async function request(path, { method = 'GET', body, cookie } = {}) {
+    const headers = {};
+    if (method !== 'GET') headers.Origin = origin;
+    if (cookie) headers.Cookie = cookie;
+    if (body !== undefined) headers['Content-Type'] = 'application/json';
+    const response = await fetch(origin + basePath + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+    return { status: response.status, json: await response.json(), cookie: response.headers.get('set-cookie')?.split(';')[0] };
+  }
+
+  const credentials = { email: emails[0], password: 'een-veilig-testwachtwoord' };
+  assert.equal((await request('/api/register', { method: 'POST', body: credentials })).status, 201);
+  const verificationToken = decodeQuotedPrintable(smtp.messages.at(-1)).match(/email-verification=([A-Za-z0-9_-]{43})/)?.[1];
+  assert.ok(verificationToken);
+  assert.equal((await request('/api/email-verifications/complete', { method: 'POST', body: { token: verificationToken } })).status, 200);
+  const parent = await request('/api/login', { method: 'POST', body: credentials });
+  assert.equal(parent.status, 200);
+
+  const inviteBody = { email: emails[1], role: 'child', memberId: 'member-3' };
+  assert.equal((await request('/api/invitations', { method: 'POST', body: inviteBody })).status, 401);
+  const beforeInvitation = smtp.messages.length;
+  const invite = await request('/api/invitations', { method: 'POST', cookie: parent.cookie, body: inviteBody });
+  assert.equal(invite.status, 201);
+  assert.equal(invite.json.emailSent, true);
+  assert.equal(smtp.messages.length, beforeInvitation + 1);
+  const message = decodeQuotedPrintable(smtp.messages.at(-1));
+  assert.ok(message.includes(`To: ${emails[1]}`));
+  assert.ok(message.includes(`${origin}${basePath}/?uitnodiging=${invite.json.token}`));
+  assert.equal((await request('/api/invitations', { method: 'POST', cookie: parent.cookie, body: inviteBody })).status, 409);
+  assert.equal(smtp.messages.length, beforeInvitation + 1);
+  assert.equal((await request(`/api/invitations/${invite.json.token}`)).json.email, emails[1]);
+  const child = await request('/api/invitations/accept', { method: 'POST', body: { token: invite.json.token, password: credentials.password } });
+  assert.equal(child.status, 201);
+  assert.equal((await request('/api/state', { cookie: child.cookie })).json.data.members.find(member => member.id === 'member-3').email, emails[1]);
+  assert.equal((await request('/api/invitations', { method: 'POST', cookie: child.cookie, body: { email: emails[2], role: 'parent' } })).status, 403);
+  assert.equal((await request(`/api/invitations/${invite.json.token}`)).status, 404);
+
+  smtp.rejectNextMessage();
+  const failed = await request('/api/invitations', {
+    method: 'POST', cookie: parent.cookie, body: { email: emails[2], role: 'parent', memberId: null }
+  });
+  assert.equal(failed.status, 201);
+  assert.equal(failed.json.emailSent, false);
+  assert.equal((await request(`/api/invitations/${failed.json.token}`)).json.email, emails[2]);
+  const household = await request('/api/household', { cookie: parent.cookie });
+  const pending = household.json.invitations.find(item => item.email === emails[2]);
+  assert.ok(pending);
+  assert.equal((await request(`/api/invitations/${pending.id}`, { method: 'DELETE', cookie: parent.cookie })).status, 200);
+  assert.equal((await request(`/api/invitations/${failed.json.token}`)).status, 404);
+});
+
 test(`accounts en opslag op ${basePath || '/'}`, { skip: !configured, timeout: 30000 }, async t => {
   const port = Number(process.env.TEST_PORT || 19877) + (basePath ? 1 : 0);
   const origin = `http://127.0.0.1:${port}`;
@@ -115,13 +209,13 @@ test(`accounts en opslag op ${basePath || '/'}`, { skip: !configured, timeout: 3
   assert.equal(firstRegistration.cookie, undefined);
   assert.equal((await request('/api/login', { method: 'POST', body: credentials })).status, 403);
   assert.match(smtp.messages[0], new RegExp(`To: ${emails[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i'));
-  const invalidatedVerificationToken = smtp.messages[0].match(/email-verification=([A-Za-z0-9_-]{43})/)?.[1];
+  const invalidatedVerificationToken = decodeQuotedPrintable(smtp.messages[0]).match(/email-verification=([A-Za-z0-9_-]{43})/)?.[1];
   assert.ok(invalidatedVerificationToken, 'registration email contains an email verification URL');
   assert.equal((await request('/api/email-verifications/resend', {
     method: 'POST', body: { email: emails[0] }
   })).status, 202);
   assert.match(smtp.messages[1], new RegExp(`To: ${emails[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i'));
-  const firstVerificationToken = smtp.messages[1].match(/email-verification=([A-Za-z0-9_-]{43})/)?.[1];
+  const firstVerificationToken = decodeQuotedPrintable(smtp.messages[1]).match(/email-verification=([A-Za-z0-9_-]{43})/)?.[1];
   assert.ok(firstVerificationToken);
   assert.equal((await request('/api/email-verifications/complete', {
     method: 'POST', body: { token: invalidatedVerificationToken }
@@ -141,7 +235,7 @@ test(`accounts en opslag op ${basePath || '/'}`, { skip: !configured, timeout: 3
   assert.equal((await request('/api/login', { method: 'POST', body: { ...credentials, password: 'een-fout-wachtwoord' } })).status, 401);
   const secondRegistration = await request('/api/register', { method: 'POST', body: { email: emails[1], password: credentials.password } });
   assert.equal(secondRegistration.status, 201);
-  const secondVerificationToken = smtp.messages[2].match(/email-verification=([A-Za-z0-9_-]{43})/)?.[1];
+  const secondVerificationToken = decodeQuotedPrintable(smtp.messages[2]).match(/email-verification=([A-Za-z0-9_-]{43})/)?.[1];
   assert.ok(secondVerificationToken);
   assert.equal((await request('/api/email-verifications/complete', {
     method: 'POST', body: { token: secondVerificationToken }
@@ -269,6 +363,11 @@ test(`accounts en opslag op ${basePath || '/'}`, { skip: !configured, timeout: 3
     method: 'POST', cookie: first.cookie, body: { email: emails[2], role: 'parent', memberId: 'member-3' }
   });
   assert.equal(invitation.status, 201);
+  assert.equal(invitation.json.emailSent, true);
+  const invitationMessage = smtp.messages.at(-1);
+  assert.match(invitationMessage, new RegExp(`To: ${emails[2].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i'));
+  const emailedInvitationUrl = decodeQuotedPrintable(invitationMessage).match(/https?:\/\/[^\s<>]+\/\?uitnodiging=[A-Za-z0-9_-]{43}/)?.[0];
+  assert.equal(emailedInvitationUrl, `${origin}${basePath}/?uitnodiging=${invitation.json.token}`);
   assert.equal((await request('/api/invitations', {
     method: 'POST', cookie: first.cookie, body: { email: emails[2], role: 'parent', memberId: 'member-3' }
   })).status, 409);
@@ -295,6 +394,9 @@ test(`accounts en opslag op ${basePath || '/'}`, { skip: !configured, timeout: 3
     method: 'POST', cookie: first.cookie, body: { email: emails[3], role: 'child', memberId: null }
   });
   assert.equal(childInvitation.status, 201);
+  assert.equal(childInvitation.json.emailSent, true);
+  assert.match(smtp.messages.at(-1), new RegExp(`To: ${emails[3].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i'));
+  assert.ok(decodeQuotedPrintable(smtp.messages.at(-1)).includes(`?uitnodiging=${childInvitation.json.token}`));
   const childAccount = await request('/api/invitations/accept', {
     method: 'POST', body: { token: childInvitation.json.token, password: credentials.password }
   });
@@ -352,14 +454,14 @@ test(`accounts en opslag op ${basePath || '/'}`, { skip: !configured, timeout: 3
     method: 'POST', cookie: first.cookie, body: { email: emails[0] }
   });
   assert.equal(selfPasswordReset.status, 202);
-  assert.match(smtp.messages[0], new RegExp(`To: ${emails[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i'));
+  assert.match(smtp.messages.at(-1), new RegExp(`To: ${emails[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i'));
   const passwordReset = await request('/api/password-resets', {
     method: 'POST', cookie: first.cookie, body: { email: emails[3] }
   });
   assert.equal(passwordReset.status, 202);
   assert.deepEqual(passwordReset.json, { sent: true });
-  assert.match(smtp.messages[0], new RegExp(`To: ${emails[3].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i'));
-  const resetToken = smtp.messages[0].match(/wachtwoord-reset=([A-Za-z0-9_-]{43})/)?.[1];
+  assert.match(smtp.messages.at(-1), new RegExp(`To: ${emails[3].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i'));
+  const resetToken = decodeQuotedPrintable(smtp.messages.at(-1)).match(/wachtwoord-reset=([A-Za-z0-9_-]{43})/)?.[1];
   assert.ok(resetToken, 'resetmail contains a one-time reset URL');
   assert.equal((await request(`/api/password-resets/${resetToken}`)).json.email, emails[3]);
   const changedPassword = 'een-nieuw-veilig-testwachtwoord';
@@ -374,10 +476,13 @@ test(`accounts en opslag op ${basePath || '/'}`, { skip: !configured, timeout: 3
   assert.equal((await request('/api/login', {
     method: 'POST', body: { email: emails[3], password: changedPassword }
   })).status, 200);
+  smtp.rejectNextMessage();
   const revoked = await request('/api/invitations', {
     method: 'POST', cookie: first.cookie, body: { email: emails[4], role: 'parent', memberId: null }
   });
   assert.equal(revoked.status, 201);
+  assert.equal(revoked.json.emailSent, false);
+  assert.equal((await request(`/api/invitations/${revoked.json.token}`)).json.email, emails[4]);
   const pending = await request('/api/household', { cookie: first.cookie });
   assert.equal(pending.json.invitations.length, 1);
   assert.equal((await request(`/api/invitations/${pending.json.invitations[0].id}`, {

@@ -145,8 +145,10 @@ niet-schrikkeljaar op 1 maart. Verjaardagen tellen niet mee als taken.
 Op **Ons gezin** kun je ook gezinsleden uitnodigen voor hetzelfde dashboard.
 Selecteer desgewenst een bestaand gezinslid om het account na acceptatie aan
 dat profiel te koppelen, of kies **Nieuw gezinslid** en selecteer alleen de
-rol (ouder of kind). Vul het e-mailadres voor de login in en deel de link
-persoonlijk; de app verstuurt zelf geen e-mail. De ontvanger stelt via die link
+rol (ouder of kind). Vul het e-mailadres voor de login in; de app verstuurt de
+uitnodigingslink per e-mail. Als verzenden mislukt, toont de app een melding en
+kun je de gemaakte link rechtstreeks delen. Ook na succesvolle verzending kun
+je de link kopiëren; deel hem alleen met de bedoelde ontvanger. De ontvanger stelt via die link
 een eigen wachtwoord in en krijgt een aparte login. Uitnodigingen zijn zeven
 dagen geldig en kunnen worden ingetrokken zolang ze niet zijn geaccepteerd.
 Alle accounts in het huishouden zien dezelfde gezinsgegevens. Alleen ouders
@@ -413,7 +415,7 @@ Voor een submap zet je bijvoorbeeld `APP_BASE_PATH=/household` en open je
 <http://localhost:3000/household/>. Laat deze instelling weg voor de root.
 Gebruik uitsluitend letters, cijfers, `_` en `-` in de padsegmenten, met
 een `/` aan het begin en zonder `/` aan het einde.
-Voor registratieverificatie en wachtwoordresetmails moeten `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`
+Voor registratieverificatie, uitnodigingen en wachtwoordresetmails moeten `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`
 (`true` voor directe TLS of `false` voor STARTTLS), `SMTP_USER`,
 `SMTP_PASSWORD` en een toegestaan afzenderadres in `SMTP_FROM` zijn ingesteld.
 

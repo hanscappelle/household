@@ -40,6 +40,8 @@ let revision = null;
 let savedState = null;
 let householdInfo = { members: [], invitations: [], canInvite: false };
 let createdInvitationUrl = '';
+let createdInvitationEmail = '';
+let createdInvitationEmailSent = false;
 let passwordResetSentEmail = '';
 let accountEmail = '';
 let currentUserId = '';
@@ -1334,9 +1336,10 @@ function renderFamily() {
           <label for="invite-role">Rol voor de login</label><select id="invite-role" name="role"><option value="parent">Ouder</option><option value="child">Kind</option></select>
           <label for="invite-new-email">E-mailadres voor de login</label><input id="invite-new-email" name="email" type="email" autocomplete="email" required maxlength="254" placeholder="naam@voorbeeld.nl">
           <span class="field-help invite-help">Kies een bestaand gezinslid om het account eraan te koppelen, of laat ‘Nieuw gezinslid’ staan en kies alleen de rol.</span>
-          <button class="button" type="submit">Uitnodigingslink maken</button><div id="household-invite-error" role="alert"></div>
+          <button class="button" type="submit">Uitnodiging versturen</button><div id="household-invite-error" role="alert"></div>
         </form>` : '<p class="field-help">Alleen ouders kunnen nieuwe gezinsleden uitnodigen.</p>'}
         <div id="created-invitation" class="created-invitation" ${createdInvitationUrl ? '' : 'hidden'}>
+          <p role="status">${createdInvitationEmailSent ? `De uitnodigingsmail is aangeboden voor verzending naar ${escapeHtml(createdInvitationEmail)}. Controleer bij problemen ook de spammap.` : 'De uitnodiging is gemaakt, maar de e-mail kon niet worden verzonden. Deel de link hieronder rechtstreeks met de ontvanger.'}</p>
           <label for="created-invitation-url">Deel deze link binnen je gezin</label><input id="created-invitation-url" readonly value="${escapeHtml(createdInvitationUrl)}">
           <button type="button" class="button secondary" data-action="copy-invitation">Link kopiëren</button><p>De link is 7 dagen geldig. De ontvanger stelt zelf een wachtwoord in.</p>
         </div>
@@ -1417,7 +1420,7 @@ function renderHelp() {
     <div class="help-content">
       ${demoMode ? '<section class="panel help-panel"><h2>Demomodus</h2><p>Je gebruikt fictieve gegevens. Wijzigingen en je kleurenkeuze blijven alleen tijdens deze demo in dit tabblad. Bij afsluiten of herladen verdwijnen ze. Uitnodigingen, wachtwoordreset en back-ups zijn alleen beschikbaar met een account.</p></section>' : ''}
       <section class="panel help-panel"><h2>Aanmelden en samen gebruiken</h2>
-        <p>Log in met je e-mailadres en wachtwoord. Een nieuw account kan pas inloggen nadat het e-mailadres via de verificatiemail is bevestigd. Een ouder kan via <a href="#gezin">Ons gezin</a> een partner of kind uitnodigen met een persoonlijke link. De genodigde kiest zelf een wachtwoord. Een geaccepteerde uitnodiging geeft toegang tot hetzelfde gezinsdashboard.</p>
+        <p>Log in met je e-mailadres en wachtwoord. Een nieuw account kan pas inloggen nadat het e-mailadres via de verificatiemail is bevestigd. Een ouder kan via <a href="#gezin">Ons gezin</a> een partner of kind per e-mail uitnodigen. De genodigde kiest zelf een wachtwoord. Een geaccepteerde uitnodiging geeft toegang tot hetzelfde gezinsdashboard.</p>
         <p>Is een gezinslid het wachtwoord vergeten? Een ouder kan bij <a href="#gezin">Gezinsaccounts</a> een resetmail naar dat account sturen. De eenmalige link verloopt na een uur; de gebruiker kiest zelf het nieuwe wachtwoord.</p>
         <p>De uitnodigingslink is zeven dagen geldig. Deel hem alleen met de bedoelde persoon. Kindaccounts kunnen geen bestaande gezinsleden bewerken of verwijderen, gezinsleden uitnodigen of uitnodigingen intrekken. Ze kunnen taken alleen afvinken, boodschappen en gerechten toevoegen en afvinken, en notities plaatsen. Bestaande boodschappen, gerechten en notities verwijderen of wijzigen is voorbehouden aan ouders.</p>
       </section>
@@ -1435,7 +1438,7 @@ function renderHelp() {
       </section>
       <section class="panel help-panel"><h2>Gezinsleden</h2>
         <p>Voeg op <a href="#gezin">Ons gezin</a> gezinsleden toe en bewerk hun naam, geboortedatum en optioneel e-mailadres. Een geboortedatum wordt gebruikt om de leeftijd te tonen en verjaardagen op het overzicht te markeren.</p>
-        <p>Om iemand een eigen login te geven, kies je bij de uitnodiging een bestaand gezinslid of maak je een uitnodiging voor een nieuw gezinslid. Vul het login-e-mailadres in en deel de link. Na acceptatie wordt het e-mailadres van een gekoppeld gezinslid gelijk aan het e-mailadres van de login.</p>
+        <p>Om iemand een eigen login te geven, kies je bij de uitnodiging een bestaand gezinslid of maak je een uitnodiging voor een nieuw gezinslid. Vul het login-e-mailadres in; de app verstuurt de uitnodigingslink per e-mail. Als dat mislukt, kun je de link rechtstreeks delen. Na acceptatie wordt het e-mailadres van een gekoppeld gezinslid gelijk aan het e-mailadres van de login.</p>
       </section>
       <section class="panel help-panel"><h2>Boodschappen en kookinspiratie</h2>
         <p>Op <a href="#boodschappen">Boodschappen</a> voeg je producten toe. Vink ze af na aankoop, markeer ze zo nodig als dringend of verwijder ze als ze niet meer nodig zijn.</p>
@@ -2284,12 +2287,13 @@ document.addEventListener('submit', async event => {
     const errorBox = form.querySelector('#household-invite-error');
     errorBox.textContent = '';
     form.inert = true;
+    const email = form.elements.email.value.trim();
     try {
       const result = await api('api/invitations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: form.elements.email.value,
+          email,
           role: form.elements.role.value,
           memberId: form.elements.memberId.value || null
         })
@@ -2298,6 +2302,8 @@ document.addEventListener('submit', async event => {
       url.search = '';
       url.searchParams.set('uitnodiging', result.token);
       createdInvitationUrl = url.toString();
+      createdInvitationEmail = email;
+      createdInvitationEmailSent = result.emailSent === true;
       let refreshError;
       try {
         householdInfo = await api('api/household');
@@ -2308,7 +2314,7 @@ document.addEventListener('submit', async event => {
       render();
       showToast(refreshError
         ? `Uitnodiging is gemaakt, maar de lijst kon niet worden vernieuwd: ${refreshError.message}`
-        : 'Uitnodigingslink aangemaakt');
+        : createdInvitationEmailSent ? 'Uitnodigingsmail verstuurd' : 'Uitnodigingsmail mislukt; deel de link rechtstreeks');
     } catch (error) {
       console.error('Uitnodiging maken mislukt:', error);
       errorBox.textContent = error.message;
@@ -2665,6 +2671,8 @@ document.querySelector('#logout').addEventListener('click', async () => {
     savedState = null;
     householdInfo = { members: [], invitations: [], canInvite: false };
     createdInvitationUrl = '';
+    createdInvitationEmail = '';
+    createdInvitationEmailSent = false;
     passwordResetSentEmail = '';
     document.querySelector('#app').hidden = true;
     document.querySelector('#auth-screen').hidden = false;

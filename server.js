@@ -488,7 +488,21 @@ router.post('/api/invitations', authenticate, async (req, res) => {
     'INSERT INTO invitations (token_hash, household_id, email, role, member_id, invited_by_user_id, expires_at) VALUES (?, ?, ?, ?, ?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 7 DAY))',
     [hashToken(token), req.user.household_id, email, role, memberId || null, req.user.id]
   );
-  res.status(201).json({ token });
+  const invitationUrl = new URL(basePath ? `${basePath}/` : '/', origin.origin);
+  invitationUrl.searchParams.set('uitnodiging', token);
+  try {
+    await getMailTransport().sendMail({
+      from: process.env.SMTP_FROM,
+      to: email,
+      subject: 'Uitnodiging voor Ons huishouden',
+      text: `Je bent uitgenodigd om deel te nemen aan een dashboard bij Ons huishouden.\n\nGebruik deze persoonlijke link binnen zeven dagen om een eigen wachtwoord te kiezen:\n${invitationUrl}\n\nHeb je deze uitnodiging niet verwacht? Dan kun je deze e-mail negeren.`,
+      html: `<p>Je bent uitgenodigd om deel te nemen aan een dashboard bij Ons huishouden.</p><p>Gebruik deze persoonlijke link binnen zeven dagen om een eigen wachtwoord te kiezen:</p><p><a href="${invitationUrl}">Uitnodiging accepteren</a></p><p>Heb je deze uitnodiging niet verwacht? Dan kun je deze e-mail negeren.</p>`
+    });
+  } catch (error) {
+    console.error('Uitnodigingsmail versturen mislukt:', error);
+    return res.status(201).json({ token, emailSent: false });
+  }
+  res.status(201).json({ token, emailSent: true });
 });
 
 router.get('/api/invitations/:token', async (req, res) => {
