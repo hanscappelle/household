@@ -1417,7 +1417,7 @@ function renderHelp() {
     <div class="help-content">
       ${demoMode ? '<section class="panel help-panel"><h2>Demomodus</h2><p>Je gebruikt fictieve gegevens. Wijzigingen en je kleurenkeuze blijven alleen tijdens deze demo in dit tabblad. Bij afsluiten of herladen verdwijnen ze. Uitnodigingen, wachtwoordreset en back-ups zijn alleen beschikbaar met een account.</p></section>' : ''}
       <section class="panel help-panel"><h2>Aanmelden en samen gebruiken</h2>
-        <p>Log in met je e-mailadres en wachtwoord. Een ouder kan via <a href="#gezin">Ons gezin</a> een partner of kind uitnodigen met een persoonlijke link. De genodigde kiest zelf een wachtwoord. Een geaccepteerde uitnodiging geeft toegang tot hetzelfde gezinsdashboard.</p>
+        <p>Log in met je e-mailadres en wachtwoord. Een nieuw account kan pas inloggen nadat het e-mailadres via de verificatiemail is bevestigd. Een ouder kan via <a href="#gezin">Ons gezin</a> een partner of kind uitnodigen met een persoonlijke link. De genodigde kiest zelf een wachtwoord. Een geaccepteerde uitnodiging geeft toegang tot hetzelfde gezinsdashboard.</p>
         <p>Is een gezinslid het wachtwoord vergeten? Een ouder kan bij <a href="#gezin">Gezinsaccounts</a> een resetmail naar dat account sturen. De eenmalige link verloopt na een uur; de gebruiker kiest zelf het nieuwe wachtwoord.</p>
         <p>De uitnodigingslink is zeven dagen geldig. Deel hem alleen met de bedoelde persoon. Kindaccounts kunnen geen bestaande gezinsleden bewerken of verwijderen, gezinsleden uitnodigen of uitnodigingen intrekken. Ze kunnen taken alleen afvinken, boodschappen en gerechten toevoegen en afvinken, en notities plaatsen. Bestaande boodschappen, gerechten en notities verwijderen of wijzigen is voorbehouden aan ouders.</p>
       </section>
@@ -2444,6 +2444,9 @@ const inviteToken = new URLSearchParams(location.search).get('uitnodiging');
 const inviteForm = document.querySelector('#invite-form');
 const passwordResetToken = new URLSearchParams(location.search).get('wachtwoord-reset');
 const passwordResetForm = document.querySelector('#password-reset-form');
+const emailVerificationToken = new URLSearchParams(location.search).get('email-verification');
+const emailVerificationButton = document.querySelector('#confirm-email-verification');
+const resendVerificationButton = document.querySelector('#resend-verification');
 const authEmail = authForm.elements.email;
 const authPassword = authForm.elements.password;
 const authPasswordToggle = document.querySelector('#auth-password-toggle');
@@ -2482,6 +2485,9 @@ if (passwordResetToken) {
     document.querySelector('#password-reset-error').textContent = error.message;
     passwordResetForm.querySelector('button[type="submit"]').disabled = true;
   }).finally(() => { passwordResetForm.inert = false; });
+} else if (emailVerificationToken) {
+  document.querySelector('#auth-screen').hidden = true;
+  document.querySelector('#email-verification-screen').hidden = false;
 } else if (inviteToken) {
   document.querySelector('#auth-screen').hidden = true;
   document.querySelector('#invite-screen').hidden = false;
@@ -2517,19 +2523,81 @@ authForm.addEventListener('submit', async event => {
   }
   authForm.inert = true;
   try {
-    await api(`api/${action}`, {
+    const result = await api(`api/${action}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password: data.get('password') })
     });
-    authForm.reset();
-    await openAccount();
+    if (action === 'register') {
+      if (result.verificationRequired !== true) throw new Error('De server heeft de verificatiemail niet bevestigd.');
+      authForm.reset();
+      authEmail.value = email;
+      errorBox.textContent = 'Je account is aangemaakt. Bevestig je e-mailadres via de link in je inbox voordat je inlogt.';
+      resendVerificationButton.hidden = false;
+    } else {
+      authForm.reset();
+      resendVerificationButton.hidden = true;
+      await openAccount();
+    }
   } catch (error) {
     console.error('Aanmelden mislukt:', error);
     errorBox.textContent = error.message;
+    if ((action === 'register' && [502, 503].includes(error.status)) ||
+        (action === 'login' && error.status === 403)) {
+      authEmail.value = email;
+      resendVerificationButton.hidden = false;
+    }
   } finally {
     authForm.inert = false;
   }
+});
+
+resendVerificationButton.addEventListener('click', async () => {
+  const email = authEmail.value.trim();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    authError.textContent = 'Vul eerst het e-mailadres van je account in.';
+    authEmail.focus();
+    return;
+  }
+  resendVerificationButton.disabled = true;
+  try {
+    await api('api/email-verifications/resend', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    authError.textContent = 'Als er een niet-bevestigd account met dit e-mailadres bestaat, is een nieuwe verificatiemail verstuurd.';
+  } catch (error) {
+    console.error('Verificatiemail opnieuw versturen mislukt:', error);
+    authError.textContent = error.message;
+  } finally {
+    resendVerificationButton.disabled = false;
+  }
+});
+
+emailVerificationButton.addEventListener('click', async () => {
+  const errorBox = document.querySelector('#email-verification-error');
+  errorBox.textContent = '';
+  emailVerificationButton.disabled = true;
+  try {
+    await api('api/email-verifications/complete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: emailVerificationToken })
+    });
+    history.replaceState(null, '', `${location.pathname}${location.hash}`);
+    document.querySelector('#email-verification-message').textContent = 'Je e-mailadres is bevestigd. Je kunt nu inloggen.';
+    emailVerificationButton.hidden = true;
+    document.querySelector('#return-to-login').hidden = false;
+  } catch (error) {
+    console.error('E-mailadres bevestigen mislukt:', error);
+    errorBox.textContent = error.message;
+    emailVerificationButton.disabled = false;
+  }
+});
+document.querySelector('#return-to-login').addEventListener('click', () => {
+  document.querySelector('#email-verification-screen').hidden = true;
+  document.querySelector('#auth-screen').hidden = false;
 });
 
 inviteForm.addEventListener('submit', async event => {

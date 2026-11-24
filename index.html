@@ -14,7 +14,7 @@
   <main class="auth-screen" id="auth-screen">
     <div class="panel auth-panel">
       <h1 id="auth-title">Ons huishouden</h1>
-      <p>Log in om je gegevens op al je apparaten te gebruiken.</p>
+      <p>Log in om je gegevens op al je apparaten te gebruiken. Bevestig na het aanmaken van een account eerst je e-mailadres via de verificatiemail.</p>
       <form id="auth-form">
         <label for="auth-email">E-mailadres</label>
         <input id="auth-email" name="email" type="email" autocomplete="username" required maxlength="254">
@@ -27,11 +27,21 @@
         </div>
         <p>Een nieuw wachtwoord moet minimaal 12 tekens bevatten.</p>
         <div id="auth-error" role="alert"></div>
+        <button class="button secondary" type="button" id="resend-verification" hidden>Verificatiemail opnieuw versturen</button>
         <button class="button" type="submit" name="action" value="login">Inloggen</button>
         <button class="button secondary" type="submit" name="action" value="register">Account maken</button>
         <button class="button secondary" type="button" id="start-demo">Demo proberen</button>
       </form>
       <p>De demo gebruikt fictieve gegevens. Wijzigingen verdwijnen bij afsluiten of herladen.</p>
+    </div>
+  </main>
+  <main class="auth-screen" id="email-verification-screen" hidden>
+    <div class="panel auth-panel">
+      <h1>E-mailadres bevestigen</h1>
+      <p id="email-verification-message">Bevestig je e-mailadres om je account te activeren.</p>
+      <div id="email-verification-error" role="alert"></div>
+      <button class="button" type="button" id="confirm-email-verification">E-mailadres bevestigen</button>
+      <button class="button secondary" type="button" id="return-to-login" hidden>Naar aanmelden</button>
     </div>
   </main>
   <main class="auth-screen" id="invite-screen" hidden>

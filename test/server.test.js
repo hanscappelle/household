@@ -109,15 +109,45 @@ test(`accounts en opslag op ${basePath || '/'}`, { skip: !configured, timeout: 3
   assert.equal((await request('/api/register', { method: 'POST', requestOrigin: 'https://evil.example', body: {} })).status, 403);
   assert.equal((await request('/api/register', { method: 'POST', body: { email: emails[0], password: 'kort' } })).status, 400);
   const credentials = { email: emails[0], password: 'een-veilig-testwachtwoord' };
-  const first = await request('/api/register', { method: 'POST', body: credentials });
-  assert.equal(first.status, 201);
+  const firstRegistration = await request('/api/register', { method: 'POST', body: credentials });
+  assert.equal(firstRegistration.status, 201);
+  assert.deepEqual(firstRegistration.json, { email: emails[0], verificationRequired: true });
+  assert.equal(firstRegistration.cookie, undefined);
+  assert.equal((await request('/api/login', { method: 'POST', body: credentials })).status, 403);
+  assert.match(smtp.messages[0], new RegExp(`To: ${emails[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i'));
+  const invalidatedVerificationToken = smtp.messages[0].match(/email-verification=([A-Za-z0-9_-]{43})/)?.[1];
+  assert.ok(invalidatedVerificationToken, 'registration email contains an email verification URL');
+  assert.equal((await request('/api/email-verifications/resend', {
+    method: 'POST', body: { email: emails[0] }
+  })).status, 202);
+  assert.match(smtp.messages[1], new RegExp(`To: ${emails[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i'));
+  const firstVerificationToken = smtp.messages[1].match(/email-verification=([A-Za-z0-9_-]{43})/)?.[1];
+  assert.ok(firstVerificationToken);
+  assert.equal((await request('/api/email-verifications/complete', {
+    method: 'POST', body: { token: invalidatedVerificationToken }
+  })).status, 404);
+  assert.equal((await request('/api/email-verifications/complete', {
+    method: 'POST', body: { token: firstVerificationToken }
+  })).status, 200);
+  assert.equal((await request('/api/email-verifications/complete', {
+    method: 'POST', body: { token: firstVerificationToken }
+  })).status, 404);
+  const first = await request('/api/login', { method: 'POST', body: credentials });
+  assert.equal(first.status, 200);
   assert.match(first.headers.get('set-cookie'), /HttpOnly/);
   assert.match(first.headers.get('set-cookie'), /SameSite=Strict/);
   assert.ok(first.headers.get('set-cookie').includes(`Path=${basePath || '/'}`));
   assert.equal((await request('/api/register', { method: 'POST', body: credentials })).status, 409);
   assert.equal((await request('/api/login', { method: 'POST', body: { ...credentials, password: 'een-fout-wachtwoord' } })).status, 401);
-  const second = await request('/api/register', { method: 'POST', body: { email: emails[1], password: credentials.password } });
-  assert.equal(second.status, 201);
+  const secondRegistration = await request('/api/register', { method: 'POST', body: { email: emails[1], password: credentials.password } });
+  assert.equal(secondRegistration.status, 201);
+  const secondVerificationToken = smtp.messages[2].match(/email-verification=([A-Za-z0-9_-]{43})/)?.[1];
+  assert.ok(secondVerificationToken);
+  assert.equal((await request('/api/email-verifications/complete', {
+    method: 'POST', body: { token: secondVerificationToken }
+  })).status, 200);
+  const second = await request('/api/login', { method: 'POST', body: { email: emails[1], password: credentials.password } });
+  assert.equal(second.status, 200);
   assert.deepEqual((await request('/api/preferences', { cookie: first.cookie })).json, { colorPalette: 'forest', textSize: 'normal', largeText: false });
   assert.deepEqual((await request('/api/preferences', { cookie: second.cookie })).json, { colorPalette: 'forest', textSize: 'normal', largeText: false });
   const initialHousehold = await request('/api/state', { cookie: first.cookie });

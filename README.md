@@ -165,16 +165,19 @@ bijgewerkt naar het e-mailadres waarmee het account inlogt.
 
 #### Wachtwoord beheren
 
-Registratie staat open voor iedereen die de site kan bereiken. Het e-mailadres
-is een gebruikersnaam en wordt niet geverifieerd; er is geen e-mailverificatie
-of zelfstandig wachtwoordherstel via e-mail. Een volwassen gebruiker kan op
-**Ons gezin** bij het eigen account **Wachtwoord resetten** kiezen om een
-wachtwoordresetmail te ontvangen. Een ouder kan daar ook voor een ander account
-in hetzelfde huishouden een resetmail versturen. Deze bevat een eenmalige link
-die één uur geldig is en de gebruiker zelf een nieuw wachtwoord laat kiezen.
-Na de reset worden bestaande sessies beëindigd. Iedereen die de link ontvangt
-kan het wachtwoord resetten; deel de link daarom niet openbaar. Bewaar je
-wachtwoord veilig.
+Registratie staat open voor iedereen die de site kan bereiken. Na registratie
+stuurt de app een verificatiemail. Bevestig het e-mailadres via de link binnen
+24 uur voordat je inlogt. Is de mail verlopen of niet aangekomen, dan kun je op
+het aanmeldscherm de verificatiemail opnieuw laten versturen. Oude accounts
+blijven geverifieerd; uitnodigingen werken via hun eigen uitnodigingslink.
+
+Een volwassen gebruiker kan op **Ons gezin** bij het eigen account
+**Wachtwoord resetten** kiezen om een wachtwoordresetmail te ontvangen. Een
+ouder kan daar ook voor een ander account in hetzelfde huishouden een resetmail
+versturen. Deze bevat een eenmalige link die één uur geldig is en de gebruiker
+zelf een nieuw wachtwoord laat kiezen. Na de reset worden bestaande sessies
+beëindigd. Iedereen die de link ontvangt kan het wachtwoord resetten; deel de
+link daarom niet openbaar. Bewaar je wachtwoord veilig.
 
 ### Notities
 
@@ -379,7 +382,7 @@ DB_USER=household
 DB_PASSWORD="eigen-databasewachtwoord"
 APP_ORIGIN=http://localhost:3000
 PORT=3000
-# Nodig om wachtwoordresetmails te versturen; gebruik de SMTP-waarden van je host.
+# Nodig voor registratieverificatie en wachtwoordresetmails; gebruik de SMTP-waarden van je host.
 SMTP_HOST=smtp.example.com
 SMTP_PORT=587
 SMTP_SECURE=false
@@ -398,7 +401,8 @@ node --env-file=/pad/naar/household.env server.js
 ```
 
 Open <http://localhost:3000>, maak een account met een e-mailadres en een
-wachtwoord van minimaal 12 tekens en log in. `APP_ORIGIN` moet exact overeenkomen
+wachtwoord van minimaal 12 tekens, bevestig je e-mailadres via de verificatiemail
+en log in. `APP_ORIGIN` moet exact overeenkomen
 met het adres in de browser, inclusief protocol en eventuele poort, zonder pad
 of afsluitende slash. De server luistert standaard alleen lokaal. `IP` (of
 `HOST`) en `PORT` bepalen het luisteradres; op een host achter een proxy stelt
@@ -409,7 +413,7 @@ Voor een submap zet je bijvoorbeeld `APP_BASE_PATH=/household` en open je
 <http://localhost:3000/household/>. Laat deze instelling weg voor de root.
 Gebruik uitsluitend letters, cijfers, `_` en `-` in de padsegmenten, met
 een `/` aan het begin en zonder `/` aan het einde.
-Voor wachtwoordresetmails moeten `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`
+Voor registratieverificatie en wachtwoordresetmails moeten `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`
 (`true` voor directe TLS of `false` voor STARTTLS), `SMTP_USER`,
 `SMTP_PASSWORD` en een toegestaan afzenderadres in `SMTP_FROM` zijn ingesteld.
 

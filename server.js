@@ -104,6 +104,50 @@ function getMailTransport() {
   }
   return mailTransport;
 }
+async function sendEmailVerification(userId, email) {
+  const mailer = getMailTransport();
+  const token = randomBytes(32).toString('base64url');
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    await connection.execute(
+      'UPDATE email_verifications SET used_at = UTC_TIMESTAMP() WHERE user_id = ? AND used_at IS NULL',
+      [userId]
+    );
+    await connection.execute(
+      'INSERT INTO email_verifications (token_hash, user_id, expires_at) VALUES (?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 24 HOUR))',
+      [hashToken(token), userId]
+    );
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+  const verificationUrl = new URL(basePath ? `${basePath}/` : '/', origin.origin);
+  verificationUrl.searchParams.set('email-verification', token);
+  try {
+    await mailer.sendMail({
+      from: process.env.SMTP_FROM,
+      to: email,
+      subject: 'Bevestig je e-mailadres voor Ons huishouden',
+      text: `Bedankt voor het aanmaken van een account bij Ons huishouden.\n\nBevestig je e-mailadres binnen 24 uur via deze link:\n${verificationUrl}\n\nHeb je geen account aangemaakt? Dan kun je deze e-mail negeren.`,
+      html: `<p>Bedankt voor het aanmaken van een account bij Ons huishouden.</p><p>Bevestig je e-mailadres binnen 24 uur via deze link:</p><p><a href="${verificationUrl}">E-mailadres bevestigen</a></p><p>Heb je geen account aangemaakt? Dan kun je deze e-mail negeren.</p>`
+    });
+  } catch (error) {
+    try {
+      await pool.execute(
+        'UPDATE email_verifications SET used_at = UTC_TIMESTAMP() WHERE token_hash = ? AND used_at IS NULL',
+        [hashToken(token)]
+      );
+    } catch (cleanupError) {
+      console.error('Verificatielink ongeldig maken na mailfout mislukt:', cleanupError);
+      throw new Error('Verificatiemail versturen is mislukt en de verificatielink kon niet veilig worden ingetrokken.', { cause: error });
+    }
+    throw error;
+  }
+}
 const passwordValid = password => typeof password === 'string' && password.length >= 12 && Buffer.byteLength(password, 'utf8') <= 1024;
 const colorPalettes = new Set(['forest', 'ocean', 'lavender', 'terracotta']);
 const notesValid = notes => Array.isArray(notes) && notes.length <= 1000 &&
@@ -199,7 +243,7 @@ router.post('/api/register', authLimit, async (req, res) => {
   let userId;
   try {
     await connection.beginTransaction();
-    const [result] = await connection.execute('INSERT INTO users (email, password_salt, password_hash, data, revision) VALUES (?, ?, ?, ?, 1)', [email, salt, passwordHash, JSON.stringify(initialState())]);
+    const [result] = await connection.execute('INSERT INTO users (email, password_salt, password_hash, data, revision, email_verified) VALUES (?, ?, ?, ?, 1, 0)', [email, salt, passwordHash, JSON.stringify(initialState())]);
     userId = result.insertId;
     await createHousehold(userId, connection);
     await connection.commit();
@@ -210,8 +254,13 @@ router.post('/api/register', authLimit, async (req, res) => {
   } finally {
     connection.release();
   }
-  await createSession(res, userId);
-  res.status(201).json({ email });
+  try {
+    await sendEmailVerification(userId, email);
+  } catch (error) {
+    console.error('Verificatiemail versturen mislukt:', error);
+    return res.status(502).json({ error: 'Je account is aangemaakt, maar de verificatiemail kon niet worden verzonden. Probeer de mail opnieuw te versturen.' });
+  }
+  res.status(201).json({ email, verificationRequired: true });
 });
 
 router.post('/api/login', authLimit, async (req, res) => {
@@ -220,13 +269,58 @@ router.post('/api/login', authLimit, async (req, res) => {
   if (!emailValid(email) || typeof password !== 'string' || Buffer.byteLength(password, 'utf8') > 1024) {
     return res.status(400).json({ error: 'Ongeldig e-mailadres of wachtwoord.' });
   }
-  const [rows] = await pool.execute('SELECT id, password_salt, password_hash FROM users WHERE email = ?', [email]);
+  const [rows] = await pool.execute('SELECT id, password_salt, password_hash, email_verified FROM users WHERE email = ?', [email]);
   const user = rows[0];
   const calculated = await scrypt(password, user?.password_salt || '00000000000000000000000000000000', 64);
   const expected = Buffer.from(user?.password_hash || '0'.repeat(128), 'hex');
   if (!timingSafeEqual(calculated, expected) || !user) return res.status(401).json({ error: 'Ongeldig e-mailadres of wachtwoord.' });
+  if (!user.email_verified) return res.status(403).json({ error: 'Bevestig eerst je e-mailadres via de verificatiemail.' });
   await createSession(res, user.id);
   res.json({ email });
+});
+
+router.post('/api/email-verifications/resend', authLimit, async (req, res) => {
+  const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+  if (!emailValid(email)) return res.status(400).json({ error: 'Vul een geldig e-mailadres in.' });
+  const [users] = await pool.execute('SELECT id FROM users WHERE email = ? AND email_verified = 0', [email]);
+  if (users.length) {
+    try {
+      await sendEmailVerification(users[0].id, email);
+    } catch (error) {
+      console.error('Verificatiemail opnieuw versturen mislukt:', error);
+      return res.status(502).json({ error: 'De verificatiemail kon niet worden verzonden. Probeer het later opnieuw.' });
+    }
+  }
+  res.status(202).json({ sent: true });
+});
+
+router.post('/api/email-verifications/complete', authLimit, async (req, res) => {
+  const token = req.body?.token;
+  if (typeof token !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(token)) {
+    return res.status(400).json({ error: 'Deze verificatielink is ongeldig of verlopen.' });
+  }
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [rows] = await connection.execute(
+      'SELECT user_id FROM email_verifications WHERE token_hash = ? AND used_at IS NULL AND expires_at > UTC_TIMESTAMP() FOR UPDATE',
+      [hashToken(token)]
+    );
+    if (!rows.length) {
+      await connection.rollback();
+      return res.status(404).json({ error: 'Deze verificatielink is ongeldig of verlopen.' });
+    }
+    const userId = rows[0].user_id;
+    await connection.execute('UPDATE users SET email_verified = 1 WHERE id = ?', [userId]);
+    await connection.execute('UPDATE email_verifications SET used_at = UTC_TIMESTAMP() WHERE user_id = ? AND used_at IS NULL', [userId]);
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+  res.json({ verified: true });
 });
 
 router.get('/api/preferences', authenticate, async (req, res) => {
@@ -622,7 +716,8 @@ async function start() {
     data LONGTEXT NOT NULL,
     revision INT UNSIGNED NOT NULL,
     color_palette VARCHAR(20) NOT NULL DEFAULT 'forest',
-    large_text TINYINT(1) NOT NULL DEFAULT 0
+    large_text TINYINT(1) NOT NULL DEFAULT 0,
+    email_verified TINYINT(1) NOT NULL DEFAULT 1
   ) ENGINE=InnoDB`);
   const [userColumns] = await pool.execute("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'");
   if (!userColumns.some(column => column.COLUMN_NAME === 'color_palette')) {
@@ -630,6 +725,9 @@ async function start() {
   }
   if (!userColumns.some(column => column.COLUMN_NAME === 'large_text')) {
     await pool.query('ALTER TABLE users ADD COLUMN large_text TINYINT(1) NOT NULL DEFAULT 0');
+  }
+  if (!userColumns.some(column => column.COLUMN_NAME === 'email_verified')) {
+    await pool.query('ALTER TABLE users ADD COLUMN email_verified TINYINT(1) NOT NULL DEFAULT 1');
   }
   await pool.query(`CREATE TABLE IF NOT EXISTS sessions (
     token_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL PRIMARY KEY,
@@ -676,6 +774,15 @@ async function start() {
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (household_id) REFERENCES households(id) ON DELETE CASCADE,
     FOREIGN KEY (requested_by_user_id) REFERENCES users(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS email_verifications (
+    token_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL PRIMARY KEY,
+    user_id BIGINT UNSIGNED NOT NULL,
+    expires_at DATETIME NOT NULL,
+    used_at DATETIME NULL,
+    INDEX (user_id, used_at),
+    INDEX (expires_at),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   ) ENGINE=InnoDB`);
   const [invitationColumns] = await pool.execute("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'invitations'");
   if (!invitationColumns.some(column => column.COLUMN_NAME === 'member_id')) {
