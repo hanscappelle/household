@@ -4,17 +4,72 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { spawn } = require('node:child_process');
 const { randomUUID } = require('node:crypto');
+const net = require('node:net');
 const mysql = require('mysql2/promise');
 
 const configured = ['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASSWORD'].every(key => process.env[key]);
+
+async function startSmtpTestServer() {
+  const messages = [];
+  const server = net.createServer(socket => {
+    socket.setEncoding('utf8');
+    socket.write('220 test SMTP ready\r\n');
+    let buffer = '';
+    let inData = false;
+    let messageLines = [];
+    socket.on('data', chunk => {
+      buffer += chunk;
+      let end;
+      while ((end = buffer.indexOf('\r\n')) !== -1) {
+        const line = buffer.slice(0, end);
+        buffer = buffer.slice(end + 2);
+        if (inData) {
+          if (line === '.') {
+            inData = false;
+            messages.push(messageLines.join('\r\n'));
+            messageLines = [];
+            socket.write('250 message accepted\r\n');
+          } else {
+            messageLines.push(line.startsWith('..') ? line.slice(1) : line);
+          }
+        } else if (/^(EHLO|HELO)\b/i.test(line)) {
+          socket.write('250-test SMTP\r\n250 AUTH PLAIN LOGIN\r\n');
+        } else if (/^AUTH\b/i.test(line)) {
+          socket.write('235 authenticated\r\n');
+        } else if (/^(MAIL FROM|RCPT TO|RSET|NOOP)\b/i.test(line)) {
+          socket.write('250 ok\r\n');
+        } else if (/^DATA\b/i.test(line)) {
+          inData = true;
+          socket.write('354 end with <CRLF>.<CRLF>\r\n');
+        } else if (/^QUIT\b/i.test(line)) {
+          socket.write('221 bye\r\n');
+          socket.end();
+        } else {
+          socket.write('250 ok\r\n');
+        }
+      }
+    });
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  return {
+    port: server.address().port,
+    messages,
+    close: () => new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
+  };
+}
 
 for (const basePath of ['', '/household']) {
 test(`accounts en opslag op ${basePath || '/'}`, { skip: !configured, timeout: 30000 }, async t => {
   const port = Number(process.env.TEST_PORT || 19877) + (basePath ? 1 : 0);
   const origin = `http://127.0.0.1:${port}`;
+  const smtp = await startSmtpTestServer();
   const server = spawn(process.execPath, ['server.js'], {
     cwd: require('node:path').join(__dirname, '..'),
-    env: { ...process.env, APP_ORIGIN: origin, APP_BASE_PATH: basePath, IP: '127.0.0.1', PORT: String(port), TRUST_PROXY: '' },
+    env: {
+      ...process.env, APP_ORIGIN: origin, APP_BASE_PATH: basePath, IP: '127.0.0.1', PORT: String(port), TRUST_PROXY: '',
+      SMTP_HOST: '127.0.0.1', SMTP_PORT: String(smtp.port), SMTP_SECURE: 'false',
+      SMTP_USER: 'test@example.test', SMTP_PASSWORD: 'test-password', SMTP_FROM: 'household@example.test'
+    },
     stdio: ['ignore', 'pipe', 'pipe']
   });
   let output = '';
@@ -30,6 +85,8 @@ test(`accounts en opslag op ${basePath || '/'}`, { skip: !configured, timeout: 3
     await pool.execute('DELETE FROM users WHERE email IN (?, ?, ?, ?, ?)', emails);
     await pool.end();
     server.kill();
+    if (server.exitCode === null) await new Promise(resolve => server.once('exit', resolve));
+    await smtp.close();
   });
   for (let i = 0; i < 100 && !output.includes('Server luistert'); i++) {
     if (server.exitCode !== null) throw new Error(output);
@@ -261,17 +318,26 @@ test(`accounts en opslag op ${basePath || '/'}`, { skip: !configured, timeout: 3
   assert.equal((await request('/api/password-resets', {
     method: 'POST', cookie: childAccount.cookie, body: { email: emails[0] }
   })).status, 403);
+  const selfPasswordReset = await request('/api/password-resets', {
+    method: 'POST', cookie: first.cookie, body: { email: emails[0] }
+  });
+  assert.equal(selfPasswordReset.status, 202);
+  assert.match(smtp.messages[0], new RegExp(`To: ${emails[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i'));
   const passwordReset = await request('/api/password-resets', {
     method: 'POST', cookie: first.cookie, body: { email: emails[3] }
   });
-  assert.equal(passwordReset.status, 201);
-  assert.equal((await request(`/api/password-resets/${passwordReset.json.token}`)).json.email, emails[3]);
+  assert.equal(passwordReset.status, 202);
+  assert.deepEqual(passwordReset.json, { sent: true });
+  assert.match(smtp.messages[0], new RegExp(`To: ${emails[3].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i'));
+  const resetToken = smtp.messages[0].match(/wachtwoord-reset=([A-Za-z0-9_-]{43})/)?.[1];
+  assert.ok(resetToken, 'resetmail contains a one-time reset URL');
+  assert.equal((await request(`/api/password-resets/${resetToken}`)).json.email, emails[3]);
   const changedPassword = 'een-nieuw-veilig-testwachtwoord';
   assert.equal((await request('/api/password-resets/complete', {
-    method: 'POST', body: { token: passwordReset.json.token, password: changedPassword }
+    method: 'POST', body: { token: resetToken, password: changedPassword }
   })).status, 200);
   assert.equal((await request('/api/state', { cookie: childAccount.cookie })).status, 401);
-  assert.equal((await request(`/api/password-resets/${passwordReset.json.token}`)).status, 404);
+  assert.equal((await request(`/api/password-resets/${resetToken}`)).status, 404);
   assert.equal((await request('/api/login', {
     method: 'POST', body: { email: emails[3], password: credentials.password }
   })).status, 401);

@@ -40,8 +40,7 @@ let revision = null;
 let savedState = null;
 let householdInfo = { members: [], invitations: [], canInvite: false };
 let createdInvitationUrl = '';
-let createdPasswordResetUrl = '';
-let createdPasswordResetEmail = '';
+let passwordResetSentEmail = '';
 let accountEmail = '';
 let currentUserId = '';
 let currentRole = '';
@@ -1324,7 +1323,11 @@ function renderFamily() {
       <div class="section-heading"><div><h2>Samen in hetzelfde dashboard</h2><p>Nodig je partner of kinderen uit met hun eigen e-mailadres en wachtwoord.</p></div></div>
       <div class="panel backup-panel">
         <h2>Gezinsaccounts</h2>
-        <div class="household-account-list">${householdInfo.members.map(member => `<div class="family-row"><span class="avatar">${escapeHtml(member.email.slice(0, 1).toUpperCase())}</span><div><strong>${escapeHtml(member.email)}</strong><small>${roles[member.role] || 'Gezinslid'} · eigen login</small></div>${member.canReset ? `<button type="button" class="text-button" data-action="create-password-reset" data-email="${escapeHtml(member.email)}">Wachtwoord resetten</button>` : ''}</div>`).join('')}</div>
+        <div class="household-account-list">${householdInfo.members.map(member => {
+          const isCurrentAccount = member.email.toLowerCase() === accountEmail.toLowerCase();
+          const canRequestReset = member.canReset || (isCurrentAccount && !isChild());
+          return `<div class="family-row"><span class="avatar">${escapeHtml(member.email.slice(0, 1).toUpperCase())}</span><div><strong>${escapeHtml(member.email)}</strong><small>${roles[member.role] || 'Gezinslid'} · eigen login</small></div>${canRequestReset ? `<button type="button" class="text-button" data-action="create-password-reset" data-email="${escapeHtml(member.email)}">${isCurrentAccount ? 'Wachtwoord resetten' : 'Resetmail versturen'}</button>` : ''}</div>`;
+        }).join('')}</div>
         ${householdInfo.invitations.length ? `<h3 class="invite-list-title">Openstaande uitnodigingen</h3>${householdInfo.invitations.map(invite => `<div class="family-row"><div><strong>${escapeHtml(invite.email)}</strong><small>${roles[invite.role]} · geldig tot ${escapeHtml(new Date(invite.expiresAt).toLocaleDateString('nl-BE'))}</small></div>${householdInfo.canInvite ? `<button type="button" class="text-button" data-action="revoke-invitation" data-id="${escapeHtml(invite.id)}">Intrekken</button>` : ''}</div>`).join('')}` : ''}
         ${householdInfo.canInvite ? `<form id="household-invite-form" class="invite-form">
           <label for="invite-member">Gezinslid</label><select id="invite-member" name="memberId"><option value="">Nieuw gezinslid</option>${state.members.map(member => `<option value="${escapeHtml(member.id)}">${escapeHtml(member.name)}${member.email ? ` · ${escapeHtml(member.email)}` : ''}</option>`).join('')}</select>
@@ -1337,9 +1340,8 @@ function renderFamily() {
           <label for="created-invitation-url">Deel deze link binnen je gezin</label><input id="created-invitation-url" readonly value="${escapeHtml(createdInvitationUrl)}">
           <button type="button" class="button secondary" data-action="copy-invitation">Link kopiëren</button><p>De link is 7 dagen geldig. De ontvanger stelt zelf een wachtwoord in.</p>
         </div>
-        <div id="created-password-reset" class="created-invitation" ${createdPasswordResetUrl ? '' : 'hidden'}>
-          <label for="created-password-reset-url">Resetlink voor ${escapeHtml(createdPasswordResetEmail)}</label><input id="created-password-reset-url" readonly value="${escapeHtml(createdPasswordResetUrl)}">
-          <button type="button" class="button secondary" data-action="copy-password-reset">Link kopiëren</button><p>Deel deze link rechtstreeks met de gebruiker. De link is eenmalig geldig voor 1 uur; daarna kiest de gebruiker zelf een nieuw wachtwoord. Na de reset worden bestaande sessies beëindigd.</p>
+        <div id="password-reset-sent" class="created-invitation" ${passwordResetSentEmail ? '' : 'hidden'}>
+          <p>De eenmalige wachtwoordresetlink is naar <strong>${escapeHtml(passwordResetSentEmail)}</strong> verstuurd. De link is 1 uur geldig; na de reset worden bestaande sessies beëindigd.</p>
         </div>
       </div>
     </section>`}`;
@@ -1416,7 +1418,7 @@ function renderHelp() {
       ${demoMode ? '<section class="panel help-panel"><h2>Demomodus</h2><p>Je gebruikt fictieve gegevens. Wijzigingen en je kleurenkeuze blijven alleen tijdens deze demo in dit tabblad. Bij afsluiten of herladen verdwijnen ze. Uitnodigingen, wachtwoordreset en back-ups zijn alleen beschikbaar met een account.</p></section>' : ''}
       <section class="panel help-panel"><h2>Aanmelden en samen gebruiken</h2>
         <p>Log in met je e-mailadres en wachtwoord. Een ouder kan via <a href="#gezin">Ons gezin</a> een partner of kind uitnodigen met een persoonlijke link. De genodigde kiest zelf een wachtwoord. Een geaccepteerde uitnodiging geeft toegang tot hetzelfde gezinsdashboard.</p>
-        <p>Is een gezinslid het wachtwoord vergeten? Een ouder kan bij <a href="#gezin">Gezinsaccounts</a> een eenmalige resetlink maken en deze rechtstreeks met die gebruiker delen. De link verloopt na een uur; de gebruiker kiest zelf het nieuwe wachtwoord.</p>
+        <p>Is een gezinslid het wachtwoord vergeten? Een ouder kan bij <a href="#gezin">Gezinsaccounts</a> een resetmail naar dat account sturen. De eenmalige link verloopt na een uur; de gebruiker kiest zelf het nieuwe wachtwoord.</p>
         <p>De uitnodigingslink is zeven dagen geldig. Deel hem alleen met de bedoelde persoon. Kindaccounts kunnen geen bestaande gezinsleden bewerken of verwijderen, gezinsleden uitnodigen of uitnodigingen intrekken. Ze kunnen taken alleen afvinken, boodschappen en gerechten toevoegen en afvinken, en notities plaatsen. Bestaande boodschappen, gerechten en notities verwijderen of wijzigen is voorbehouden aan ouders.</p>
       </section>
       <section class="panel help-panel"><h2>Overzicht en taken</h2>
@@ -2063,28 +2065,14 @@ document.addEventListener('click', async event => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: button.dataset.email })
       });
-      const url = new URL(location.href);
-      url.search = '';
-      url.hash = '';
-      url.searchParams.set('wachtwoord-reset', result.token);
-      createdPasswordResetUrl = url.toString();
-      createdPasswordResetEmail = button.dataset.email;
+      if (result.sent !== true) throw new Error('De server heeft het versturen van de resetmail niet bevestigd.');
+      passwordResetSentEmail = button.dataset.email;
       render();
-      showToast('Resetlink aangemaakt');
+      showToast('Resetlink per e-mail verstuurd');
     } catch (error) {
-      console.error('Resetlink maken mislukt:', error);
-      showToast(`Resetlink maken is niet gelukt: ${error.message}`);
+      console.error('Resetmail versturen mislukt:', error);
+      showToast(`Resetmail versturen is niet gelukt: ${error.message}`);
       button.disabled = false;
-    }
-  }
-  if (action === 'copy-password-reset') {
-    try {
-      await navigator.clipboard.writeText(createdPasswordResetUrl);
-      showToast('Resetlink gekopieerd');
-    } catch (error) {
-      console.error('Resetlink kopiëren mislukt:', error);
-      showToast('Kopiëren is niet gelukt. Selecteer de link om deze te kopiëren.');
-      document.querySelector('#created-password-reset-url')?.select();
     }
   }
   if (action === 'edit-note') openNote(button.dataset.id);
@@ -2609,8 +2597,7 @@ document.querySelector('#logout').addEventListener('click', async () => {
     savedState = null;
     householdInfo = { members: [], invitations: [], canInvite: false };
     createdInvitationUrl = '';
-    createdPasswordResetUrl = '';
-    createdPasswordResetEmail = '';
+    passwordResetSentEmail = '';
     document.querySelector('#app').hidden = true;
     document.querySelector('#auth-screen').hidden = false;
     setAuthPasswordVisible(false);

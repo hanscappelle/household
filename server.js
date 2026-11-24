@@ -3,6 +3,7 @@
 const express = require('express');
 const { rateLimit } = require('express-rate-limit');
 const mysql = require('mysql2/promise');
+const nodemailer = require('nodemailer');
 const { randomBytes, scrypt: scryptCallback, timingSafeEqual, createHash } = require('node:crypto');
 const { promisify, isDeepStrictEqual } = require('node:util');
 const path = require('node:path');
@@ -83,6 +84,26 @@ const hashToken = token => createHash('sha256').update(token).digest('hex');
 const cookieName = basePath ? 'household_session' : 'session';
 const cookieOptions = { httpOnly: true, secure: secureCookie, sameSite: 'strict', path: basePath || '/', maxAge: 7 * 24 * 60 * 60 * 1000 };
 const emailValid = email => typeof email === 'string' && email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+let mailTransport;
+function getMailTransport() {
+  const requiredMailSettings = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_SECURE', 'SMTP_USER', 'SMTP_PASSWORD', 'SMTP_FROM'];
+  const missingSettings = requiredMailSettings.filter(name => !process.env[name]);
+  if (missingSettings.length) throw new Error(`Ontbrekende SMTP-instellingen: ${missingSettings.join(', ')}`);
+  const port = Number(process.env.SMTP_PORT);
+  if (!Number.isInteger(port) || port < 1 || port > 65535 ||
+      !['true', 'false'].includes(process.env.SMTP_SECURE) || !emailValid(process.env.SMTP_FROM)) {
+    throw new Error('Ongeldige SMTP-instellingen: controleer SMTP_PORT, SMTP_SECURE en SMTP_FROM.');
+  }
+  if (!mailTransport) {
+    mailTransport = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port,
+      secure: process.env.SMTP_SECURE === 'true',
+      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD }
+    });
+  }
+  return mailTransport;
+}
 const passwordValid = password => typeof password === 'string' && password.length >= 12 && Buffer.byteLength(password, 'utf8') <= 1024;
 const colorPalettes = new Set(['forest', 'ocean', 'lavender', 'terracotta']);
 const notesValid = notes => Array.isArray(notes) && notes.length <= 1000 &&
@@ -235,11 +256,18 @@ router.put('/api/preferences', authenticate, async (req, res) => {
 
 router.post('/api/password-resets', authenticate, authLimit, async (req, res) => {
   const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
-  if (!emailValid(email) || email === req.user.email) {
-    return res.status(400).json({ error: 'Kies een ander account met een geldig e-mailadres.' });
+  if (!emailValid(email)) {
+    return res.status(400).json({ error: 'Vul een geldig e-mailadres in.' });
   }
   if (req.user.household_role === 'child') {
     return res.status(403).json({ error: 'Alleen ouders kunnen wachtwoorden van andere gezinsaccounts resetten.' });
+  }
+  let mailer;
+  try {
+    mailer = getMailTransport();
+  } catch (error) {
+    console.error('SMTP-configuratie controleren mislukt:', error);
+    return res.status(503).json({ error: 'E-mail is niet geconfigureerd of de SMTP-instellingen zijn ongeldig.' });
   }
   const token = randomBytes(32).toString('base64url');
   const connection = await pool.getConnection();
@@ -268,7 +296,30 @@ router.post('/api/password-resets', authenticate, authLimit, async (req, res) =>
   } finally {
     connection.release();
   }
-  res.status(201).json({ token });
+  const resetUrl = new URL(basePath ? `${basePath}/` : '/', origin.origin);
+  resetUrl.searchParams.set('wachtwoord-reset', token);
+  try {
+    await mailer.sendMail({
+      from: process.env.SMTP_FROM,
+      to: email,
+      subject: 'Wachtwoord resetten voor Ons huishouden',
+      text: `Er is een wachtwoordreset aangevraagd voor je account bij Ons huishouden.\n\nKies binnen een uur een nieuw wachtwoord via deze eenmalige link:\n${resetUrl}\n\nHeb je deze reset niet verwacht? Neem dan contact op met een ouder of beheerder van je huishouden.`,
+      html: `<p>Er is een wachtwoordreset aangevraagd voor je account bij Ons huishouden.</p><p>Kies binnen een uur een nieuw wachtwoord via deze eenmalige link:</p><p><a href="${resetUrl}">Wachtwoord resetten</a></p><p>Heb je deze reset niet verwacht? Neem dan contact op met een ouder of beheerder van je huishouden.</p>`
+    });
+  } catch (error) {
+    console.error('Resetmail versturen mislukt:', error);
+    try {
+      await pool.execute(
+        'UPDATE password_resets SET used_at = UTC_TIMESTAMP() WHERE token_hash = ? AND used_at IS NULL',
+        [hashToken(token)]
+      );
+    } catch (cleanupError) {
+      console.error('Resetlink ongeldig maken na mailfout mislukt:', cleanupError);
+      return res.status(500).json({ error: 'De resetmail kon niet worden verzonden en de resetlink kon niet veilig worden ingetrokken. Neem contact op met de beheerder.' });
+    }
+    return res.status(502).json({ error: 'De resetmail kon niet worden verzonden. Controleer de SMTP-instellingen en probeer het opnieuw.' });
+  }
+  res.status(202).json({ sent: true });
 });
 
 router.get('/api/password-resets/:token', async (req, res) => {

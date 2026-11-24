@@ -167,13 +167,14 @@ bijgewerkt naar het e-mailadres waarmee het account inlogt.
 
 Registratie staat open voor iedereen die de site kan bereiken. Het e-mailadres
 is een gebruikersnaam en wordt niet geverifieerd; er is geen e-mailverificatie
-of zelfstandig wachtwoordherstel via e-mail. Een ouder kan op **Ons gezin** bij
-een ander account in hetzelfde huishouden een eenmalige resetlink maken. Deel
-die link rechtstreeks met de betreffende gebruiker: de link is één uur geldig,
-wordt na gebruik onbruikbaar en laat de gebruiker zelf een nieuw wachtwoord
-kiezen. Bestaande sessies van dat account worden na de reset beëindigd. Deel de
-link niet openbaar; iedereen die de link ontvangt kan het wachtwoord resetten.
-Bewaar je wachtwoord veilig.
+of zelfstandig wachtwoordherstel via e-mail. Een volwassen gebruiker kan op
+**Ons gezin** bij het eigen account **Wachtwoord resetten** kiezen om een
+wachtwoordresetmail te ontvangen. Een ouder kan daar ook voor een ander account
+in hetzelfde huishouden een resetmail versturen. Deze bevat een eenmalige link
+die één uur geldig is en de gebruiker zelf een nieuw wachtwoord laat kiezen.
+Na de reset worden bestaande sessies beëindigd. Iedereen die de link ontvangt
+kan het wachtwoord resetten; deel de link daarom niet openbaar. Bewaar je
+wachtwoord veilig.
 
 ### Notities
 
@@ -378,6 +379,13 @@ DB_USER=household
 DB_PASSWORD="eigen-databasewachtwoord"
 APP_ORIGIN=http://localhost:3000
 PORT=3000
+# Nodig om wachtwoordresetmails te versturen; gebruik de SMTP-waarden van je host.
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=mailbox@example.com
+SMTP_PASSWORD="eigen-mailboxwachtwoord"
+SMTP_FROM=mailbox@example.com
 # Optioneel, alleen bij een submap:
 # APP_BASE_PATH=/household
 ```
@@ -401,6 +409,9 @@ Voor een submap zet je bijvoorbeeld `APP_BASE_PATH=/household` en open je
 <http://localhost:3000/household/>. Laat deze instelling weg voor de root.
 Gebruik uitsluitend letters, cijfers, `_` en `-` in de padsegmenten, met
 een `/` aan het begin en zonder `/` aan het einde.
+Voor wachtwoordresetmails moeten `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`
+(`true` voor directe TLS of `false` voor STARTTLS), `SMTP_USER`,
+`SMTP_PASSWORD` en een toegestaan afzenderadres in `SMTP_FROM` zijn ingesteld.
 
 ### Publiceren en beveiliging
 
